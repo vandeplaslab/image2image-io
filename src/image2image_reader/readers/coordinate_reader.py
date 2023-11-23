@@ -9,9 +9,9 @@ from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
 
-from image2image.config import CONFIG
-from image2image.readers._base_reader import BaseReader
-from image2image.utils.utilities import format_mz
+from image2image_reader.config import CONFIG
+from image2image_reader.readers._base_reader import BaseReader
+from image2image_reader.utils.utilities import format_mz
 
 if ty.TYPE_CHECKING:
     from imzy._readers._base import BaseReader as BaseImzyReader
@@ -25,7 +25,7 @@ def set_dimensions(reader: CoordinateImageReader) -> None:
     reader.image_shape = (reader.ymax - reader.ymin + 1, reader.xmax - reader.xmin + 1)
 
 
-def get_image(array_or_reader: ty.Union[np.ndarray, BaseImzyReader]) -> np.ndarray:
+def get_image(array_or_reader: np.ndarray | BaseImzyReader) -> np.ndarray:
     """Return image for the array/image."""
     if isinstance(array_or_reader, np.ndarray):
         return array_or_reader
@@ -50,8 +50,8 @@ class CoordinateImageReader(BaseReader):
         y: np.ndarray,
         key: str | None = None,
         resolution: float = 1.0,
-        array_or_reader: ty.Optional[ty.Union[np.ndarray, BaseImzyReader]] = None,
-        data: ty.Optional[dict[str, np.ndarray]] = None,
+        array_or_reader: np.ndarray | BaseImzyReader | None = None,
+        data: dict[str, np.ndarray] | None = None,
     ):
         super().__init__(path, key)
         self.x = x
@@ -99,7 +99,7 @@ class CoordinateImageReader(BaseReader):
             return [self.get_random_image()]
         return [self.get_image()]
 
-    def get_channel_axis_and_n_channels(self) -> tuple[ty.Optional[int], int]:
+    def get_channel_axis_and_n_channels(self) -> tuple[int | None, int]:
         """Return channel axis and number of channels."""
         if len(self.data) == 1:
             return None, 1
@@ -114,6 +114,6 @@ class CoordinateImageReader(BaseReader):
     def get_image(self):
         """Return image as a stack."""
         if len(self.data) == 1:
-            key = list(self.data)[0]
+            key = next(iter(self.data))
             return self.data[key]
         return np.dstack([self.data[key] for key in self.data])

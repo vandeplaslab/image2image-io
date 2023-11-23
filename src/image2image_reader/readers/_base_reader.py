@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 from koyo.typing import PathLike
 
-from image2image.enums import DEFAULT_TRANSFORM_NAME
-from image2image.models.transform import TransformData
+from image2image_reader.enums import DEFAULT_TRANSFORM_NAME
+from image2image_reader.models.transform import TransformData
 
 
 class BaseReader:
@@ -59,7 +59,7 @@ class BaseReader:
     def image_shape(self) -> tuple[int, int]:
         """Image shape."""
         if self._image_shape is None:
-            from image2image.utils.utilities import get_shape_of_image
+            from image2image_reader.utils.utilities import get_shape_of_image
 
             return get_shape_of_image(self.pyramid[0])[-1]
         return self._image_shape
@@ -111,7 +111,7 @@ class BaseReader:
 
     def flat_array(self, index: int = 0) -> tuple[np.ndarray, tuple[int, int]]:
         """Return a flat array."""
-        from image2image.utils.utilities import get_shape_of_image
+        from image2image_reader.utils.utilities import get_shape_of_image
 
         array = self.pyramid[index]
         if hasattr(array, "compute"):
@@ -172,7 +172,7 @@ class BaseReader:
 
     def warp(self, array: np.ndarray) -> np.ndarray:
         """Warp array."""
-        from image2image.utils.mask import transform_mask
+        from image2image_reader.utils.mask import transform_mask
 
         transform = self.transform_data.compute(yx=True, px=True).params
         transformed_mask = transform_mask(array, transform, self.image_shape)

@@ -177,7 +177,7 @@ def numpy_to_geojson(
 
 
 def shape_reader(shape_data: list, **kwargs: ty.Any) -> tuple[dict, dict]:
-    """Read shape data for transformation
+    """Read shape data for transformation.
 
     Shape data is stored as numpy arrays for operations but also as GeoJSON
     to contain metadata and interface with QuPath.

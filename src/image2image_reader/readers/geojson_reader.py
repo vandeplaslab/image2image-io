@@ -6,8 +6,8 @@ import typing as ty
 import numpy as np
 from koyo.typing import PathLike
 
-from image2image.readers._base_reader import BaseReader
-from image2image.readers.geojson_utils import read_geojson, shape_reader
+from image2image_reader.readers._base_reader import BaseReader
+from image2image_reader.readers.geojson_utils import read_geojson, shape_reader
 
 
 class GeoJSONReader(BaseReader):
@@ -24,7 +24,7 @@ class GeoJSONReader(BaseReader):
 
     def to_mask(self, output_shape: tuple[int, int], with_index: bool = False) -> np.ndarray:
         """Convert to mask."""
-        from image2image.utils.mask import polygons_to_mask, shapes_to_polygons
+        from image2image_reader.utils.mask import polygons_to_mask, shapes_to_polygons
 
         polygons = shapes_to_polygons(self.shape_data, with_index=with_index)
         mask = polygons_to_mask(polygons, output_shape)

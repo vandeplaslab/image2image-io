@@ -12,15 +12,15 @@ from loguru import logger
 from ome_types import from_xml
 from tifffile import TiffFile
 
-from image2image.config import CONFIG
-from image2image.readers._base_reader import BaseReader
-from image2image.readers.tiff_utils import (
+from image2image_reader.config import CONFIG
+from image2image_reader.readers._base_reader import BaseReader
+from image2image_reader.readers.tiff_utils import (
     ometiff_ch_names,
     ometiff_xy_pixel_sizes,
     svs_xy_pixel_sizes,
     tifftag_xy_pixel_sizes,
 )
-from image2image.readers.utilities import (
+from image2image_reader.readers.utilities import (
     get_tifffile_info,
     guess_rgb,
     tf_zarr_read_single_ch,
@@ -59,7 +59,6 @@ class TiffImageReader(BaseReader):
 
     def get_dask_pyr(self):
         """Get instance of Dask pyramid."""
-
         d_pyr = tifffile_to_dask(self.path, self.largest_series)
         if self.is_rgb and guess_rgb(d_pyr[0].shape) is True:
             d_pyr[0] = d_pyr[0].rechunk((2048, 2048, 1))

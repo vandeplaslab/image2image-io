@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import numpy as np
-from image2image.readers._base_reader import BaseReader
 from koyo.typing import PathLike
+
+from image2image_reader.readers._base_reader import BaseReader
 
 
 class ArrayImageReader(BaseReader):

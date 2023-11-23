@@ -28,7 +28,22 @@ classifiers = [
     "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = []
+dependencies = [
+    "zarr",
+    "h5py",
+    "imzy",
+    "czifile",
+    "tifffile",
+    "imagecodecs",
+    "aicsimageio[bioformats]",
+    "ome_types",
+    "wsireg",
+    "rasterio",
+    "shapely",
+    "napari-czifile2",
+    "pydantic<2",
+    "scikit-image",
+]
 
 # extras
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
@@ -119,8 +134,25 @@ files = "src/**/"
 strict = true
 disallow_any_generics = false
 disallow_subclassing_any = false
+disallow_untyped_defs = false
+disable_error_code = [
+    "no-redef",
+    "assignment",
+    "variance"
+]
 show_error_codes = true
-pretty = true
+pretty = false
+ignore_missing_imports = true
+exclude = [
+    "venv",
+    "tests",
+    "package",
+    "build",
+    "src/image2image_reader/_version.py",
+    "src/image2image_reader/readers/czi.py",
+    "src/image2image_reader/readers/czi_reader.py",
+    "src/image2image_reader/readers/tiff_reader.py",
+]
 
 # # module specific overrides
 # [[tool.mypy.overrides]]
