@@ -105,3 +105,13 @@ ENV/
 .vscode/
 
 _version.py
+
+# nuitka
+*.build/
+
+# idea
+*.iml
+.idea/modules.xml
+.idea/misc.xml
+.idea/workspace.xml
+.idea/watcherTasks.xml
