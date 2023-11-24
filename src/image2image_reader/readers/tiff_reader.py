@@ -35,8 +35,14 @@ class TiffImageReader(BaseReader):
 
     fh: TiffFile
 
-    def __init__(self, path, key: str | None = None, init_pyramid: bool = True):
-        super().__init__(path, key)
+    def __init__(
+        self,
+        path,
+        key: str | None = None,
+        init_pyramid: bool | None = None,
+        auto_pyramid: bool | None = None,
+    ):
+        super().__init__(path, key, auto_pyramid=auto_pyramid)
         self.fh = TiffFile(self.path)
         self.reader = "tifffile"
 
@@ -49,6 +55,7 @@ class TiffImageReader(BaseReader):
         self.channel_colors = None
         logger.trace(f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution}")
 
+        init_pyramid = init_pyramid if init_pyramid is not None else CONFIG.init_pyramid
         if init_pyramid:
             self._pyramid = self.pyramid
 

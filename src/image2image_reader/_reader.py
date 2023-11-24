@@ -8,6 +8,7 @@ import numpy as np
 from koyo.typing import PathLike
 from loguru import logger
 
+from image2image_reader.config import CONFIG
 from image2image_reader.exceptions import UnsupportedFileFormatError
 from image2image_reader.models.transform import TransformData
 
@@ -133,12 +134,16 @@ class ImageWrapper:
         self,
     ) -> ty.Generator[tuple[str, BaseReader, int], None, None]:
         """Iterator to add channels."""
-        for reader_name, reader_or_array in self.data.items():
-            if reader_or_array.reader_type == "shapes":
-                yield reader_name, reader_or_array, 0
+        for reader_name, reader in self.data.items():
+            if reader.reader_type == "shapes":
+                yield reader_name, reader, 0
             else:
-                for reader_name_, reader_or_array_, _, index in self._reader_image_iter(reader_name, reader_or_array):
-                    yield reader_name_, reader_or_array_, index
+                if reader.channel_names:
+                    for index, _ in enumerate(reader.channel_names):
+                        yield reader_name, reader, index
+                else:
+                    for reader_name_, _, _, index in self._reader_image_iter(reader_name, reader):
+                        yield reader_name_, reader, index
 
     def reader_data_iter(
         self,
@@ -250,7 +255,7 @@ def get_alternative_path(path: PathLike) -> Path:
 
 
 def sanitize_read_path(path: PathLike, raise_error: bool = True) -> Path | None:
-    """Sanitize path that can be read by the reader."""
+    """Sanitize the path that can be read by the reader."""
     path = Path(path)
     if not path.exists():
         if raise_error:
@@ -288,69 +293,38 @@ def read_data(
     is_fixed: bool = False,
     transform_data: TransformData | None = None,
     resolution: float | None = None,
+    split_czi: bool | None = None,
 ) -> tuple[ImageWrapper, list[str], dict[Path, Path]]:
     """Read image data."""
     path = Path(path)
-    path = sanitize_read_path(path)
+    path = sanitize_read_path(path)  # type: ignore[assignment]
+    if not path:
+        raise UnsupportedFileFormatError("Could not sanitize path - are you sure this file is supported?")
 
-    reader: dict[str, BaseReader]
+    readers: dict[str, BaseReader]
     name = path.name
-    suffix = path.suffix.lower()
     original_path = path
-    if suffix in TIFF_EXTENSIONS:
-        logger.trace(f"Reading TIFF file: {path}")
-        path, reader = _read_tiff(path)  # type: ignore
-    elif suffix in CZI_EXTENSIONS:
-        if _check_multi_scene_czi(path):
-            logger.trace(f"Reading multi-scene CZI file: {path}")
-            path, reader = _read_multi_scene_czi(path)  # type: ignore
-        else:
-            logger.trace(f"Reading single-scene CZI file: {path}")
-            path, reader = _read_single_scene_czi(path)  # type: ignore
-    elif suffix in IMAGE_EXTENSIONS:
-        logger.trace(f"Reading image file: {path}")
-        path, reader = _read_image(path)  # type: ignore
-    elif suffix in NPY_EXTENSIONS:
-        logger.trace(f"Reading NPY file: {path}")
-        path, reader = _read_npy_coordinates(path)  # type: ignore
-    elif suffix in BRUKER_EXTENSIONS:
-        logger.trace(f"Reading Bruker file: {path}")
-        path, reader = _read_tsf_tdf_reader(path)  # type: ignore
-    elif suffix in IMZML_EXTENSIONS:
-        logger.trace(f"Reading imzML file: {path}")
-        path, reader = _read_imzml_reader(path)  # type: ignore
-    elif suffix in H5_EXTENSIONS + IMSPY_EXTENSIONS:
-        logger.trace(f"Reading HDF5 file: {path}")
-        if path.suffix == ".data":
-            path = path / "dataset.metadata.h5"
-        if path.name.startswith("dataset.metadata"):
-            path, reader = _read_metadata_h5_coordinates(path)  # type: ignore
-        else:
-            path, reader = _read_centroids_h5_coordinates(path)  # type: ignore
-    elif suffix in GEOJSON_EXTENSIONS:
-        logger.trace(f"Reading GeoJSON file: {path}")
-        path, reader = _read_geojson(path)  # type: ignore
-    else:
-        raise UnsupportedFileFormatError(f"Unsupported file format: '{suffix}'")
+    path, readers = get_reader(path, split_czi)
+
     # add transformation information if provided
     if transform_data is not None:
-        for reader_ in reader.values():
+        for reader_ in readers.values():
             reader_.transform_data = transform_data
             reader_.transform_name = name
     # add resolution information if provided
     if resolution is not None:
-        for reader_ in reader.values():
+        for reader_ in readers.values():
             reader_.resolution = resolution
     # specify whether the model is fixed
-    if hasattr(reader, "is_fixed"):
-        reader.is_fixed = is_fixed
+    if hasattr(readers, "is_fixed"):
+        readers.is_fixed = is_fixed
 
     # initialize image wrapper, unless it's been provided
     if wrapper is None:
         wrapper = ImageWrapper(None)
     # add readers to the wrapper
     just_added = []
-    for reader_ in reader.values():
+    for reader_ in readers.values():
         wrapper.add(reader_)
         just_added.append(reader_.key)
     return wrapper, just_added, {original_path: path}
@@ -364,6 +338,55 @@ def get_key(path: Path, scene_index: int | None = None) -> str:
     if scene_index is not None:
         name = f"Scene={scene_index}; {name}"
     return name
+
+
+def get_reader(path: Path, split_czi: bool | None = None) -> tuple[Path, dict[str, BaseReader]]:
+    """Get reader for the specified path."""
+    path = Path(path)
+    path = sanitize_read_path(path)  # type: ignore[assignment]
+    if not path:
+        raise UnsupportedFileFormatError("Could not sanitize path - are you sure this file is supported?")
+
+    split_czi = split_czi if split_czi is not None else CONFIG.split_czi
+
+    readers: dict[str, BaseReader]
+    suffix = path.suffix.lower()
+    if suffix in TIFF_EXTENSIONS:
+        logger.trace(f"Reading TIFF file: {path}")
+        path, readers = _read_tiff(path)  # type: ignore
+    elif suffix in CZI_EXTENSIONS:
+        if split_czi and _check_multi_scene_czi(path):
+            logger.trace(f"Reading multi-scene CZI file: {path}")
+            path, readers = _read_multi_scene_czi(path)  # type: ignore
+        else:
+            logger.trace(f"Reading single-scene CZI file: {path}")
+            path, readers = _read_single_scene_czi(path)  # type: ignore
+    elif suffix in IMAGE_EXTENSIONS:
+        logger.trace(f"Reading image file: {path}")
+        path, readers = _read_image(path)  # type: ignore
+    elif suffix in NPY_EXTENSIONS:
+        logger.trace(f"Reading NPY file: {path}")
+        path, readers = _read_npy_coordinates(path)  # type: ignore
+    elif suffix in BRUKER_EXTENSIONS:
+        logger.trace(f"Reading Bruker file: {path}")
+        path, readers = _read_tsf_tdf_reader(path)  # type: ignore
+    elif suffix in IMZML_EXTENSIONS:
+        logger.trace(f"Reading imzML file: {path}")
+        path, readers = _read_imzml_reader(path)  # type: ignore
+    elif suffix in H5_EXTENSIONS + IMSPY_EXTENSIONS:
+        logger.trace(f"Reading HDF5 file: {path}")
+        if path.suffix == ".data":
+            path = path / "dataset.metadata.h5"
+        if path.name.startswith("dataset.metadata"):
+            path, readers = _read_metadata_h5_coordinates(path)  # type: ignore
+        else:
+            path, readers = _read_centroids_h5_coordinates(path)  # type: ignore
+    elif suffix in GEOJSON_EXTENSIONS:
+        logger.trace(f"Reading GeoJSON file: {path}")
+        path, readers = _read_geojson(path)  # type: ignore
+    else:
+        raise UnsupportedFileFormatError(f"Unsupported file format: '{suffix}'")
+    return path, readers
 
 
 def _check_multi_scene_czi(path: PathLike) -> bool:
@@ -384,14 +407,14 @@ def _read_geojson(path: PathLike) -> tuple[Path, dict[str, GeoJSONReader]]:
     return path, {path.name: GeoJSONReader(path, key=key)}
 
 
-def _read_single_scene_czi(path: PathLike) -> tuple[Path, dict[str, CziImageReader]]:
+def _read_single_scene_czi(path: PathLike, **kwargs: ty.Any) -> tuple[Path, dict[str, CziImageReader]]:
     """Read CZI file."""
     from image2image_reader.readers.czi_reader import CziImageReader
 
     path = Path(path)
     assert path.exists(), f"File does not exist: {path}"
     key = get_key(path)
-    return path, {path.name: CziImageReader(path, key=key)}
+    return path, {path.name: CziImageReader(path, key=key, **kwargs)}
 
 
 def _read_multi_scene_czi(path: PathLike) -> tuple[Path, dict[str, CziSceneImageReader]]:
@@ -498,7 +521,8 @@ def _read_centroids_h5_coordinates_with_metadata(
 
     assert metadata_file.exists(), f"File does not exist: {metadata_file}"
     _, reader_ = _read_metadata_h5_coordinates(metadata_file)
-    reader = reader_[path.name]
+    key = next(iter(reader_.keys()))
+    reader = reader_[key]
 
     x = reader.x
     y = reader.y

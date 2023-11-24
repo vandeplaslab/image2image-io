@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import typing as ty
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -52,8 +53,9 @@ class CoordinateImageReader(BaseReader):
         resolution: float = 1.0,
         array_or_reader: np.ndarray | BaseImzyReader | None = None,
         data: dict[str, np.ndarray] | None = None,
+        auto_pyramid: bool | None = None,
     ):
-        super().__init__(path, key)
+        super().__init__(path, key, auto_pyramid=auto_pyramid)
         self.x = x
         self.y = y
         self.resolution = resolution
@@ -63,6 +65,7 @@ class CoordinateImageReader(BaseReader):
         if self.name not in self.data:
             name = "tic" if self.reader is not None else self.name
             self.data[name] = get_image(array_or_reader)
+            self.get_image.cache_clear()  # clear cache
         set_dimensions(self)
 
     @property
@@ -105,12 +108,13 @@ class CoordinateImageReader(BaseReader):
             return None, 1
         return 2, len(self.data)
 
-    def get_random_image(self):
+    def get_random_image(self) -> np.ndarray:
         """Return random ion image."""
         array = np.full(self.image_shape, np.nan)
-        array[self.y - self.ymin, self.x - self.xmin] = np.random.randint(5, 255, size=len(self.x)) / 255
+        array[self.y - self.ymin, self.x - self.xmin] = np.random.randint(30, 255, size=len(self.x)) / 255
         return array
 
+    @lru_cache(maxsize=1)
     def get_image(self):
         """Return image as a stack."""
         if len(self.data) == 1:

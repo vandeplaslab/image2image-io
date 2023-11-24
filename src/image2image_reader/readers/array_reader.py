@@ -12,8 +12,15 @@ class ArrayImageReader(BaseReader):
 
     is_fixed: bool = False
 
-    def __init__(self, path: PathLike, array: np.ndarray, key: str | None = None, resolution: float = 1.0):
-        super().__init__(path, key)
+    def __init__(
+        self,
+        path: PathLike,
+        array: np.ndarray,
+        key: str | None = None,
+        resolution: float = 1.0,
+        auto_pyramid: bool | None = None,
+    ):
+        super().__init__(path, key, auto_pyramid=auto_pyramid)
         self.array = array
         self.resolution = resolution
 

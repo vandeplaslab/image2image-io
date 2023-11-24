@@ -13,7 +13,7 @@ from tifffile import TiffFile, imread, xml2dict
 logger = logger.bind(src="Tiff")
 
 
-def tifffile_to_dask(im_fp: ty.Union[str, Path], largest_series: int):
+def tifffile_to_dask(im_fp: ty.Union[str, Path], largest_series: int) -> list[da.Array]:
     """Convert a tifffile to a dask array."""
     with MeasureTimer() as timer:
         imdata = zarr.open(imread(im_fp, aszarr=True, series=largest_series))

@@ -17,17 +17,22 @@ class BaseReader:
 
     _pyramid = None
     _image_shape: tuple[int, int] | None = None
+    auto_pyramid: bool | None = None
     reader_type: str = "image"
+    n_scenes: int = 1
     lazy: bool = False
     fh: ty.Any | None = None
     allow_extraction: bool = False
     _resolution: float = 1.0
     _channel_names: list[str]
 
-    def __init__(self, path: PathLike, key: str | None = None, reader_kws: dict | None = None):
+    def __init__(
+        self, path: PathLike, key: str | None = None, reader_kws: dict | None = None, auto_pyramid: bool | None = None
+    ):
         # This is the direct path to the image
         self.path = Path(path)
         # This is the attribute we will use to identify the image
+        self.auto_pyramid = auto_pyramid
         self.key = key or self.path.name
         self.reader_kws = reader_kws or {}
         self.transform_data: TransformData = TransformData()
@@ -91,7 +96,7 @@ class BaseReader:
     @property
     def resolution(self) -> float:
         """Return resolution."""
-        return self._resolution
+        return self._resolution or 1.0
 
     @resolution.setter
     def resolution(self, value: float) -> None:

@@ -43,6 +43,9 @@ dependencies = [
     "napari-czifile2",
     "pydantic<2",
     "scikit-image",
+    "SimpleITK",
+    "opencv-python",
+    "dicttoxml",
 ]
 
 # extras

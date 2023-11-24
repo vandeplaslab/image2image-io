@@ -8,7 +8,6 @@ from functools import cached_property
 from pathlib import Path
 from xml.etree import ElementTree
 
-import cv2
 import dask.array as da
 import numpy as np
 import zarr
@@ -65,6 +64,8 @@ class CziMixin:
         out:np.ndarray
             image read with selected parameters as np.ndarray
         """
+        import cv2
+
         out_shape = list(self.shape)
         start = list(self.start)
 
@@ -170,7 +171,7 @@ class CziMixin:
             out.flush()
         return out
 
-    def zarr_pyramidalize_czi(self, zarr_fp, pyramid: bool = True):
+    def zarr_pyramidalize_czi(self, zarr_fp, pyramid: bool = True) -> list:
         """Create a pyramidal zarr store from a CZI file."""
         dask_pyr = []
         root = zarr.open_group(zarr_fp, mode="a")
@@ -211,15 +212,15 @@ class CziFile(_CziFile, CziMixin):
 
 class CziSceneFile(_CziFile, CziMixin):
     @staticmethod
-    def get_num_scenes(path: str | ty.Path, *args, **kwargs) -> int:
+    def get_num_scenes(path: str | Path, *args, **kwargs) -> int:
         """Get number of scenes."""
-        with CziFile(path, *args, **kwargs) as czi_file:
+        with _CziFile(path, *args, **kwargs) as czi_file:
             if "S" in czi_file.axes:
                 return czi_file.shape[czi_file.axes.index("S")]
             return 1
 
     def __init__(self, path: str | Path, scene_index: int, *args: ty.Any, **kwargs: ty.Any):
-        super(CZISceneFile, self).__init__(str(path), *args, **kwargs)
+        super().__init__(str(path), *args, **kwargs)
         self.scene_index = scene_index
 
     @cached_property
@@ -318,7 +319,7 @@ class CziSceneFile(_CziFile, CziMixin):
 
     @cached_property
     def filtered_subblock_directory(self) -> list[DirectoryEntryDV]:
-        dir_entries = super(CZISceneFile, self).filtered_subblock_directory
+        dir_entries = super().filtered_subblock_directory
         return list(
             filter(
                 lambda dir_entry: self._get_scene_index(dir_entry) == self.scene_index,
