@@ -9,5 +9,5 @@ TIME_FORMAT = "%d/%m/%Y-%H:%M:%S:%f"
 class ViewType(str, Enum):
     """View type."""
 
-    RANDOM = auto()
-    OVERLAY = auto()
+    RANDOM = "random"
+    OVERLAY = "overlay"

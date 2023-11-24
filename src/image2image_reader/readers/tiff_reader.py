@@ -75,7 +75,7 @@ class TiffImageReader(BaseReader):
             d_pyr[0] = d_pyr[0].rechunk((2048, 2048))
         return d_pyr
 
-    def _get_im_res(self):
+    def _get_im_res(self) -> float:
         if Path(self.path).suffix.lower() in [".scn", ".ndpi"]:
             return tifftag_xy_pixel_sizes(
                 self.fh,
