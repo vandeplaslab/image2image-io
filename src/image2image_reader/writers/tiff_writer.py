@@ -9,12 +9,8 @@ import numpy as np
 import SimpleITK as sitk
 from tifffile import TiffWriter
 from tqdm import trange
-from wsireg.reg_images.reg_image import RegImage
-from wsireg.utils.im_utils import (
-    format_channel_names,
-    get_pyramid_info,
-    prepare_ome_xml_str,
-)
+
+from image2image_reader.readers.utilities import get_pyramid_info, prepare_ome_xml_str
 
 if ty.TYPE_CHECKING:
     from image2image_reader.readers._base_reader import BaseReader
@@ -38,11 +34,6 @@ class OmeTiffWriter:
     def __init__(self, reader: BaseReader):
         """
         Class for managing writing images to OME-TIFF.
-
-        Parameters
-        ----------
-        reg_image: RegImage
-            RegImage to be transformed
 
         Attibutes
         ---------
@@ -96,7 +87,7 @@ class OmeTiffWriter:
         self.PhysicalSizeX = self.reader.resolution
         self.PhysicalSizeY = self.reader.resolution
 
-        channel_names = format_channel_names(self.reader.channel_names, self.reader.n_channels)
+        channel_names = self.reader.channel_names
 
         self.omexml = prepare_ome_xml_str(
             self.y_size,

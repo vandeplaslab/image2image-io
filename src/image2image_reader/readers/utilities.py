@@ -404,3 +404,26 @@ def compute_sub_res(zarray, ds_factor, tile_size, is_rgb, im_dtype):
     resampled_zarray_subres = resampled_zarray_subres.rechunk(tiling)
 
     return resampled_zarray_subres
+
+
+def prepare_ome_xml_str(y_size, x_size, n_ch, im_dtype, is_rgb, **ome_metadata):
+    """Prepare OME-XML metadata."""
+    from tifffile import OmeXml
+
+    omexml = OmeXml()
+    if is_rgb:
+        stored_shape = (1, 1, 1, y_size, x_size, n_ch)
+        im_shape = (y_size, x_size, n_ch)
+    else:
+        stored_shape = (n_ch, 1, 1, y_size, x_size, 1)
+        im_shape = (n_ch, y_size, x_size)
+
+    omexml.addimage(
+        dtype=im_dtype,
+        shape=im_shape,
+        # specify how the image is stored in the TIFF file
+        storedshape=stored_shape,
+        **ome_metadata,
+    )
+
+    return omexml.tostring().encode("utf8")
