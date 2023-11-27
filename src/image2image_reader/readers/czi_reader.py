@@ -32,9 +32,9 @@ class CziImageReader(BaseReader):
         self.fh = CziFile(self.path)
         self.n_scenes = CziSceneFile.get_num_scenes(self.path)
 
-        *_, self.im_dims, self.im_dtype = self._get_image_info()
+        *_, self.im_dims, self._im_dtype = self._get_image_info()
         self.im_dims = tuple(self.im_dims)
-        self.is_rgb = guess_rgb(self.im_dims)
+        self._is_rgb = guess_rgb(self.im_dims)
 
         czi_meta = xml2dict(self.fh.metadata())
         pixel_scaling_str = czi_meta["ImageDocument"]["Metadata"]["Scaling"]["Items"]["Distance"][0]["Value"]
@@ -93,9 +93,9 @@ class CziSceneImageReader(BaseReader):
         super().__init__(path, key, reader_kws={"scene_index": scene_index}, auto_pyramid=auto_pyramid)
         self.fh = CziSceneFile(self.path, scene_index=scene_index)
 
-        *_, self.im_dims, self.im_dtype = self._get_image_info()
+        *_, self.im_dims, self._im_dtype = self._get_image_info()
         self.im_dims = tuple(self.im_dims)
-        self.is_rgb = self.fh.is_rgb
+        self._is_rgb = self.fh.is_rgb
 
         czi_meta = xml2dict(self.fh.metadata())
         pixel_scaling_str = czi_meta["ImageDocument"]["Metadata"]["Scaling"]["Items"]["Distance"][0]["Value"]

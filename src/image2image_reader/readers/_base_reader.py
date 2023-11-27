@@ -10,12 +10,15 @@ from koyo.typing import PathLike
 
 from image2image_reader.enums import DEFAULT_TRANSFORM_NAME
 from image2image_reader.models.transform import TransformData
+from image2image_reader.readers.utilities import guess_rgb
 
 
 class BaseReader:
     """Base class for some of the other image readers."""
 
     _pyramid = None
+    _is_rgb: bool | None = None
+    _im_dtype: np.dtype | None = None
     _image_shape: tuple[int, int] | None = None
     auto_pyramid: bool | None = None
     reader_type: str = "image"
@@ -86,7 +89,16 @@ class BaseReader:
     @property
     def dtype(self) -> np.dtype:
         """Return dtype."""
-        return self.pyramid[0].dtype
+        if self._im_dtype is None:
+            self._im_dtype = self.pyramid[0].dtype
+        return self._im_dtype
+
+    @property
+    def is_rgb(self) -> bool:
+        """Return whether image is RGB."""
+        if self._is_rgb is None:
+            self._is_rgb = guess_rgb(self.pyramid[0].shape)
+        return self._is_rgb
 
     @property
     def scale(self) -> tuple[float, float]:
@@ -196,3 +208,18 @@ class BaseReader:
             channel_axis = int(np.argmin(shape))
             n_channels = shape[channel_axis]
         return channel_axis, n_channels
+
+    def get_channel(self, index: int) -> np.ndarray:
+        """Return channel."""
+        array = self.pyramid[0]
+        channel_axis, n_channels = self.get_channel_axis_and_n_channels()
+        if channel_axis is None:
+            return array
+        if channel_axis == 0:
+            return array[index]
+        elif channel_axis == 1:
+            return array[:, index]
+        elif channel_axis == 2:
+            return array[:, :, index]
+        else:
+            raise ValueError(f"Array has unsupported shape: {array.shape}")

@@ -48,7 +48,7 @@ class TiffImageReader(BaseReader):
 
         self.im_dims, self.im_dtype, self.largest_series = self._get_image_info()
         self.im_dims = tuple(self.im_dims)
-        self.is_rgb = guess_rgb(self.im_dims)
+        self._is_rgb = guess_rgb(self.im_dims)
 
         self.resolution = self._get_im_res()
         self._channel_names = self._get_channel_names()
