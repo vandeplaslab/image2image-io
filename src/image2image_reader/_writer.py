@@ -22,15 +22,27 @@ if ty.TYPE_CHECKING:
 
 def czis_to_ome_tiff(
     paths: ty.Iterable[PathLike], output_dir: PathLike | None = None
-) -> ty.Generator[tuple[str, int, int], None, None]:
+) -> ty.Generator[tuple[str, int, int, int, int], None, None]:
     """Convert multiple CZI images to OME-TIFF."""
+    from image2image_reader.readers._czi import CziSceneFile
+
+    # calculate true total number of scenes
+    total = 0
+    paths_ = []
     for path_ in paths:
         path_ = Path(path_)
         if path_.is_dir():
             for path__ in path_.glob("**/*.czi"):
-                yield from czi_to_ome_tiff(path__, output_dir)
+                total += CziSceneFile.get_num_scenes(path__)
+                paths_.append(path__)
         else:
-            yield from czi_to_ome_tiff(path_, output_dir)
+            total += CziSceneFile.get_num_scenes(path_)
+            paths_.append(path_)
+
+    for current, path_ in enumerate(paths_):
+        path_ = Path(path_)
+        for key, current_scene, total_scene in czi_to_ome_tiff(path_, output_dir):
+            yield key, current_scene, total_scene, current, total
 
 
 def czi_to_ome_tiff(
