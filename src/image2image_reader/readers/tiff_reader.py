@@ -53,7 +53,9 @@ class TiffImageReader(BaseReader):
         self.resolution = self._get_im_res()
         self._channel_names = self._get_channel_names()
         self.channel_colors = None
-        logger.trace(f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution}")
+        logger.trace(
+            f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution}; n_ch={len(self._channel_names)}"
+        )
 
         init_pyramid = init_pyramid if init_pyramid is not None else CONFIG.init_pyramid
         if init_pyramid:
@@ -108,16 +110,16 @@ class TiffImageReader(BaseReader):
                 return 1.0
 
     def _get_channel_names(self):
+        channel_names = []
         if self.fh.ome_metadata:
             channel_names = ometiff_ch_names(from_xml(self.fh.ome_metadata), self.largest_series)
-        else:
-            channel_names = []
-            if self.is_rgb:
-                channel_names.append("C01 - RGB")
-            else:
-                for idx, _ch in enumerate(range(self.n_channels)):
-                    channel_names.append(f"C{str(idx + 1).zfill(2)}")
+            if self.n_channels > len(channel_names):
+                channel_names = []
 
+        if not channel_names:
+            channel_names = []
+            for idx, _ch in enumerate(range(self.n_channels)):
+                channel_names.append(f"C{str(idx + 1).zfill(2)}")
         return channel_names
 
     def _get_image_info(self):
@@ -132,14 +134,3 @@ class TiffImageReader(BaseReader):
             largest_series = 0
 
         return im_dims, im_dtype, largest_series
-
-    def read_single_channel(self, channel_idx: int):
-        """Read data from a single channel."""
-        if channel_idx > (self.n_channels - 1):
-            warnings.warn(
-                "channel_idx exceeds number of channels, reading channel at channel_idx == 0",
-                stacklevel=2,
-            )
-            channel_idx = 0
-        image = tf_zarr_read_single_ch(self.path, channel_idx, self.is_rgb)
-        return image

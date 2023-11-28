@@ -41,7 +41,6 @@ class CziImageReader(BaseReader):
         pixel_scaling = float(pixel_scaling_str) * 1_000_000
         self.resolution = pixel_scaling
         channels_meta = czi_meta["ImageDocument"]["Metadata"]["DisplaySetting"]["Channels"]["Channel"]
-        logger.trace(f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution}")
 
         channel_names: list[str] = []
         for ch in channels_meta:
@@ -50,6 +49,9 @@ class CziImageReader(BaseReader):
             else:
                 channel_names.append(str(ch))
         self._channel_names = channel_names
+        logger.trace(
+            f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution}; n_ch={len(self._channel_names)}"
+        )
 
         init_pyramid = init_pyramid if init_pyramid is not None else CONFIG.init_pyramid
         if init_pyramid:
@@ -101,7 +103,6 @@ class CziSceneImageReader(BaseReader):
         pixel_scaling_str = czi_meta["ImageDocument"]["Metadata"]["Scaling"]["Items"]["Distance"][0]["Value"]
         pixel_scaling = float(pixel_scaling_str) * 1_000_000
         self.resolution = pixel_scaling
-        logger.trace(f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; scene={scene_index}; px={pixel_scaling}")
 
         channel_names = []
         channels_meta = czi_meta["ImageDocument"]["Metadata"]["DisplaySetting"]["Channels"]["Channel"]
@@ -111,6 +112,9 @@ class CziSceneImageReader(BaseReader):
             else:
                 channel_names.append(str(ch))
         self._channel_names = channel_names
+        logger.trace(
+            f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution}; n_ch={len(self._channel_names)}"
+        )
 
         init_pyramid = init_pyramid if init_pyramid is not None else CONFIG.init_pyramid
         if init_pyramid:
