@@ -25,15 +25,15 @@ logger = logger.bind(src="CZI")
 class CziMixin:
     def sub_asarray(
         self,
-        resize=True,
-        order=0,
-        out=None,
-        max_workers=None,
-        channel_idx=None,
-        as_uint8=False,
+        resize: bool = True,
+        order: int = 0,
+        out: np.ndarray | None = None,
+        max_workers: int | None = None,
+        channel_idx: int | None = None,
+        as_uint8: bool = False,
         zarr_fp=None,
-        ds_factor=1,
-    ):
+        ds_factor: int = 1,
+    ) -> da.Array | np.ndarray:
         """Return image data from file(s) as numpy array.
 
         Parameters
@@ -182,18 +182,21 @@ class CziMixin:
         yx_dims = np.where(np.isin(all_axes, ["Y", "X"]) == 1)[0].tolist()
         yx_shape = np.array(self.shape[slice(yx_dims[0], yx_dims[1] + 1)])
 
-        ds = 1
-        while np.min(yx_shape) // 2**ds >= 512:
-            ds += 1
-
         with MeasureTimer() as timer:
             self.sub_asarray(zarr_fp=zarr_fp, resize=True, order=0, ds_factor=1, max_workers=4)
-        logger.trace(f"Down-sampled 0 in {timer()}")
+        logger.trace(f"Down-sampled 0 in {timer()} ({yx_shape})")
 
         zarray = da.squeeze(da.from_zarr(zarr.open(zarr_fp)[0]))
         dask_pyr.append(da.squeeze(zarray))
         if not pyramid:
+            logger.trace("Pyramid creation disabled")
             return dask_pyr
+
+        ds = 1
+        while np.min(yx_shape) // 2**ds >= 512:
+            ds += 1
+        logger.trace(f"Generating {ds} down-sampled images")
+
         for ds_factor in range(1, ds):
             with MeasureTimer() as timer:
                 zres = zarr.storage.TempStore()
@@ -202,7 +205,7 @@ class CziMixin:
                 sub_res_image = compute_sub_res(zarray, ds_factor, 512, is_rgb, self.dtype)
                 da.to_zarr(sub_res_image, zres, component="0")
                 dask_pyr.append(da.squeeze(da.from_zarr(zres, component="0")))
-            logger.trace(f"Down-sampled {ds_factor} in {timer()}")
+            logger.trace(f"Down-sampled {ds_factor} in {timer()} ({sub_res_image.shape})")
         return dask_pyr
 
 

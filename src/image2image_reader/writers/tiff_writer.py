@@ -7,6 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import SimpleITK as sitk
+from loguru import logger
 from tifffile import TiffWriter
 from tqdm import trange
 
@@ -109,7 +110,7 @@ class OmeTiffWriter:
             self.compression = "jpeg" if self.reader.is_rgb else "deflate"
         else:
             self.compression = compression
-        print(f"Saving using {self.compression} compression")
+        logger.info(f"Saving using {self.compression} compression")
 
     def write_image_by_plane(
         self,
@@ -158,7 +159,7 @@ class OmeTiffWriter:
 
         rgb_im_data = []
 
-        print(f"Saving to '{output_file_name}'")
+        logger.info(f"Saving to '{output_file_name}'")
         with TiffWriter(output_file_name, bigtiff=True) as tif:
             for channel_idx in trange(self.reader.n_channels):
                 image = self.reader.get_channel(channel_idx)
@@ -178,10 +179,11 @@ class OmeTiffWriter:
                         "photometric": "rgb" if self.reader.is_rgb else "minisblack",
                         "metadata": None,
                     }
+                    logger.trace(f"options: {options}")
                     # write OME-XML to the ImageDescription tag of the first page
                     description = self.omexml if channel_idx == 0 else None
                     # write channel data
-                    print(f" writing channel {channel_idx} - shape: {image.shape}")
+                    logger.info(f" writing channel {channel_idx} - shape: {image.shape}")
                     tif.write(
                         image,
                         subifds=self.subifds,
@@ -200,8 +202,7 @@ class OmeTiffWriter:
                                 resize_shape,
                                 cv2.INTER_LINEAR,
                             )
-                            print(f"pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}")
-
+                            logger.info(f"pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}")
                             tif.write(image, **options, subfiletype=1)
 
             if self.reader.is_rgb:
@@ -214,6 +215,7 @@ class OmeTiffWriter:
                     "photometric": "rgb",
                     "metadata": None,
                 }
+                logger.trace(f"options: {options}")
                 # write OME-XML to the ImageDescription tag of the first page
                 description = self.omexml
 
@@ -225,8 +227,9 @@ class OmeTiffWriter:
                     **options,
                 )
 
-                print(f"RGB shape: {rgb_im_data.shape}")
+                logger.info(f"RGB shape: {rgb_im_data.shape}")
                 if write_pyramid:
+                    logger.info("Writing pyramid...")
                     for pyr_idx in range(1, self.n_pyr_levels):
                         resize_shape = (
                             self.pyr_levels[pyr_idx][0],
@@ -237,5 +240,6 @@ class OmeTiffWriter:
                             resize_shape,
                             cv2.INTER_LINEAR,
                         )
+                        logger.info(f"pyramid index {pyr_idx} : shape: {resize_shape}")
                         tif.write(rgb_im_data, **options, subfiletype=1)
         return output_file_name

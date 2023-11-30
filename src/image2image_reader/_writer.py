@@ -77,21 +77,25 @@ def czi_to_ome_tiff(
         # read the scene
         reader = CziSceneImageReader(path, scene_index=scene_index, auto_pyramid=False, init_pyramid=True)
         # write the scene
-        write_ome_tiff(output_path, reader.pyramid[0], reader)
+        try:
+            write_ome_tiff(output_path, reader.pyramid[0], reader)
+        except Exception:
+            logger.warning("Failed to write using default writer. Trying internal writer instead.")
+            write_ome_tiff_alt(output_path, reader)
         yield key, scene_index + 1, n
 
 
-# def write_ome_tiff(path: PathLike, array: np.ndarray, reader: BaseReader) -> Path:
-#     """Write OME-TIFF."""
-#     from image2image_reader.writers.tiff_writer import OmeTiffWriter
-#
-#     if array.ndim == 2:
-#         array = np.atleast_3d(array)
-#
-#     path = Path(path)
-#     writer = OmeTiffWriter(reader)
-#     filename = Path(writer.write_image_by_plane(path.stem, path.parent, write_pyramid=True))
-#     return filename
+def write_ome_tiff_alt(path: PathLike, reader: BaseReader) -> Path:
+    """Write OME-TIFF."""
+    from image2image_reader.writers.tiff_writer import OmeTiffWriter
+
+    # if array.ndim == 2:
+    #     array = np.atleast_3d(array)
+
+    path = Path(path)
+    writer = OmeTiffWriter(reader)
+    filename = Path(writer.write_image_by_plane(path.stem, path.parent, write_pyramid=True))
+    return filename
 
 
 def write_ome_tiff(path: PathLike, array: np.ndarray, reader: BaseReader) -> Path:
