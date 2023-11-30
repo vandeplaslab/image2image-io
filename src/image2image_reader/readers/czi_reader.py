@@ -136,7 +136,8 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         self.resolution = self._get_pixel_size()
         self._channel_names = self._get_channel_names()
         logger.trace(
-            f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution:.3f}; n_ch={len(self._channel_names)}"
+            f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution:.3f}; n_ch={len(self._channel_names)};"
+            f" scene={scene_index}"
         )
 
         init_pyramid = init_pyramid if init_pyramid is not None else CONFIG.init_pyramid
@@ -153,5 +154,4 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
         auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
-        # return self.fh.zarr_pyramidize_czi(zarr.storage.TempStore(), auto_pyramid)
-        return self.fh.zarr_pyramidize_czi(None, auto_pyramid)
+        return self.fh.zarr_pyramidize_czi(zarr.storage.TempStore(), auto_pyramid)

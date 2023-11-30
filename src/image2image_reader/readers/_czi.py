@@ -208,6 +208,7 @@ class CziFile(_CziFile):
             try:
                 out[index] = tile
             except ValueError as e:
+                print(e, "???")
                 warnings.warn(str(e))
 
         if max_workers > 1:
@@ -248,71 +249,35 @@ class CziFile(_CziFile):
                 chunks=chunking,
                 dtype=out_dtype,
                 overwrite=True,
+                synchronizer=zarr.ThreadSynchronizer(),
             )
 
         with MeasureTimer() as timer:
-            out = self.as_tzcyx0_array(out=out, max_workers=cpu_count())
-            dask_pyr.append(da.squeeze(da.squeeze(da.from_array(out))))
+            self.as_tzcyx0_array(out=out, max_workers=cpu_count())
+            # out = da.squeeze(da.squeeze(da.from_array(out)))
+            zarray = da.squeeze(da.from_zarr(zarr.open(zarr_fp)[0]))
+            dask_pyr.append(da.squeeze(out))
         logger.trace(f"Down-sampled 0 in {timer()} ({yx_shape})")
 
-        # zarray = da.squeeze(da.from_zarr(zarr.open(zarr_fp)[0]))
-        # dask_pyr.append(da.squeeze(zarray))
-        # if not pyramid:
-        #     logger.trace("Pyramid creation disabled")
-        #     return dask_pyr
-        #
-        # ds = 1
-        # while np.min(yx_shape) // 2**ds >= 512:
-        #     ds += 1
-        # logger.trace(f"Generating {ds} down-sampled images")
-        #
-        # for ds_factor in range(1, ds):
-        #     with MeasureTimer() as timer:
-        #         zres = zarr.storage.TempStore()
-        #         rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
-        #         is_rgb = True if rgb_chunk > 1 else False
-        #         sub_res_image = compute_sub_res(zarray, ds_factor, 512, is_rgb, self.dtype)
-        #         da.to_zarr(sub_res_image, zres, component="0")
-        #         dask_pyr.append(da.squeeze(da.from_zarr(zres, component="0")))
-        #     logger.trace(f"Down-sampled {ds_factor} in {timer()} ({sub_res_image.shape})")
-        return dask_pyr
+        if not pyramid:
+            logger.trace("Pyramid creation disabled")
+            return dask_pyr
 
-    # def zarr_pyramidalize_czi(self, zarr_fp, pyramid: bool = True) -> list:
-    #     """Create a pyramidal zarr store from a CZI file."""
-    #     dask_pyr = []
-    #     root = zarr.open_group(zarr_fp, mode="a")
-    #
-    #     root.attrs["axes_names"] = list(self.axes)
-    #     root.attrs["orig_shape"] = list(self.shape)
-    #     all_axes = list(self.axes)
-    #     yx_dims = np.where(np.isin(all_axes, ["Y", "X"]) == 1)[0].tolist()
-    #     yx_shape = np.array(self.shape[slice(yx_dims[0], yx_dims[1] + 1)])
-    #
-    #     with MeasureTimer() as timer:
-    #         self.sub_asarray(zarr_fp=zarr_fp, resize=True, order=0, ds_factor=1, max_workers=4)
-    #     logger.trace(f"Down-sampled 0 in {timer()} ({yx_shape})")
-    #
-    #     zarray = da.squeeze(da.from_zarr(zarr.open(zarr_fp)[0]))
-    #     dask_pyr.append(da.squeeze(zarray))
-    #     if not pyramid:
-    #         logger.trace("Pyramid creation disabled")
-    #         return dask_pyr
-    #
-    #     ds = 1
-    #     while np.min(yx_shape) // 2**ds >= 512:
-    #         ds += 1
-    #     logger.trace(f"Generating {ds} down-sampled images")
-    #
-    #     for ds_factor in range(1, ds):
-    #         with MeasureTimer() as timer:
-    #             zres = zarr.storage.TempStore()
-    #             rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
-    #             is_rgb = True if rgb_chunk > 1 else False
-    #             sub_res_image = compute_sub_res(zarray, ds_factor, 512, is_rgb, self.dtype)
-    #             da.to_zarr(sub_res_image, zres, component="0")
-    #             dask_pyr.append(da.squeeze(da.from_zarr(zres, component="0")))
-    #         logger.trace(f"Down-sampled {ds_factor} in {timer()} ({sub_res_image.shape})")
-    #     return dask_pyr
+        ds = 1
+        while np.min(yx_shape) // 2**ds >= 512:
+            ds += 1
+        logger.trace(f"Generating {ds} down-sampled images")
+
+        for ds_factor in range(1, ds):
+            with MeasureTimer() as timer:
+                zres = zarr.storage.TempStore()
+                rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
+                is_rgb = True if rgb_chunk > 1 else False
+                sub_res_image = compute_sub_res(zarray, ds_factor, 512, is_rgb, self.dtype)
+                da.to_zarr(sub_res_image, zres, component="0")
+                dask_pyr.append(da.squeeze(da.from_zarr(zres, component="0")))
+            logger.trace(f"Down-sampled {ds_factor} in {timer()} ({sub_res_image.shape})")
+        return dask_pyr
 
     @cached_property
     def pos_x_um(self) -> float:
