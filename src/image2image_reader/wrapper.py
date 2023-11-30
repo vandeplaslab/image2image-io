@@ -66,11 +66,6 @@ class ImageWrapper:
                 return True
         return False
 
-    @property
-    def n_channels(self) -> int:
-        """Return number of channels."""
-        return len(self.channel_names())
-
     def channel_names_for_names(self, names: ty.Sequence[str]) -> list[str]:
         """Return list of channel names for a given wrapper/dataset."""
         clean_names = []
@@ -101,10 +96,22 @@ class ImageWrapper:
         """Iterator of channel name + image."""
         yield from zip(self.channel_names(), self.image_iter())
 
+    def channel_image_for_channel_names_iter(
+        self, channel_names: list[str] | None
+    ) -> ty.Generator[tuple[str, list[np.ndarray], BaseReader], None, None]:
+        """Iterate of channel name + image for a specified list of channels."""
+        if channel_names is None:
+            channel_names = self.channel_names()
+        for channel_name in channel_names:
+            name, dataset = channel_name.split(" | ")
+            reader = self.data[dataset]
+            index = reader.channel_to_index(name)
+            yield channel_name, reader.get_channel_pyramid(index), reader
+
     def channel_image_reader_iter(self) -> ty.Generator[tuple[str, list[np.ndarray], BaseReader], None, None]:
         """Iterator of channel name + image."""
-        for channel_name, (_, reader_or_array, image, _) in zip(self.channel_names(), self.reader_data_iter()):
-            yield channel_name, image, reader_or_array
+        for channel_name, (_, reader, image, _) in zip(self.channel_names(), self.reader_data_iter()):
+            yield channel_name, image, reader
 
     def path_reader_iter(self) -> ty.Generator[tuple[Path, BaseReader], None, None]:
         """Iterator of a path + reader."""
@@ -123,8 +130,10 @@ class ImageWrapper:
                     for index, _ in enumerate(reader.channel_names):
                         yield reader_name, reader, index
                 else:
-                    for reader_name_, _, _, index in self._reader_image_iter(reader_name, reader):
-                        yield reader_name_, reader, index
+                    yield from self._reader_channel_iter(reader_name, reader)
+                    # for reader_name_, index in self._reader_channel_iter(reader_name, reader):
+                    #     # for reader_name_, _, _, index in self._reader_image_iter(reader_name, reader):
+                    #     yield reader_name_, reader, index
 
     def reader_data_iter(
         self,
@@ -144,19 +153,23 @@ class ImageWrapper:
             yield from self._reader_image_iter(reader_name, reader_or_array)
 
     @staticmethod
+    def _reader_channel_iter(
+        reader_name: str, reader: BaseReader
+    ) -> ty.Generator[tuple[str, BaseReader, int], None, None]:
+        """Iterator to add channels."""
+        for channel_index in range(reader.n_channels):
+            yield reader_name, reader, channel_index
+
+    @staticmethod
     def _reader_image_iter(
         reader_name: str, reader: BaseReader
     ) -> ty.Generator[tuple[str, BaseReader, list[np.ndarray], int], None, None]:
         # image is a numpy array
-        # microscopy or ims data wrapper
-        if hasattr(reader, "pyramid"):
-            temp = reader.pyramid
-            array = temp if isinstance(temp, list) else [temp]
-        else:
-            raise ValueError("Cannot read image")
+        temp = reader.pyramid
+        array = temp if isinstance(temp, list) else [temp]
 
         # get the shape of the 'largest image in pyramid'
-        shape = array[0].shape
+        shape = reader.image_shape
         # get the number of dimensions, which determines how images are split into channels
         ndim = len(shape)
         channel_axis, n_channels = reader.get_channel_axis_and_n_channels()
@@ -191,13 +204,10 @@ class ImageWrapper:
         """Return list of channel names."""
         names = []
         for key, reader_or_array, index in self.reader_channel_iter():
-            if isinstance(reader_or_array, np.ndarray):
+            try:
+                channel_names = [reader_or_array.channel_names[index]]
+            except IndexError:
                 channel_names = [f"C{index}"]
-            else:
-                try:
-                    channel_names = [reader_or_array.channel_names[index]]
-                except IndexError:
-                    channel_names = [f"C{index}"]
             names.extend([f"{name} | {key}" for name in channel_names])
         return names
 

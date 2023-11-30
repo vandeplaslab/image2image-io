@@ -19,6 +19,7 @@ class BaseReader:
     _pyramid = None
     _is_rgb: bool | None = None
     _im_dtype: np.dtype | None = None
+    _im_shape: tuple[int, ...] | None = None
     _image_shape: tuple[int, int] | None = None
     auto_pyramid: bool | None = None
     reader_type: str = "image"
@@ -64,22 +65,29 @@ class BaseReader:
         return 1 / self.resolution
 
     @property
+    def shape(self) -> tuple[int, ...]:
+        """Return shape of the image, including channels, etc."""
+        if self._im_shape is None:
+            self._im_shape = self.pyramid[0].shape
+        return self._im_shape
+
+    @property
     def image_shape(self) -> tuple[int, int]:
         """Image shape."""
         if self._image_shape is None:
             from image2image_reader.utils.utilities import get_shape_of_image
 
-            return get_shape_of_image(self.pyramid[0])[-1]
+            self._image_shape = get_shape_of_image(self.shape)[-1]
         return self._image_shape
-
-    @image_shape.setter
-    def image_shape(self, value: tuple[int, int]) -> None:
-        self._image_shape = value
 
     @property
     def channel_names(self) -> list[str]:
         """Return channel names."""
         return self._channel_names
+
+    def channel_to_index(self, channel: str) -> int:
+        """Return index of a channel."""
+        return self.channel_names.index(channel)
 
     @property
     def n_channels(self) -> int:
@@ -197,7 +205,7 @@ class BaseReader:
 
     def get_channel_axis_and_n_channels(self) -> tuple[int | None, int]:
         """Return channel axis and number of channels."""
-        shape = self.pyramid[0].shape
+        shape = self.shape
         ndim = len(shape)
         # 2D images will be returned as they are
         if ndim == 2:
@@ -223,3 +231,18 @@ class BaseReader:
             return array[:, :, index]
         else:
             raise ValueError(f"Array has unsupported shape: {array.shape}")
+
+    def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
+        """Return channel pyramid."""
+        array = self.pyramid
+        channel_axis, n_channels = self.get_channel_axis_and_n_channels()
+        if channel_axis is None:
+            return array
+        if channel_axis == 0:
+            return [a[index] for a in array]
+        elif channel_axis == 1:
+            return [a[:, index] for a in array]
+        elif channel_axis == 2:
+            return [a[:, :, index] for a in array]
+        else:
+            raise ValueError("Could not retrieve channel pyramid.")

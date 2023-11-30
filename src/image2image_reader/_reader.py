@@ -11,21 +11,32 @@ from loguru import logger
 from image2image_reader.config import CONFIG
 from image2image_reader.exceptions import UnsupportedFileFormatError
 from image2image_reader.models.transform import TransformData
+from image2image_reader.utils.utilities import get_yx_coordinates_from_shape, reshape, reshape_batch
 from image2image_reader.wrapper import ImageWrapper
 
 if ty.TYPE_CHECKING:
     from image2image_reader.readers._base_reader import BaseReader
     from image2image_reader.readers.array_reader import ArrayImageReader
-    from image2image_reader.readers.coordinate_reader import CoordinateImageReader
+    from image2image_reader.readers.coordinate_reader import CoordinateImageReader, LazyCoordinateImagerReader
     from image2image_reader.readers.czi_reader import CziImageReader, CziSceneImageReader
     from image2image_reader.readers.geojson_reader import GeoJSONReader
     from image2image_reader.readers.tiff_reader import TiffImageReader
 
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png"]
-TIFF_EXTENSIONS = [".scn", ".ome.tiff", ".tif", ".tiff", ".svs", ".ndpi", ".qptiff"]
+TIFF_EXTENSIONS = [
+    ".scn",
+    ".ome.tiff",
+    ".tif",
+    ".tiff",
+    ".svs",
+    ".ndpi",
+    ".qptiff",
+    ".qptiff.raw",
+    ".qptiff.intermediate",
+]
 CZI_EXTENSIONS = [".czi"]
 BRUKER_EXTENSIONS = [".tsf", ".tdf", ".d"]
-IMZML_EXTENSIONS = [".imzml"]
+IMZML_EXTENSIONS = [".imzml", ".ibd"]
 H5_EXTENSIONS = [".h5", ".hdf5"]
 IMSPY_EXTENSIONS = [".data"]
 NPY_EXTENSIONS = [".npy"]
@@ -177,7 +188,8 @@ def get_reader(path: Path, split_czi: bool | None = None) -> tuple[Path, dict[st
         if path.name.startswith("dataset.metadata"):
             path, readers = _read_metadata_h5_coordinates(path)  # type: ignore
         else:
-            path, readers = _read_centroids_h5_coordinates(path)  # type: ignore
+            # path, readers = _read_centroids_h5_coordinates(path)  # type: ignore
+            path, readers = _read_centroids_h5_coordinates_lazy(path)  # type: ignore
     elif suffix in GEOJSON_EXTENSIONS:
         logger.trace(f"Reading GeoJSON file: {path}")
         path, readers = _read_geojson(path)  # type: ignore
@@ -223,10 +235,11 @@ def _read_multi_scene_czi(path: PathLike) -> tuple[Path, dict[str, CziSceneImage
     assert path.exists(), f"File does not exist: {path}"
     n = CziSceneFile.get_num_scenes(path)
     logger.trace(f"Found {n} scenes in CZI file: {path}")
-    return path, {
-        f"S{i}_{path.name}": CziSceneImageReader(path, scene_index=i, key=get_key(path, scene_index=i))
-        for i in range(n)
-    }
+    return path, {f"S{1}_{path.name}": CziSceneImageReader(path, scene_index=1, key=get_key(path, scene_index=1))}
+    # return path, {
+    #     f"S{i}_{path.name}": CziSceneImageReader(path, scene_index=i, key=get_key(path, scene_index=i))
+    #     for i in range(n)
+    # }
 
 
 def _read_tiff(path: PathLike) -> tuple[Path, dict[str, TiffImageReader]]:
@@ -309,6 +322,20 @@ def _read_centroids_h5_coordinates(path: PathLike) -> tuple[Path, dict[str, Coor
     return _read_centroids_h5_coordinates_without_metadata(path)
 
 
+def _read_centroids_h5_coordinates_lazy(path: PathLike) -> tuple[Path, dict[str, LazyCoordinateImagerReader]]:
+    """Read centroids data from HDF5 file."""
+    path = Path(path)
+    assert path.suffix in H5_EXTENSIONS, "Only .h5 files are supported"
+
+    metadata_file = path.parent / "dataset.metadata.h5"
+    if not metadata_file.exists():
+        data_dir = path.parent.parent.with_suffix(".data")
+        metadata_file = data_dir / "dataset.metadata.h5"
+    if metadata_file.exists():
+        return _read_centroids_h5_coordinates_with_metadata_lazy(path, metadata_file)
+    return _read_centroids_h5_coordinates_without_metadata_lazy(path)
+
+
 def _read_centroids_h5_coordinates_with_metadata(
     path: Path, metadata_file: Path
 ) -> tuple[Path, dict[str, CoordinateImageReader]]:
@@ -333,26 +360,31 @@ def _read_centroids_h5_coordinates_with_metadata(
     return path, {path.name: reader}
 
 
-def _read_centroids_h5_coordinates_without_metadata_lazy(path: Path) -> tuple[Path, dict[str, CoordinateImageReader]]:
+def _read_centroids_h5_coordinates_with_metadata_lazy(
+    path: Path, metadata_file: Path
+) -> tuple[Path, dict[str, LazyCoordinateImagerReader]]:
     import h5py
 
-    from image2image_reader.readers.coordinate_reader import CoordinateImageReader
+    from image2image_reader.utils.lazy import LazyImageWrapper
     from image2image_reader.utils.utilities import format_mz
 
+    assert metadata_file.exists(), f"File does not exist: {metadata_file}"
+    _, readers = _read_metadata_h5_coordinates(metadata_file)
+    key = next(iter(readers.keys()))
+    reader_ = readers[key]
+
+    x = reader_.x
+    y = reader_.y
+    resolution = reader_.resolution
+
     with h5py.File(path, "r") as f:
-        # get coordinate metadata
-        x = f["Misc/Spatial/x_coordinates"][:]
-        y = f["Misc/Spatial/y_coordinates"][:]
-        resolution = float(f["Misc/Spatial"].attrs["pixel_size"])
         mzs = f["Array"]["xs"][:]  # retrieve m/zs
-        centroids = f["Array"]["array"][:]  # retrieve ion images
-    tic = np.random.randint(128, 255, len(x), dtype=np.uint8)
-    tic = reshape(x, y, tic)
+    lazy_wrapper = LazyImageWrapper(path, "Array/array", mzs, x, y)
     key = get_key(path)
-    reader = CoordinateImageReader(path, x, y, resolution=resolution, array_or_reader=tic, key=key)
     mzs = [format_mz(mz) for mz in mzs]  # generate labels
-    centroids = reshape_batch(x, y, centroids)  # reshape images
-    reader.data.update(dict(zip(mzs, centroids)))
+    reader = LazyCoordinateImagerReader(
+        path, x, y, resolution=resolution, lazy_wrapper=lazy_wrapper, key=key, channel_names=mzs
+    )
     return path, {path.name: reader}
 
 
@@ -376,6 +408,30 @@ def _read_centroids_h5_coordinates_without_metadata(path: Path) -> tuple[Path, d
     mzs = [format_mz(mz) for mz in mzs]  # generate labels
     centroids = reshape_batch(x, y, centroids)  # reshape images
     reader.data.update(dict(zip(mzs, centroids)))
+    return path, {path.name: reader}
+
+
+def _read_centroids_h5_coordinates_without_metadata_lazy(
+    path: Path,
+) -> tuple[Path, dict[str, LazyCoordinateImagerReader]]:
+    import h5py
+
+    from image2image_reader.readers.coordinate_reader import LazyCoordinateImagerReader
+    from image2image_reader.utils.lazy import LazyImageWrapper
+    from image2image_reader.utils.utilities import format_mz
+
+    with h5py.File(path, "r") as f:
+        # get coordinate metadata
+        x = f["Misc/Spatial/x_coordinates"][:]
+        y = f["Misc/Spatial/y_coordinates"][:]
+        resolution = float(f["Misc/Spatial"].attrs["pixel_size"])
+        mzs = f["Array"]["xs"][:]  # retrieve m/zs
+    lazy_wrapper = LazyImageWrapper(path, "Array/array", mzs, x, y)
+    key = get_key(path)
+    mzs = [format_mz(mz) for mz in mzs]  # generate labels
+    reader = LazyCoordinateImagerReader(
+        path, x, y, resolution=resolution, lazy_wrapper=lazy_wrapper, key=key, channel_names=mzs
+    )
     return path, {path.name: reader}
 
 
@@ -464,6 +520,8 @@ def _read_imzml_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateI
 
     path = Path(path)
     assert path.suffix.lower() in IMZML_EXTENSIONS, "Only .imzML files are supported"
+    if path.suffix.lower() == ".ibd":
+        path = path.with_suffix(".imzML")
 
     # get wrapper
     reader = get_reader(path)
@@ -484,6 +542,8 @@ def _read_imzml_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImageR
 
     path = Path(path)
     assert path.suffix.lower() in IMZML_EXTENSIONS, "Only .imzML files are supported"
+    if path.suffix.lower() == ".ibd":
+        path = path.with_suffix(".imzML")
 
     # get wrapper
     reader = get_reader(path)
@@ -493,38 +553,3 @@ def _read_imzml_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImageR
     y = y - np.min(y)  # minimized
     key = get_key(path)
     return path, {path.name: CoordinateImageReader(path, x, y, array_or_reader=reader, key=key)}
-
-
-def reshape(x: np.ndarray, y: np.ndarray, array: np.ndarray, fill_value: float = 0) -> np.ndarray:
-    """Reshape array."""
-    xmin, xmax = np.min(x), np.max(x)
-    ymin, ymax = np.min(y), np.max(y)
-    shape = (ymax - ymin + 1, xmax - xmin + 1)
-    dtype = np.float32 if np.isnan(fill_value) else array.dtype
-    new_array = np.full(shape, fill_value=fill_value, dtype=dtype)
-    new_array[y - ymin, x - xmin] = array
-    return new_array
-
-
-def reshape_batch(x: np.ndarray, y: np.ndarray, array: np.ndarray, fill_value: float = 0) -> np.ndarray:
-    """Batch reshaping of images."""
-    if array.ndim != 2:
-        raise ValueError("Expected 2-D array.")
-    xmin, xmax = np.min(x), np.max(x)
-    ymin, ymax = np.min(y), np.max(y)
-    y = y - ymin
-    x = x - xmin
-    n = array.shape[1]
-    shape = (n, ymax - ymin + 1, xmax - xmin + 1)
-    dtype = np.float32 if np.isnan(fill_value) else array.dtype
-    im = np.full(shape, fill_value=fill_value, dtype=dtype)
-    for i in range(n):
-        im[i, y, x] = array[:, i]
-    return im
-
-
-def get_yx_coordinates_from_shape(shape: tuple[int, int]) -> tuple[np.ndarray, np.ndarray]:
-    """Get coordinates from image shape."""
-    _y, _x = np.indices(shape)
-    yx_coordinates = np.c_[np.ravel(_y), np.ravel(_x)]
-    return yx_coordinates[:, 0], yx_coordinates[:, 1]

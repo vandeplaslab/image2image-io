@@ -155,8 +155,8 @@ def write_reader_to_xml(reader: BaseReader, filename: PathLike) -> None:
 
     from dicttoxml import dicttoxml
 
-    _, _, image_shape = get_shape_of_image(reader.pyramid[0])
-    shape = get_flat_shape_of_image(reader.pyramid[0])
+    _, _, image_shape = get_shape_of_image(reader.shape)
+    shape = get_flat_shape_of_image(reader.shape)
 
     meta = {
         "modality": "microscopy",
