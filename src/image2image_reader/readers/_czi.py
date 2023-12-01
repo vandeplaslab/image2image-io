@@ -224,47 +224,43 @@ class CziFile(_CziFile):
             out.flush()
         return out
 
-    def zarr_pyramidize_czi(self, zarr_fp, pyramid: bool = True) -> list:
+    def zarr_pyramidize_czi(self, zarr_fp, pyramid: bool = True, tile_size: int = 1024) -> list:
         """Create a pyramidal zarr store from a CZI file."""
         dask_pyr = []
         root = zarr.open_group(zarr_fp, mode="a")
-
         root.attrs["axes_names"] = list(self.axes)
         root.attrs["orig_shape"] = list(self.shape)
+
         all_axes = list(self.axes)
         yx_dims = np.where(np.isin(all_axes, ["Y", "X"]) == 1)[0].tolist()
         yx_shape = np.array(self.shape[slice(yx_dims[0], yx_dims[1] + 1)])
 
-        out = None
-        if zarr_fp:
-            root = zarr.open_group(zarr_fp, mode="a")
-            pyramid_seq = 0
-            rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
-            chunking = (1, 1, 1, 1024, 1024, rgb_chunk)
-            out_shape = list(self.shape)
-            out_dtype = self.dtype
-            out = root.create_dataset(
-                pyramid_seq,
-                shape=tuple(out_shape),
-                chunks=chunking,
-                dtype=out_dtype,
-                overwrite=True,
-                synchronizer=zarr.ThreadSynchronizer(),
-            )
+        pyramid_seq = 0
+        rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
+        chunking = (1, 1, 1, tile_size, tile_size, rgb_chunk)
+        out_shape = list(self.shape)
+        out_dtype = self.dtype
+        out = root.create_dataset(
+            pyramid_seq,
+            shape=tuple(out_shape),
+            chunks=chunking,
+            dtype=out_dtype,
+            overwrite=True,
+            synchronizer=zarr.ThreadSynchronizer(),
+        )
 
         with MeasureTimer() as timer:
             self.as_tzcyx0_array(out=out, max_workers=cpu_count())
-            # out = da.squeeze(da.squeeze(da.from_array(out)))
-            zarray = da.squeeze(da.from_zarr(zarr.open(zarr_fp)[0]))
-            dask_pyr.append(da.squeeze(out))
-        logger.trace(f"Down-sampled 0 in {timer()} ({yx_shape})")
+            z_array = da.squeeze(da.from_zarr(zarr.open(zarr_fp)[0]))
+            dask_pyr.append(da.squeeze(z_array))
+        logger.trace(f"Loaded data in {timer()} ({z_array.shape})")
 
         if not pyramid:
             logger.trace("Pyramid creation disabled")
             return dask_pyr
 
         ds = 1
-        while np.min(yx_shape) // 2**ds >= 512:
+        while np.min(yx_shape) // 2**ds >= tile_size:
             ds += 1
         logger.trace(f"Generating {ds} down-sampled images")
 
@@ -273,10 +269,10 @@ class CziFile(_CziFile):
                 zres = zarr.storage.TempStore()
                 rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
                 is_rgb = True if rgb_chunk > 1 else False
-                sub_res_image = compute_sub_res(zarray, ds_factor, 512, is_rgb, self.dtype)
-                da.to_zarr(sub_res_image, zres, component="0")
+                z_array_ds = compute_sub_res(z_array, ds_factor, tile_size, is_rgb, self.dtype)
+                da.to_zarr(z_array_ds, zres, component="0")
                 dask_pyr.append(da.squeeze(da.from_zarr(zres, component="0")))
-            logger.trace(f"Down-sampled {ds_factor} in {timer()} ({sub_res_image.shape})")
+            logger.trace(f"Down-sampled {ds_factor} in {timer()} ({z_array_ds.shape})")
         return dask_pyr
 
     @cached_property
