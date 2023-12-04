@@ -39,10 +39,12 @@ def czis_to_ome_tiff(
             total += CziSceneFile.get_num_scenes(path_)
             paths_.append(path_)
 
-    for current, path_ in enumerate(paths_):
+    current = 0
+    for path_ in paths_:
         path_ = Path(path_)
         for key, current_scene, total_scene in czi_to_ome_tiff(path_, output_dir):
             yield key, current_scene, total_scene, current, total
+            current += 1
 
 
 def czi_to_ome_tiff(
@@ -88,9 +90,6 @@ def czi_to_ome_tiff(
 def write_ome_tiff_alt(path: PathLike, reader: BaseReader) -> Path:
     """Write OME-TIFF."""
     from image2image_reader.writers.tiff_writer import OmeTiffWriter
-
-    # if array.ndim == 2:
-    #     array = np.atleast_3d(array)
 
     path = Path(path)
     writer = OmeTiffWriter(reader)

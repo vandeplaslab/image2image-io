@@ -25,6 +25,7 @@ class Config(BaseConfig):
         description="When loading CZI image(s), split them by the scene",
         in_app=True,
     )
+    only_last_pyramid: bool = Field(False, title="Only last pyramid", description="Only use last pyramid.", in_app=True)
 
     view_type: ViewType = Field(ViewType.RANDOM, title="View type", description="IMS view type.", in_app=False)
     show_transformed: bool = Field(

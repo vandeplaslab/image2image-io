@@ -217,9 +217,9 @@ class BaseReader:
             n_channels = shape[channel_axis]
         return channel_axis, n_channels
 
-    def get_channel(self, index: int) -> np.ndarray:
+    def get_channel(self, index: int, pyramid: int = 0) -> np.ndarray:
         """Return channel."""
-        array = self.pyramid[0]
+        array = self.pyramid[pyramid]
         channel_axis, n_channels = self.get_channel_axis_and_n_channels()
         if channel_axis is None:
             return array
@@ -246,3 +246,15 @@ class BaseReader:
             return [a[:, :, index] for a in array]
         else:
             raise ValueError("Could not retrieve channel pyramid.")
+
+    @property
+    def n_in_pyramid(self) -> int:
+        """Return number of images in the pyramid."""
+        return len(self.pyramid)
+
+    def scale_for_pyramid(self, pyramid: int = 0) -> tuple[float, float]:
+        """Return scale for pyramid."""
+        if pyramid < 0:
+            pyramid = range(self.n_in_pyramid)[pyramid]
+        resolution = self.resolution * 2**pyramid
+        return resolution, resolution

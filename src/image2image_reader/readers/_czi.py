@@ -208,7 +208,6 @@ class CziFile(_CziFile):
             try:
                 out[index] = tile
             except ValueError as e:
-                print(e, "???")
                 warnings.warn(str(e))
 
         if max_workers > 1:

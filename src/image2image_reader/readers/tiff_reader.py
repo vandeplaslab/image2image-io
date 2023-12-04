@@ -125,12 +125,11 @@ class TiffImageReader(BaseReader):
     def _get_image_info(self):
         if len(self.fh.series) > 1:
             warnings.warn(
-                "The tiff contains multiple series, " "the largest series will be read by default",
+                "The tiff contains multiple series, the largest series will be read by default",
                 stacklevel=2,
             )
 
         im_dims, im_dtype, largest_series = get_tifffile_info(self.path)
         if not CONFIG.auto_pyramid:
             largest_series = 0
-
         return im_dims, im_dtype, largest_series
