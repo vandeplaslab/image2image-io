@@ -77,7 +77,7 @@ repository = "https://github.com/vandeplaslab/image2image-io"
 # tomatoes = "spam:main_tomatoes"
 
 [tool.setuptools_scm]
-write_to = "src/image2image_reader/_version.py"
+write_to = "src/image2image-io/_version.py"
 
 # https://github.com/psf/black
 [tool.black]
@@ -151,10 +151,10 @@ exclude = [
     "tests",
     "package",
     "build",
-    "src/image2image_reader/_version.py",
-    "src/image2image_reader/readers/czi.py",
-    "src/image2image_reader/readers/czi_reader.py",
-    "src/image2image_reader/readers/tiff_reader.py",
+    "src/image2image-io/_version.py",
+    "src/image2image-io/readers/czi.py",
+    "src/image2image-io/readers/czi_reader.py",
+    "src/image2image-io/readers/tiff_reader.py",
 ]
 
 # # module specific overrides
@@ -175,7 +175,7 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-source = ["image2image_reader"]
+source = ["image2image-io"]
 
 # https://github.com/mgedmin/check-manifest#configuration
 [tool.check-manifest]

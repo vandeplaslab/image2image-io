@@ -1,4 +1,4 @@
-* image2image-reader version:
+* image2image-io version:
 * Python version:
 * Operating System:
 
