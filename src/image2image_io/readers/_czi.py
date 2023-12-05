@@ -18,7 +18,7 @@ from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import create_output
 
-from image2image_reader.readers.utilities import compute_sub_res
+from image2image_io.readers.utilities import compute_sub_res
 
 logger = logger.bind(src="CZI")
 

@@ -4,8 +4,8 @@ import typing as ty
 from koyo.config import BaseConfig
 from pydantic import Field, validator
 
-from image2image_reader.enums import ViewType
-from image2image_reader.utils._appdirs import USER_CONFIG_DIR
+from image2image_io.enums import ViewType
+from image2image_io.utils._appdirs import USER_CONFIG_DIR
 
 
 # noinspection PyMethodParameters

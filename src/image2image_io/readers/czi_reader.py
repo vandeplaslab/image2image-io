@@ -10,10 +10,10 @@ from koyo.typing import PathLike
 from loguru import logger
 from tifffile import xml2dict
 
-from image2image_reader.config import CONFIG
-from image2image_reader.readers._base_reader import BaseReader
-from image2image_reader.readers._czi import CziFile, CziSceneFile
-from image2image_reader.readers.utilities import guess_rgb
+from image2image_io.config import CONFIG
+from image2image_io.readers._base_reader import BaseReader
+from image2image_io.readers._czi import CziFile, CziSceneFile
+from image2image_io.readers.utilities import guess_rgb
 
 logger = logger.bind(src="CZI")
 

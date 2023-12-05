@@ -11,7 +11,7 @@ from scipy.ndimage import affine_transform
 from shapely import Polygon
 from skimage.transform import AffineTransform
 
-from image2image_reader.enums import TIME_FORMAT
+from image2image_io.enums import TIME_FORMAT
 
 logger = logger.bind(src="Mask")
 

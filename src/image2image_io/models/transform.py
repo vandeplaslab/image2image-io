@@ -8,8 +8,8 @@ from loguru import logger
 from pydantic import PrivateAttr
 from skimage.transform import AffineTransform, ProjectiveTransform
 
-from image2image_reader.enums import DEFAULT_TRANSFORM_NAME
-from image2image_reader.models.base import BaseModel
+from image2image_io.enums import DEFAULT_TRANSFORM_NAME
+from image2image_io.models.base import BaseModel
 
 
 class TransformData(BaseModel):
@@ -77,7 +77,7 @@ class TransformData(BaseModel):
         self, moving_resolution: ty.Optional[float] = None, yx: bool = True, px: bool = False
     ) -> ProjectiveTransform:
         """Compute transformation matrix."""
-        from image2image_reader.utils.utilities import compute_transform
+        from image2image_io.utils.utilities import compute_transform
 
         if moving_resolution is None:
             moving_resolution = self.moving_resolution

@@ -8,19 +8,19 @@ import numpy as np
 from koyo.typing import PathLike
 from loguru import logger
 
-from image2image_reader.config import CONFIG
-from image2image_reader.exceptions import UnsupportedFileFormatError
-from image2image_reader.models.transform import TransformData
-from image2image_reader.utils.utilities import get_yx_coordinates_from_shape, reshape, reshape_batch
-from image2image_reader.wrapper import ImageWrapper
+from image2image_io.config import CONFIG
+from image2image_io.exceptions import UnsupportedFileFormatError
+from image2image_io.models.transform import TransformData
+from image2image_io.utils.utilities import get_yx_coordinates_from_shape, reshape, reshape_batch
+from image2image_io.wrapper import ImageWrapper
 
 if ty.TYPE_CHECKING:
-    from image2image_reader.readers._base_reader import BaseReader
-    from image2image_reader.readers.array_reader import ArrayImageReader
-    from image2image_reader.readers.coordinate_reader import CoordinateImageReader, LazyCoordinateImagerReader
-    from image2image_reader.readers.czi_reader import CziImageReader, CziSceneImageReader
-    from image2image_reader.readers.geojson_reader import GeoJSONReader
-    from image2image_reader.readers.tiff_reader import TiffImageReader
+    from image2image_io.readers._base_reader import BaseReader
+    from image2image_io.readers.array_reader import ArrayImageReader
+    from image2image_io.readers.coordinate_reader import CoordinateImageReader, LazyCoordinateImagerReader
+    from image2image_io.readers.czi_reader import CziImageReader, CziSceneImageReader
+    from image2image_io.readers.geojson_reader import GeoJSONReader
+    from image2image_io.readers.tiff_reader import TiffImageReader
 
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png"]
 TIFF_EXTENSIONS = [
@@ -200,7 +200,7 @@ def get_reader(path: Path, split_czi: bool | None = None) -> tuple[Path, dict[st
 
 def _check_multi_scene_czi(path: PathLike) -> bool:
     """Check whether this is a multi-scene CZI file."""
-    from image2image_reader.readers._czi import CziSceneFile
+    from image2image_io.readers._czi import CziSceneFile
 
     path = Path(path)
     return bool(CziSceneFile.get_num_scenes(path) > 1)
@@ -208,7 +208,7 @@ def _check_multi_scene_czi(path: PathLike) -> bool:
 
 def _read_geojson(path: PathLike) -> tuple[Path, dict[str, GeoJSONReader]]:
     """Read GeoJSON file."""
-    from image2image_reader.readers.geojson_reader import GeoJSONReader
+    from image2image_io.readers.geojson_reader import GeoJSONReader
 
     path = Path(path)
     assert path.exists(), f"File does not exist: {path}"
@@ -218,7 +218,7 @@ def _read_geojson(path: PathLike) -> tuple[Path, dict[str, GeoJSONReader]]:
 
 def _read_single_scene_czi(path: PathLike, **kwargs: ty.Any) -> tuple[Path, dict[str, CziImageReader]]:
     """Read CZI file."""
-    from image2image_reader.readers.czi_reader import CziImageReader
+    from image2image_io.readers.czi_reader import CziImageReader
 
     path = Path(path)
     assert path.exists(), f"File does not exist: {path}"
@@ -228,23 +228,23 @@ def _read_single_scene_czi(path: PathLike, **kwargs: ty.Any) -> tuple[Path, dict
 
 def _read_multi_scene_czi(path: PathLike) -> tuple[Path, dict[str, CziSceneImageReader]]:
     """Read CZI file."""
-    from image2image_reader.readers._czi import CziSceneFile
-    from image2image_reader.readers.czi_reader import CziSceneImageReader
+    from image2image_io.readers._czi import CziSceneFile
+    from image2image_io.readers.czi_reader import CziSceneImageReader
 
     path = Path(path)
     assert path.exists(), f"File does not exist: {path}"
     n = CziSceneFile.get_num_scenes(path)
     logger.trace(f"Found {n} scenes in CZI file: {path}")
-    return path, {f"S{1}_{path.name}": CziSceneImageReader(path, scene_index=1, key=get_key(path, scene_index=1))}
-    # return path, {
-    #     f"S{i}_{path.name}": CziSceneImageReader(path, scene_index=i, key=get_key(path, scene_index=i))
-    #     for i in range(n)
-    # }
+    # return path, {f"S{1}_{path.name}": CziSceneImageReader(path, scene_index=1, key=get_key(path, scene_index=1))}
+    return path, {
+        f"S{i}_{path.name}": CziSceneImageReader(path, scene_index=i, key=get_key(path, scene_index=i))
+        for i in range(n)
+    }
 
 
 def _read_tiff(path: PathLike) -> tuple[Path, dict[str, TiffImageReader]]:
     """Read TIFF file."""
-    from image2image_reader.readers.tiff_reader import TiffImageReader
+    from image2image_io.readers.tiff_reader import TiffImageReader
 
     path = Path(path)
     assert path.exists(), f"File does not exist: {path}"
@@ -256,7 +256,7 @@ def _read_image(path: PathLike) -> tuple[Path, dict[str, ArrayImageReader]]:
     """Read image."""
     from skimage.io import imread
 
-    from image2image_reader.readers.array_reader import ArrayImageReader
+    from image2image_io.readers.array_reader import ArrayImageReader
 
     path = Path(path)
     assert path.exists(), f"File does not exist: {path}"
@@ -266,7 +266,7 @@ def _read_image(path: PathLike) -> tuple[Path, dict[str, ArrayImageReader]]:
 
 def _read_npy_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateImageReader]]:
     """Read data from npz or npy file."""
-    from image2image_reader.readers.coordinate_reader import CoordinateImageReader
+    from image2image_io.readers.coordinate_reader import CoordinateImageReader
 
     path = Path(path)
     with open(path, "rb") as f:
@@ -282,7 +282,7 @@ def _read_metadata_h5_coordinates(path: PathLike) -> tuple[Path, dict[str, Coord
     import h5py
     from koyo.json import read_json_data
 
-    from image2image_reader.readers.coordinate_reader import CoordinateImageReader
+    from image2image_io.readers.coordinate_reader import CoordinateImageReader
 
     path = Path(path)
     assert path.suffix in H5_EXTENSIONS, "Only .h5 files are supported"
@@ -341,7 +341,7 @@ def _read_centroids_h5_coordinates_with_metadata(
 ) -> tuple[Path, dict[str, CoordinateImageReader]]:
     import h5py
 
-    from image2image_reader.utils.utilities import format_mz
+    from image2image_io.utils.utilities import format_mz
 
     assert metadata_file.exists(), f"File does not exist: {metadata_file}"
     _, reader_ = _read_metadata_h5_coordinates(metadata_file)
@@ -365,8 +365,8 @@ def _read_centroids_h5_coordinates_with_metadata_lazy(
 ) -> tuple[Path, dict[str, LazyCoordinateImagerReader]]:
     import h5py
 
-    from image2image_reader.utils.lazy import LazyImageWrapper
-    from image2image_reader.utils.utilities import format_mz
+    from image2image_io.utils.lazy import LazyImageWrapper
+    from image2image_io.utils.utilities import format_mz
 
     assert metadata_file.exists(), f"File does not exist: {metadata_file}"
     _, readers = _read_metadata_h5_coordinates(metadata_file)
@@ -391,8 +391,8 @@ def _read_centroids_h5_coordinates_with_metadata_lazy(
 def _read_centroids_h5_coordinates_without_metadata(path: Path) -> tuple[Path, dict[str, CoordinateImageReader]]:
     import h5py
 
-    from image2image_reader.readers.coordinate_reader import CoordinateImageReader
-    from image2image_reader.utils.utilities import format_mz
+    from image2image_io.readers.coordinate_reader import CoordinateImageReader
+    from image2image_io.utils.utilities import format_mz
 
     with h5py.File(path, "r") as f:
         # get coordinate metadata
@@ -416,9 +416,9 @@ def _read_centroids_h5_coordinates_without_metadata_lazy(
 ) -> tuple[Path, dict[str, LazyCoordinateImagerReader]]:
     import h5py
 
-    from image2image_reader.readers.coordinate_reader import LazyCoordinateImagerReader
-    from image2image_reader.utils.lazy import LazyImageWrapper
-    from image2image_reader.utils.utilities import format_mz
+    from image2image_io.readers.coordinate_reader import LazyCoordinateImagerReader
+    from image2image_io.utils.lazy import LazyImageWrapper
+    from image2image_io.utils.utilities import format_mz
 
     with h5py.File(path, "r") as f:
         # get coordinate metadata
@@ -439,7 +439,7 @@ def _read_tsf_tdf_coordinates(path: PathLike) -> tuple[Path, dict[str, Coordinat
     """Read coordinates from TSF file."""
     import sqlite3
 
-    from image2image_reader.readers.coordinate_reader import CoordinateImageReader
+    from image2image_io.readers.coordinate_reader import CoordinateImageReader
 
     path = Path(path)
     assert path.suffix in BRUKER_EXTENSIONS, "Only .tsf and .tdf files are supported"
@@ -484,7 +484,7 @@ def _read_tsf_tdf_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImag
 
     from imzy import get_reader
 
-    from image2image_reader.readers.coordinate_reader import CoordinateImageReader
+    from image2image_io.readers.coordinate_reader import CoordinateImageReader
 
     path = Path(path)
     assert path.suffix in BRUKER_EXTENSIONS, "Only .tsf and .tdf files are supported"
@@ -516,7 +516,7 @@ def _read_imzml_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateI
     """Read coordinates from imzML file."""
     from imzy import get_reader
 
-    from image2image_reader.readers.coordinate_reader import CoordinateImageReader
+    from image2image_io.readers.coordinate_reader import CoordinateImageReader
 
     path = Path(path)
     assert path.suffix.lower() in IMZML_EXTENSIONS, "Only .imzML files are supported"
@@ -538,7 +538,7 @@ def _read_imzml_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImageR
     """Read coordinates from imzML file."""
     from imzy import get_reader
 
-    from image2image_reader.readers.coordinate_reader import CoordinateImageReader
+    from image2image_io.readers.coordinate_reader import CoordinateImageReader
 
     path = Path(path)
     assert path.suffix.lower() in IMZML_EXTENSIONS, "Only .imzML files are supported"

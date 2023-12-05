@@ -8,7 +8,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from image2image_reader.utils.utilities import reshape, reshape_batch
+from image2image_io.utils.utilities import reshape, reshape_batch
 
 
 class LazyImageWrapper:

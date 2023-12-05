@@ -11,10 +11,10 @@ from loguru import logger
 from tifffile import TiffWriter
 from tqdm import trange
 
-from image2image_reader.readers.utilities import get_pyramid_info, prepare_ome_xml_str
+from image2image_io.readers.utilities import get_pyramid_info, prepare_ome_xml_str
 
 if ty.TYPE_CHECKING:
-    from image2image_reader.readers._base_reader import BaseReader
+    from image2image_io.readers._base_reader import BaseReader
 
 
 class OmeTiffWriter:

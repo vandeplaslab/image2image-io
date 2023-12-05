@@ -9,7 +9,7 @@ from koyo.system import IS_MAC_ARM
 from koyo.typing import PathLike
 from loguru import logger
 
-from image2image_reader.utils.utilities import (
+from image2image_io.utils.utilities import (
     get_dtype_for_array,
     get_flat_shape_of_image,
     get_shape_of_image,
@@ -17,14 +17,14 @@ from image2image_reader.utils.utilities import (
 )
 
 if ty.TYPE_CHECKING:
-    from image2image_reader.readers._base_reader import BaseReader
+    from image2image_io.readers._base_reader import BaseReader
 
 
 def czis_to_ome_tiff(
     paths: ty.Iterable[PathLike], output_dir: PathLike | None = None
 ) -> ty.Generator[tuple[str, int, int, int, int], None, None]:
     """Convert multiple CZI images to OME-TIFF."""
-    from image2image_reader.readers._czi import CziSceneFile
+    from image2image_io.readers._czi import CziSceneFile
 
     # calculate true total number of scenes
     total = 0
@@ -51,9 +51,9 @@ def czi_to_ome_tiff(
     path: PathLike, output_dir: PathLike | None = None
 ) -> ty.Generator[tuple[str, int, int], None, None]:
     """Convert Czi image to OME-TIFF."""
-    from image2image_reader._reader import get_key
-    from image2image_reader.readers._czi import CziSceneFile
-    from image2image_reader.readers.czi_reader import CziSceneImageReader
+    from image2image_io._reader import get_key
+    from image2image_io.readers._czi import CziSceneFile
+    from image2image_io.readers.czi_reader import CziSceneImageReader
 
     path = Path(path)
     key = get_key(path)
@@ -89,7 +89,7 @@ def czi_to_ome_tiff(
 
 def write_ome_tiff_alt(path: PathLike, reader: BaseReader) -> Path:
     """Write OME-TIFF."""
-    from image2image_reader.writers.tiff_writer import OmeTiffWriter
+    from image2image_io.writers.tiff_writer import OmeTiffWriter
 
     path = Path(path)
     writer = OmeTiffWriter(reader)
@@ -130,7 +130,7 @@ def image_to_fusion(
     path: PathLike, output_dir: PathLike | None = None
 ) -> ty.Generator[tuple[str, int, int, str], None, None]:
     """Convert image of any type to Fusion format."""
-    from image2image_reader._reader import get_reader
+    from image2image_io._reader import get_reader
 
     path = Path(path)
     path, readers = get_reader(path)

@@ -12,15 +12,15 @@ from loguru import logger
 from ome_types import from_xml
 from tifffile import TiffFile
 
-from image2image_reader.config import CONFIG
-from image2image_reader.readers._base_reader import BaseReader
-from image2image_reader.readers.tiff_utils import (
+from image2image_io.config import CONFIG
+from image2image_io.readers._base_reader import BaseReader
+from image2image_io.readers.tiff_utils import (
     ometiff_ch_names,
     ometiff_xy_pixel_sizes,
     svs_xy_pixel_sizes,
     tifftag_xy_pixel_sizes,
 )
-from image2image_reader.readers.utilities import (
+from image2image_io.readers.utilities import (
     get_tifffile_info,
     guess_rgb,
     tf_zarr_read_single_ch,

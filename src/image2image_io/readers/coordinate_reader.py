@@ -10,10 +10,10 @@ from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
 
-from image2image_reader.config import CONFIG
-from image2image_reader.readers._base_reader import BaseReader
-from image2image_reader.utils.lazy import LazyImageWrapper
-from image2image_reader.utils.utilities import format_mz
+from image2image_io.config import CONFIG
+from image2image_io.readers._base_reader import BaseReader
+from image2image_io.utils.lazy import LazyImageWrapper
+from image2image_io.utils.utilities import format_mz
 
 if ty.TYPE_CHECKING:
     from imzy._readers._base import BaseReader as BaseImzyReader
