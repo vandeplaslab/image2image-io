@@ -22,6 +22,7 @@ class BaseReader:
     _im_shape: tuple[int, ...] | None = None
     _image_shape: tuple[int, int] | None = None
     auto_pyramid: bool | None = None
+    reader: str = "base"
     reader_type: str = "image"
     n_scenes: int = 1
     lazy: bool = False
@@ -29,6 +30,7 @@ class BaseReader:
     allow_extraction: bool = False
     _resolution: float = 1.0
     _channel_names: list[str]
+    _channel_colors: list[str]
 
     def __init__(
         self, path: PathLike, key: str | None = None, reader_kws: dict | None = None, auto_pyramid: bool | None = None
@@ -84,6 +86,11 @@ class BaseReader:
     def channel_names(self) -> list[str]:
         """Return channel names."""
         return self._channel_names
+
+    @property
+    def channel_colors(self) -> list[str]:
+        """Return channel names."""
+        return self._channel_colors
 
     def channel_to_index(self, channel: str) -> int:
         """Return index of a channel."""

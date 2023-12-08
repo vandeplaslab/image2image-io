@@ -20,12 +20,7 @@ from image2image_io.readers.tiff_utils import (
     svs_xy_pixel_sizes,
     tifftag_xy_pixel_sizes,
 )
-from image2image_io.readers.utilities import (
-    get_tifffile_info,
-    guess_rgb,
-    tf_zarr_read_single_ch,
-    tifffile_to_dask,
-)
+from image2image_io.readers.utilities import get_tifffile_info, guess_rgb, tf_zarr_read_single_ch, tifffile_to_dask
 
 logger = logger.bind(src="Tiff")
 
@@ -34,6 +29,7 @@ class TiffImageReader(BaseReader):
     """TIFF image wrapper."""
 
     fh: TiffFile
+    reader = "tifffile"
 
     def __init__(
         self,
@@ -44,7 +40,6 @@ class TiffImageReader(BaseReader):
     ):
         super().__init__(path, key, auto_pyramid=auto_pyramid)
         self.fh = TiffFile(self.path)
-        self.reader = "tifffile"
 
         self.im_dims, self.im_dtype, self.largest_series = self._get_image_info()
         self.im_dims = tuple(self.im_dims)
@@ -52,7 +47,7 @@ class TiffImageReader(BaseReader):
 
         self.resolution = self._get_im_res()
         self._channel_names = self._get_channel_names()
-        self.channel_colors = None
+        self._channel_colors = None
         logger.trace(
             f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution}; n_ch={len(self._channel_names)}"
         )
@@ -112,7 +107,7 @@ class TiffImageReader(BaseReader):
     def _get_channel_names(self):
         channel_names = []
         if self.fh.ome_metadata:
-            channel_names = ometiff_ch_names(from_xml(self.fh.ome_metadata), self.largest_series)
+            channel_names = ometiff_ch_names(from_xml(self.fh.ome_metadata, parser="lxml"), self.largest_series)
             if self.n_channels > len(channel_names):
                 channel_names = []
 

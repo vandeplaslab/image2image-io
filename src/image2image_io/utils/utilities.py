@@ -9,6 +9,28 @@ if ty.TYPE_CHECKING:
     from skimage.transform import ProjectiveTransform
 
 
+def format_channel_names(channel_names, n_ch):
+    """
+    Format channel names and ensure number of channel names matches number of channels or default
+    to C1, C2, C3, etc.
+
+    Parameters
+    ----------
+    channel_names:list
+        list of str that are channel names
+    n_ch: int
+        number of channels detected in image
+
+    Returns
+    -------
+    channel_names:
+        list of str that are formatted
+    """
+    if channel_names is None or n_ch != len(channel_names):
+        channel_names = [f"C{idx}" for idx in range(n_ch)]
+    return channel_names
+
+
 def format_mz(mz: float) -> str:
     """Format m/z value."""
     return f"m/z {mz:.3f}"

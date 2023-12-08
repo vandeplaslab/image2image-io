@@ -1,4 +1,6 @@
 """Tiff file utilities."""
+from __future__ import annotations
+
 import typing as ty
 from pathlib import Path
 
@@ -13,7 +15,7 @@ from tifffile import TiffFile, imread, xml2dict
 logger = logger.bind(src="Tiff")
 
 
-def tifffile_to_dask(im_fp: ty.Union[str, Path], largest_series: int) -> list[da.Array]:
+def tifffile_to_dask(im_fp: str | Path, largest_series: int) -> list[da.Array]:
     """Convert a tifffile to a dask array."""
     with MeasureTimer() as timer:
         imdata = zarr.open(imread(im_fp, aszarr=True, series=largest_series))
@@ -27,7 +29,7 @@ def tifffile_to_dask(im_fp: ty.Union[str, Path], largest_series: int) -> list[da
     return imdata
 
 
-def calc_pyramid_levels(xy_final_shape: np.ndarray, tile_size: int) -> ty.List[ty.Tuple[int, int]]:
+def calc_pyramid_levels(xy_final_shape: np.ndarray, tile_size: int) -> list[tuple[int, int]]:
     """Calculate the number of pyramids for a given image dimension, and tile size.
 
     Stops when further downsampling would be smaller than tile_size.
@@ -57,7 +59,7 @@ def calc_pyramid_levels(xy_final_shape: np.ndarray, tile_size: int) -> ty.List[t
 
 def get_pyramid_info(
     y_size: int, x_size: int, n_ch: int, tile_size: int
-) -> ty.Tuple[ty.List[ty.Tuple[int, int]], ty.List[ty.Tuple[int, int, int, int, int]]]:
+) -> tuple[list[tuple[int, int]], list[tuple[int, int, int, int, int]]]:
     """
     Get pyramidal info for OME-tiff output.
 
@@ -113,7 +115,7 @@ def centered_transform(
     return rot_mat
 
 
-def guess_rgb(shape: ty.Tuple[int, ...]) -> bool:
+def guess_rgb(shape: tuple[int, ...]) -> bool:
     """Guess if the passed shape comes from rgb data.
 
     If last dim is 3 or 4 assume the data is rgb, including rgba.
@@ -299,7 +301,7 @@ def get_tifffile_info(image_filepath):
     return im_dims, im_dtype, largest_series
 
 
-def grayscale(rgb_image, is_interleaved=False):
+def grayscale(rgb_image: np.ndarray | da.Array, is_interleaved: bool = False) -> np.ndarray:
     """
     convert RGB image data to greyscale.
 

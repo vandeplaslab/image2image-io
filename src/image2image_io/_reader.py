@@ -148,6 +148,15 @@ def get_key(path: Path, scene_index: int | None = None) -> str:
     return name
 
 
+def is_supported(path: PathLike) -> bool:
+    """Check whether the file is supported."""
+    path = Path(path)
+    path = sanitize_read_path(path)  # type: ignore[assignment]
+    if not path:
+        raise UnsupportedFileFormatError("Could not sanitize path - are you sure this file is supported?")
+    return path is not None
+
+
 def get_reader(path: Path, split_czi: bool | None = None) -> tuple[Path, dict[str, BaseReader]]:
     """Get reader for the specified path."""
     path = Path(path)
@@ -196,6 +205,15 @@ def get_reader(path: Path, split_czi: bool | None = None) -> tuple[Path, dict[st
     else:
         raise UnsupportedFileFormatError(f"Unsupported file format: '{suffix}'")
     return path, readers
+
+
+def get_simple_reader(path: PathLike, init_pyramid: bool = True) -> BaseReader:
+    """Get simple reader."""
+    init_pyramid_ = CONFIG.init_pyramid
+    CONFIG.init_pyramid = init_pyramid
+    path, readers = get_reader(path, split_czi=False)
+    CONFIG.init_pyramid = init_pyramid_
+    return next(iter(readers.values()))
 
 
 def _check_multi_scene_czi(path: PathLike) -> bool:

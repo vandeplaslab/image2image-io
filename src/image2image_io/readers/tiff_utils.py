@@ -37,8 +37,7 @@ def tifftag_xy_pixel_sizes(rdr: TiffFile, series_idx: int, level_idx: int) -> ty
     # conversion of pixels / um to um / pixel
     x_res_um = (1 / (x_res[0] / x_res[1])) * res_to_um
     y_res_um = (1 / (y_res[0] / y_res[1])) * res_to_um
-
-    return (x_res_um, y_res_um)
+    return x_res_um, y_res_um
 
 
 def svs_xy_pixel_sizes(rdr: TiffFile, series_idx: int, level_idx: int) -> ty.Tuple[float, ...]:

@@ -17,6 +17,17 @@ if ty.TYPE_CHECKING:
     from image2image_io.readers._base_reader import BaseReader
 
 
+class Transformer(ty.Protocol):
+    """Transformer protocol to transform image."""
+
+    output_size: tuple[int, int]
+    output_spacing: tuple[float, float]
+
+    def __call__(self, image: sitk.Image) -> sitk.Image:
+        """Transform image."""
+        ...
+
+
 class OmeTiffWriter:
     """OME-TIFF writer class."""
 
@@ -32,7 +43,7 @@ class OmeTiffWriter:
     subifds: int | None = None
     compression: str = "deflate"
 
-    def __init__(self, reader: BaseReader):
+    def __init__(self, reader: BaseReader, transformer: Transformer | None = None):
         """
         Class for managing writing images to OME-TIFF.
 
@@ -64,7 +75,7 @@ class OmeTiffWriter:
 
         """
         self.reader = reader
-        # self.reg_image = reg_image
+        self.transformer = transformer
 
     def _prepare_image_info(
         self,
@@ -74,8 +85,12 @@ class OmeTiffWriter:
         compression: str | None = "default",
     ) -> None:
         """Get image info and OME-XML."""
-        self.y_size, self.x_size = self.reader.image_shape
-        self.y_spacing, self.x_spacing = None, None
+        if self.transformer:
+            self.x_size, self.y_size = self.transformer.output_size
+            self.y_spacing, self.x_spacing = self.transformer.output_spacing
+        else:
+            self.y_size, self.x_size = self.reader.image_shape
+            self.y_spacing, self.x_spacing = None, None
 
         self.tile_size = tile_size
         # protect against too large tile size
@@ -85,8 +100,12 @@ class OmeTiffWriter:
         self.pyr_levels, _ = get_pyramid_info(self.y_size, self.x_size, self.reader.n_channels, self.tile_size)
         self.n_pyr_levels = len(self.pyr_levels)
 
-        self.PhysicalSizeX = self.reader.resolution
-        self.PhysicalSizeY = self.reader.resolution
+        if self.transformer:
+            self.PhysicalSizeX = self.x_spacing
+            self.PhysicalSizeY = self.y_spacing
+        else:
+            self.PhysicalSizeX = self.reader.resolution
+            self.PhysicalSizeY = self.reader.resolution
 
         channel_names = self.reader.channel_names
 
@@ -119,7 +138,7 @@ class OmeTiffWriter:
         write_pyramid: bool = True,
         tile_size: int = 512,
         compression: str | None = "default",
-    ) -> str:
+    ) -> Path:
         """
         Write OME-TIFF image plane-by-plane to disk. WsiReg compatible RegImages all
         have methods to read an image channel-by-channel, thus each channel is read, transformed, and written to
@@ -150,6 +169,7 @@ class OmeTiffWriter:
 
         """
         output_file_name = str(Path(output_dir) / f"{image_name}.ome.tiff")
+        logger.info(f"Saving to '{output_file_name}'")
         self._prepare_image_info(
             image_name,
             write_pyramid=write_pyramid,
@@ -158,14 +178,16 @@ class OmeTiffWriter:
         )
 
         rgb_im_data = []
-
-        logger.info(f"Saving to '{output_file_name}'")
         with TiffWriter(output_file_name, bigtiff=True) as tif:
             for channel_idx in trange(self.reader.n_channels):
-                image = self.reader.get_channel(channel_idx)
+                image: np.ndarray = self.reader.get_channel(channel_idx)
                 image = np.squeeze(image)
-                image = sitk.GetImageFromArray(image)
+                image: sitk.Image = sitk.GetImageFromArray(image)
                 image.SetSpacing((self.reader.resolution, self.reader.resolution))
+
+                # transform
+                if self.transformer:
+                    image = self.transformer(image)
 
                 if self.reader.is_rgb:
                     rgb_im_data.append(image)
@@ -184,24 +206,12 @@ class OmeTiffWriter:
                     description = self.omexml if channel_idx == 0 else None
                     # write channel data
                     logger.info(f" writing channel {channel_idx} - shape: {image.shape}")
-                    tif.write(
-                        image,
-                        subifds=self.subifds,
-                        description=description,
-                        **options,
-                    )
+                    tif.write(image, subifds=self.subifds, description=description, **options)
 
                     if write_pyramid:
                         for pyr_idx in range(1, self.n_pyr_levels):
-                            resize_shape = (
-                                self.pyr_levels[pyr_idx][0],
-                                self.pyr_levels[pyr_idx][1],
-                            )
-                            image = cv2.resize(
-                                image,
-                                resize_shape,
-                                cv2.INTER_LINEAR,
-                            )
+                            resize_shape = (self.pyr_levels[pyr_idx][0], self.pyr_levels[pyr_idx][1])
+                            image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
                             logger.info(f"pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}")
                             tif.write(image, **options, subfiletype=1)
 
@@ -235,11 +245,11 @@ class OmeTiffWriter:
                             self.pyr_levels[pyr_idx][0],
                             self.pyr_levels[pyr_idx][1],
                         )
-                        rgb_im_data = cv2.resize(
-                            rgb_im_data,
-                            resize_shape,
-                            cv2.INTER_LINEAR,
-                        )
+                        rgb_im_data = cv2.resize(rgb_im_data, resize_shape, cv2.INTER_LINEAR)
                         logger.info(f"pyramid index {pyr_idx} : shape: {resize_shape}")
                         tif.write(rgb_im_data, **options, subfiletype=1)
-        return output_file_name
+        return Path(output_file_name)
+
+    def write(self, name: str, output_dir: Path) -> Path:
+        """Write image."""
+        return self.write_image_by_plane(name, output_dir)
