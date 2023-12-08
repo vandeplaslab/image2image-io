@@ -127,3 +127,15 @@ class TiffImageReader(BaseReader):
         if not CONFIG.auto_pyramid:
             largest_series = 0
         return im_dims, im_dtype, largest_series
+
+    def get_channel_axis_and_n_channels(self) -> tuple[int | None, int]:
+        """Return channel axis and number of channels."""
+        shape = self.shape
+        ndim = len(shape)
+        # 2D images will be returned as they are
+        if ndim == 3:
+            if self.is_rgb:
+                return None, 3
+            else:
+                return 0, shape[0]
+        return None, 1
