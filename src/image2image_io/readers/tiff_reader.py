@@ -51,7 +51,6 @@ class TiffImageReader(BaseReader):
         logger.trace(
             f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution}; n_ch={len(self._channel_names)}"
         )
-
         init_pyramid = init_pyramid if init_pyramid is not None else CONFIG.init_pyramid
         if init_pyramid:
             self._pyramid = self.pyramid

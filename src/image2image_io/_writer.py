@@ -267,7 +267,7 @@ def _write_txt(
     )
     with open(path, "w", newline="\n", encoding="cp1252") as f:
         f.write(",".join(columns) + ",\n")
-        with tqdm(array, total=n, mininterval=1) as pbar:
+        with tqdm(array, total=n, mininterval=1, desc="Exporting to CSV...") as pbar:
             for i, row in enumerate(pbar):
                 f.write(str_func(row))
                 if i % update_freq == 0 and i != 0:

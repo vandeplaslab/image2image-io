@@ -177,9 +177,25 @@ class OmeTiffWriter:
             compression=compression,
         )
 
-        rgb_im_data = []
         with TiffWriter(output_file_name, bigtiff=True) as tif:
-            for channel_idx in trange(self.reader.n_channels):
+            if self.reader.is_rgb:
+                options = {
+                    "tile": (self.tile_size, self.tile_size),
+                    "compression": self.compression,
+                    "photometric": "rgb",
+                    "metadata": None,
+                }
+            else:
+                options = {
+                    "tile": (self.tile_size, self.tile_size),
+                    "compression": self.compression,
+                    "photometric": "rgb" if self.reader.is_rgb else "minisblack",
+                    "metadata": None,
+                }
+            logger.trace(f"TIFF options: {options}")
+
+            rgb_im_data = []
+            for channel_idx in trange(self.reader.n_channels, desc="Writing channels..."):
                 image: np.ndarray = self.reader.get_channel(channel_idx)
                 image = np.squeeze(image)
                 image: sitk.Image = sitk.GetImageFromArray(image)
@@ -195,37 +211,23 @@ class OmeTiffWriter:
                     if isinstance(image, sitk.Image):
                         image = sitk.GetArrayFromImage(image)
 
-                    options = {
-                        "tile": (self.tile_size, self.tile_size),
-                        "compression": self.compression,
-                        "photometric": "rgb" if self.reader.is_rgb else "minisblack",
-                        "metadata": None,
-                    }
-                    logger.trace(f"options: {options}")
                     # write OME-XML to the ImageDescription tag of the first page
                     description = self.omexml if channel_idx == 0 else None
                     # write channel data
-                    logger.info(f" writing channel {channel_idx} - shape: {image.shape}")
+                    logger.info(f"Writing channel {channel_idx} - shape: {image.shape}")
                     tif.write(image, subifds=self.subifds, description=description, **options)
 
                     if write_pyramid:
                         for pyr_idx in range(1, self.n_pyr_levels):
                             resize_shape = (self.pyr_levels[pyr_idx][0], self.pyr_levels[pyr_idx][1])
                             image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
-                            logger.info(f"pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}")
+                            logger.info(f"Writing pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}")
                             tif.write(image, **options, subfiletype=1)
 
             if self.reader.is_rgb:
                 rgb_im_data = sitk.Compose(rgb_im_data)
                 rgb_im_data = sitk.GetArrayFromImage(rgb_im_data)
 
-                options = {
-                    "tile": (self.tile_size, self.tile_size),
-                    "compression": self.compression,
-                    "photometric": "rgb",
-                    "metadata": None,
-                }
-                logger.trace(f"options: {options}")
                 # write OME-XML to the ImageDescription tag of the first page
                 description = self.omexml
 
