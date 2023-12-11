@@ -98,7 +98,7 @@ class ImageWrapper:
 
     def channel_image_for_channel_names_iter(
         self, channel_names: list[str] | None
-    ) -> ty.Generator[tuple[str, list[np.ndarray], BaseReader], None, None]:
+    ) -> ty.Generator[tuple[str, list[np.ndarray] | None, BaseReader], None, None]:
         """Iterate of channel name + image for a specified list of channels."""
         if channel_names is None:
             channel_names = self.channel_names()
@@ -106,7 +106,10 @@ class ImageWrapper:
             name, dataset = channel_name.split(" | ")
             reader = self.data[dataset]
             index = reader.channel_to_index(name)
-            yield channel_name, reader.get_channel_pyramid(index), reader
+            if reader.reader_type == "image":
+                yield channel_name, reader.get_channel_pyramid(index), reader
+            else:
+                yield channel_name, None, reader
 
     def channel_image_reader_iter(self) -> ty.Generator[tuple[str, list[np.ndarray], BaseReader], None, None]:
         """Iterator of channel name + image."""

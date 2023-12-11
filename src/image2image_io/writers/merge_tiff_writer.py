@@ -8,6 +8,7 @@ from typing import List
 import cv2
 import numpy as np
 import SimpleITK as sitk
+from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import TiffWriter
 from tqdm import tqdm, trange
@@ -132,9 +133,7 @@ class MergeOmeTiffWriter:
                 out_size.append(transform.output_size)
                 out_spacing.append(transform.output_spacing)
             else:
-                out_im_size = (
-                    (reader.shape[0], reader.shape[1]) if reader.is_rgb else (reader.shape[1], reader.shape[2])
-                )
+                out_im_size = reader.shape
                 out_im_spacing = reader.resolution
 
                 out_size.append(out_im_size)
@@ -161,9 +160,7 @@ class MergeOmeTiffWriter:
             self.x_size, self.y_size = transformer.output_size
             self.x_spacing, self.y_spacing = transformer.output_spacing
         else:
-            self.y_size, self.x_size = (
-                (reader.shape[0], reader.shape[1]) if reader.is_rgb else (reader.shape[1], reader.shape[2])
-            )
+            self.y_size, self.x_size = reader.shape
             self.y_spacing, self.x_spacing = (
                 reader.resolution,
                 reader.resolution,
@@ -277,41 +274,52 @@ class MergeOmeTiffWriter:
 
         logger.trace(f"saving to {output_file_name}")
         with TiffWriter(output_file_name, bigtiff=True) as tif:
+            options = {
+                "tile": (tile_size, tile_size),
+                "compression": self.compression,
+                "photometric": "minisblack",
+                "metadata": None,
+            }
+            logger.trace(f"TIFF options: {options}")
+
             for reader_index, reader in enumerate(tqdm(self.reader.readers, desc="writing sub-images")):
                 merge_n_channels = reader.n_channels
                 for channel_idx in trange(merge_n_channels, leave=False, desc=f"writing sub-image {reader_index}"):
-                    image = self.reader.readers[reader_index].read_single_channel(channel_idx)
+                    image: np.ndarray = self.reader.readers[reader_index].get_channel(channel_idx)
                     image = np.squeeze(image)
-                    image = sitk.GetImageFromArray(image)
+                    image: sitk.Image = sitk.GetImageFromArray(image)
                     image.SetSpacing((reader.resolution, reader.resolution))
+
                     if image.GetPixelIDValue() != merge_dtype_sitk:
                         image = sitk.Cast(image, merge_dtype_sitk)
+
+                    # transform
                     if self.transformers[reader_index]:
                         image = self.transformers[reader_index](image)
 
                     if isinstance(image, sitk.Image):
                         image = sitk.GetArrayFromImage(image)
 
-                    options = {
-                        "tile": (tile_size, tile_size),
-                        "compression": self.compression,
-                        "photometric": "minisblack",
-                        "metadata": None,
-                    }
-                    logger.trace(f"options: {options}")
                     # write OME-XML to the ImageDescription tag of the first page
                     description = self.omexml if channel_idx == 0 and reader_index == 0 else None
+
                     # write channel data
                     logger.trace(
-                        f"writing sub-image index {reader_index} : {sub_image_names[reader_index]} - "
+                        f"Writing sub-image index {reader_index} : {sub_image_names[reader_index]} - "
                         f"channel index - {channel_idx} - shape: {image.shape}"
                     )
-                    tif.write(image, subifds=self.subifds, description=description, **options)
+                    with MeasureTimer() as write_timer:
+                        tif.write(image, subifds=self.subifds, description=description, **options)
+                    logger.trace(
+                        f"Wrote sub-image index {reader_index} : {sub_image_names[reader_index]} took {write_timer()}"
+                    )
 
                     if write_pyramid:
                         for pyr_idx in range(1, self.n_pyr_levels):
-                            resize_shape = (self.pyr_levels[pyr_idx][0], self.pyr_levels[pyr_idx][1])
-                            image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
-                            logger.info(f"pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}")
-                            tif.write(image, **options, subfiletype=1)
+                            with MeasureTimer() as write_timer:
+                                resize_shape = (self.pyr_levels[pyr_idx][0], self.pyr_levels[pyr_idx][1])
+                                image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
+                                logger.info(f"pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}")
+                                tif.write(image, **options, subfiletype=1)
+                            logger.info(f"Wrote pyramid index {pyr_idx} took {write_timer()}")
             return Path(output_file_name)

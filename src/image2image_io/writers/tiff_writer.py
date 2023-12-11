@@ -7,6 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import SimpleITK as sitk
+from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import TiffWriter
 from tqdm import trange
@@ -215,14 +216,23 @@ class OmeTiffWriter:
                     description = self.omexml if channel_idx == 0 else None
                     # write channel data
                     logger.info(f"Writing channel {channel_idx} - shape: {image.shape}")
-                    tif.write(image, subifds=self.subifds, description=description, **options)
+                    with MeasureTimer() as write_timer:
+                        tif.write(image, subifds=self.subifds, description=description, **options)
+                    logger.info(f"Writing channel {channel_idx} took {write_timer()}")
 
                     if write_pyramid:
-                        for pyr_idx in range(1, self.n_pyr_levels):
-                            resize_shape = (self.pyr_levels[pyr_idx][0], self.pyr_levels[pyr_idx][1])
-                            image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
-                            logger.info(f"Writing pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}")
-                            tif.write(image, **options, subfiletype=1)
+                        with MeasureTimer() as write_timer:
+                            for pyr_idx in range(1, self.n_pyr_levels):
+                                resize_shape = (self.pyr_levels[pyr_idx][0], self.pyr_levels[pyr_idx][1])
+                                image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
+                                logger.info(
+                                    f"Writing pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}"
+                                )
+                                tif.write(image, **options, subfiletype=1)
+                            logger.info(
+                                f"Wrote pyramid index {pyr_idx} : channel {channel_idx} took"
+                                f" {write_timer(since_last=True)}"
+                            )
 
             if self.reader.is_rgb:
                 rgb_im_data = sitk.Compose(rgb_im_data)
@@ -243,13 +253,12 @@ class OmeTiffWriter:
                 if write_pyramid:
                     logger.info("Writing pyramid...")
                     for pyr_idx in range(1, self.n_pyr_levels):
-                        resize_shape = (
-                            self.pyr_levels[pyr_idx][0],
-                            self.pyr_levels[pyr_idx][1],
-                        )
-                        rgb_im_data = cv2.resize(rgb_im_data, resize_shape, cv2.INTER_LINEAR)
-                        logger.info(f"pyramid index {pyr_idx} : shape: {resize_shape}")
-                        tif.write(rgb_im_data, **options, subfiletype=1)
+                        with MeasureTimer() as write_timer:
+                            resize_shape = (self.pyr_levels[pyr_idx][0], self.pyr_levels[pyr_idx][1])
+                            rgb_im_data = cv2.resize(rgb_im_data, resize_shape, cv2.INTER_LINEAR)
+                            logger.info(f"pyramid index {pyr_idx} : shape: {resize_shape}")
+                            tif.write(rgb_im_data, **options, subfiletype=1)
+                        logger.info(f"Wrote pyramid index {pyr_idx} took {write_timer()}")
         return Path(output_file_name)
 
     def write(self, name: str, output_dir: Path) -> Path:
