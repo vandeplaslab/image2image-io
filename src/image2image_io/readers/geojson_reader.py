@@ -7,7 +7,7 @@ import numpy as np
 from koyo.typing import PathLike
 
 from image2image_io.readers._base_reader import BaseReader
-from image2image_io.readers.geojson_utils import read_geojson, shape_reader
+from image2image_io.readers.geojson_utils import get_int_dtype, read_geojson, shape_reader
 
 
 class GeoJSONReader(BaseReader):
@@ -33,6 +33,38 @@ class GeoJSONReader(BaseReader):
 
         polygons = shapes_to_polygons(self.shape_data, with_index=with_index)
         mask = polygons_to_mask(polygons, output_shape)
+        return mask
+
+    def to_mask_alt(self, output_size: tuple[int, int], with_index: bool = False) -> np.ndarray:
+        """
+        Draw a binary or label mask using shape data.
+
+        Parameters
+        ----------
+        output_size: tuple of int
+            Size of the mask in in tuple(x,y)
+        with_index: bool
+            Whether to write each mask instance as a label (1-n_shapes) or to write all as binary (255)
+
+        Returns
+        -------
+        mask: np.ndarray
+            Drawn mask at set output size
+
+        """
+        import cv2
+
+        dtype = np.uint8
+        if with_index:
+            dtype = get_int_dtype(len(self.shape_data))  # type: ignore[assignment]
+        mask = np.zeros(output_size[::-1], dtype=dtype)
+        shapes = self.shape_data
+        for idx, sh in enumerate(shapes):
+            mask = cv2.fillPoly(
+                mask,
+                pts=[sh["array"].astype(np.int32)],
+                color=idx + 1 if with_index else np.iinfo(dtype).max,
+            )
         return mask
 
     def to_shapes(self) -> tuple[str, dict[str, np.ndarray | str]]:

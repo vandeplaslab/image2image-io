@@ -135,7 +135,7 @@ class TiffImageReader(BaseReader):
         # 2D images will be returned as they are
         if ndim == 3:
             if self.is_rgb:
-                return None, 3
+                return 2, 3
             else:
                 return 0, shape[0]
         return None, 1

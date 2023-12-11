@@ -27,23 +27,23 @@ def czis_to_ome_tiff(
     from image2image_io.readers._czi import CziSceneFile
 
     # calculate true total number of scenes
-    total = 0
+    total_n_scenes = 0
     paths_ = []
     for path_ in paths:
         path_ = Path(path_)
         if path_.is_dir():
             for path__ in path_.glob("**/*.czi"):
-                total += CziSceneFile.get_num_scenes(path__)
+                total_n_scenes += CziSceneFile.get_num_scenes(path__)
                 paths_.append(path__)
         else:
-            total += CziSceneFile.get_num_scenes(path_)
+            total_n_scenes += CziSceneFile.get_num_scenes(path_)
             paths_.append(path_)
 
     current = 0
     for path_ in paths_:
         path_ = Path(path_)
-        for key, current_scene, total_scene in czi_to_ome_tiff(path_, output_dir):
-            yield key, current_scene, total_scene, current, total
+        for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(path_, output_dir):
+            yield key, current_file_scene, total_file_scenes, current, total_n_scenes
             current += 1
 
 

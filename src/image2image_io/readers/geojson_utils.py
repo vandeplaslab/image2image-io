@@ -29,6 +29,29 @@ GJ_SHAPE_TYPE_NAME = {
 }
 
 
+def get_int_dtype(value: int) -> np.dtype:
+    """Determine appropriate bit precision for indexed image.
+
+    Parameters
+    ----------
+    value:int
+        number of shapes
+
+    Returns
+    -------
+    dtype:np.dtype
+        Appropriate data type for the number of masks.
+    """
+    if value <= np.iinfo(np.uint8).max:
+        return np.uint8
+    if value <= np.iinfo(np.uint16).max:
+        return np.uint16
+    if value <= np.iinfo(np.uint32).max:
+        return np.int32
+    else:
+        raise ValueError("Too many shapes")
+
+
 def geojson_to_numpy(gj: dict) -> dict:
     """
     Convert geojson representation to np.ndarray representation of shape.
