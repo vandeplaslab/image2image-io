@@ -91,26 +91,21 @@ class MergeOmeTiffWriter:
         self.reader = reader
         self.transformers = transformers
 
-    def _length_checks(self, sub_image_names):
+    def _check_transforms_and_readers(self, reader_names):
         """Make sure incoming data is kosher in dimensions."""
-        if not isinstance(sub_image_names, list):
-            if sub_image_names is None:
-                sub_image_names = ["" for i in range(len(self.reader.readers))]
-            else:
-                raise ValueError("MergeRegImage requires a list of image names for each image to merge")
+        if not isinstance(reader_names, list):
+            raise ValueError("Require a list of image names for each image to merge")
 
-        if self.transformers is None:
+        transformations = self.transformers
+        if transformations is None:
             transformations = [None for i in range(len(self.reader.readers))]
-        else:
-            transformations = self.transformers
-
         if len(transformations) != len(self.reader.readers):
-            raise ValueError("MergeRegImage number of transforms does not match number of images")
+            raise ValueError("The number of transforms does not match number of images")
 
     def _create_channel_names(self, sub_image_names):
         """Create channel names for merge data."""
 
-        def _prepare_channel_names(name_, channel_names_):
+        def _prepare_channel_names(name_: str, channel_names_: str) -> list[str]:
             return [f"{name_} - {c}" for c in channel_names_]
 
         self.reader.channel_names = [
@@ -119,31 +114,25 @@ class MergeOmeTiffWriter:
         ]
         self.reader.channel_names = [item for sublist in self.reader.channel_names for item in sublist]
 
-    def _transform_check(self):
+    def _check_transforms_sizes_and_resolutions(self):
         """Check that all transforms as currently loaded output to the same size/resolution."""
         out_size = []
         out_spacing = []
-
-        if not self.transformers:
-            rts = [None for _ in range(len(self.reader.readers))]
-        else:
-            rts = self.transformers
-        for reader, transform in zip(self.reader.readers, rts):
+        registered_transforms = self.transformers
+        if registered_transforms is None:
+            registered_transforms = [None for _ in range(len(self.reader.readers))]
+        for reader, transform in zip(self.reader.readers, registered_transforms):
             if transform:
                 out_size.append(transform.output_size)
                 out_spacing.append(transform.output_spacing)
             else:
-                out_im_size = reader.shape
-                out_im_spacing = reader.resolution
-
-                out_size.append(out_im_size)
-                out_spacing.append(out_im_spacing)
+                out_size.append(reader.image_shape)
+                out_spacing.append(reader.resolution)
 
         if not all(out_spacing):
-            raise ValueError("MergeRegImage all transforms output spacings and untransformed image spacings must match")
-
+            raise ValueError("All transforms output spacings and untransformed image spacings must match")
         if not all(out_size):
-            raise ValueError("MergeRegImage all transforms output sizes and untransformed image sizes must match")
+            raise ValueError("All transforms output sizes and untransformed image sizes must match")
 
     def _prepare_image_info(
         self,
@@ -160,7 +149,7 @@ class MergeOmeTiffWriter:
             self.x_size, self.y_size = transformer.output_size
             self.x_spacing, self.y_spacing = transformer.output_spacing
         else:
-            self.y_size, self.x_size = reader.shape
+            self.y_size, self.x_size = reader.image_shape
             self.y_spacing, self.x_spacing = (
                 reader.resolution,
                 reader.resolution,
@@ -221,12 +210,12 @@ class MergeOmeTiffWriter:
     def merge_write_image_by_plane(
         self,
         name: str,
-        sub_image_names: list[str],
+        reader_names: list[str],
         output_dir: Path | str = "",
         write_pyramid: bool = True,
         tile_size: int = 512,
         compression: str = "default",
-    ) -> str:
+    ) -> Path:
         """
          Write merged OME-TIFF image plane-by-plane to disk.
          RGB images will be de-interleaved with RGB channels written as separate planes.
@@ -236,7 +225,7 @@ class MergeOmeTiffWriter:
         name: str
              Name to be written WITHOUT extension for example if image_name = "cool_image" the file
              would be "cool_image.ome.tiff"
-        sub_image_names: list of str
+        reader_names: list of str
             Names added before each channel of a given image to distinguish it.
         output_dir: Path or str
              Directory where the image will be saved
@@ -256,17 +245,18 @@ class MergeOmeTiffWriter:
         """
         merge_dtype_sitk, merge_dtype_np = self._get_merge_dtype()
 
-        self._length_checks(sub_image_names)
-        self._create_channel_names(sub_image_names)
-        self._transform_check()
+        self._check_transforms_and_readers(reader_names)
+        self._create_channel_names(reader_names)
+        self._check_transforms_sizes_and_resolutions()
 
         output_file_name = str(Path(output_dir) / f"{name}.ome.tiff")
         logger.info(f"Saving to '{output_file_name}'")
+        transformer = self.transformers[0] if self.transformers else None
         self._prepare_image_info(
             self.reader.readers[0],
             name,
             merge_dtype_np,
-            transformer=self.transformers[0],
+            transformer=transformer,
             write_pyramid=write_pyramid,
             tile_size=tile_size,
             compression=compression,
@@ -294,7 +284,7 @@ class MergeOmeTiffWriter:
                         image = sitk.Cast(image, merge_dtype_sitk)
 
                     # transform
-                    if self.transformers[reader_index]:
+                    if self.transformers and self.transformers[reader_index]:
                         image = self.transformers[reader_index](image)
 
                     if isinstance(image, sitk.Image):
@@ -305,13 +295,13 @@ class MergeOmeTiffWriter:
 
                     # write channel data
                     logger.trace(
-                        f"Writing sub-image index {reader_index} : {sub_image_names[reader_index]} - "
+                        f"Writing sub-image index {reader_index} : {reader_names[reader_index]} - "
                         f"channel index - {channel_idx} - shape: {image.shape}"
                     )
                     with MeasureTimer() as write_timer:
                         tif.write(image, subifds=self.subifds, description=description, **options)
                     logger.trace(
-                        f"Wrote sub-image index {reader_index} : {sub_image_names[reader_index]} took {write_timer()}"
+                        f"Wrote sub-image index {reader_index} : {reader_names[reader_index]} took {write_timer()}"
                     )
 
                     if write_pyramid:
