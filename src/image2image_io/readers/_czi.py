@@ -87,7 +87,7 @@ class CziFile(_CziFile):
     #             for idx, i in enumerate(channel_idx):
     #                 min_ch_seq.update({i: idx})
     #
-    #     if as_uint8 is True:
+    #     if as_uint8 :
     #         out_dtype = np.uint8
     #     else:
     #         out_dtype = self.dtype
@@ -145,7 +145,7 @@ class CziFile(_CziFile):
     #             dvstart[3] = dvstart[3] // ds_factor
     #             dvstart[4] = dvstart[4] // ds_factor
     #
-    #         if as_uint8 is True:
+    #         if as_uint8 :
     #             tile = (tile / 256).astype("uint8")
     #
     #         index = tuple(slice(i - j, i - j + k) for i, j, k in zip(tuple(dvstart), tuple(start), tile.shape))

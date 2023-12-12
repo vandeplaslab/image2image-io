@@ -63,7 +63,7 @@ class TiffImageReader(BaseReader):
     def get_dask_pyr(self):
         """Get instance of Dask pyramid."""
         d_pyr = tifffile_to_dask(self.path, self.largest_series)
-        if self.is_rgb and guess_rgb(d_pyr[0].shape) is True:
+        if self.is_rgb and guess_rgb(d_pyr[0].shape):
             d_pyr[0] = d_pyr[0].rechunk((2048, 2048, 1))
         elif len(d_pyr[0].shape) > 2:
             d_pyr[0] = d_pyr[0].rechunk((1, 2048, 2048))

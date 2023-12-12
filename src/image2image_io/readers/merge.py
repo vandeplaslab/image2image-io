@@ -41,9 +41,9 @@ class MergeImages:
                 reader._channel_names = [f"C{idx}" for idx in range(0, reader.n_channels)]
             readers.append(reader)
 
-        if all(im.dtype == readers[0].dtype for im in readers) is False:
+        if not all(im.dtype == readers[0].dtype for im in readers):
             warn("MergeImages created with mixed data types, writing will cast to the largest data type")
-        if any(im.is_rgb for im in readers) is True:
+        if any(im.is_rgb for im in readers):
             warn("MergeImages does not support writing merged interleaved RGB. Data will be written as multi-channel")
 
         self.readers = readers

@@ -93,7 +93,7 @@ class MergeOmeTiffWriter:
 
     def _length_checks(self, sub_image_names):
         """Make sure incoming data is kosher in dimensions."""
-        if isinstance(sub_image_names, list) is False:
+        if not isinstance(sub_image_names, list):
             if sub_image_names is None:
                 sub_image_names = ["" for i in range(len(self.reader.readers))]
             else:
@@ -139,10 +139,10 @@ class MergeOmeTiffWriter:
                 out_size.append(out_im_size)
                 out_spacing.append(out_im_spacing)
 
-        if all(out_spacing) is False:
+        if not all(out_spacing):
             raise ValueError("MergeRegImage all transforms output spacings and untransformed image spacings must match")
 
-        if all(out_size) is False:
+        if not all(out_size):
             raise ValueError("MergeRegImage all transforms output sizes and untransformed image sizes must match")
 
     def _prepare_image_info(

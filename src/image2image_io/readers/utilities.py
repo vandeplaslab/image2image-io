@@ -317,7 +317,7 @@ def grayscale(rgb_image: np.ndarray | da.Array, is_interleaved: bool = False) ->
     image:np.ndarray
         returns 8-bit greyscale image for 24-bit RGB image
     """
-    if is_interleaved is True:
+    if is_interleaved:
         result = (
             (rgb_image[..., 0] * 0.2125).astype(np.uint8)
             + (rgb_image[..., 1] * 0.7154).astype(np.uint8)
@@ -357,7 +357,7 @@ def tf_zarr_read_single_ch(image_filepath, channel_idx, is_rgb, is_rgb_interleav
     zarr_im = zarr_get_base_pyr_layer(zarr_im)
     try:
         im = da.squeeze(da.from_zarr(zarr_im))
-        if is_rgb and is_rgb_interleaved is True:
+        if is_rgb and is_rgb_interleaved :
             im = im[:, :, channel_idx].compute()
         elif len(im.shape) > 2:
             im = im[channel_idx, :, :].compute()
@@ -366,7 +366,7 @@ def tf_zarr_read_single_ch(image_filepath, channel_idx, is_rgb, is_rgb_interleav
 
     except ValueError:
         im = zarr_im
-        if is_rgb is True and is_rgb_interleaved is True:
+        if is_rgb is True and is_rgb_interleaved :
             im = im[:, :, channel_idx]
         elif len(im.shape) > 2:
             im = im[channel_idx, :, :].compute()

@@ -223,7 +223,7 @@ def shape_reader(shape_data: list, **kwargs: ty.Any) -> tuple[dict, dict]:
         "shape_type": str - indicates GeoJSON shape_type (Polygon, MultiPolygon, etc.)
         "shape_name": str - name inherited from QuPath GeoJSON
     """
-    if isinstance(shape_data, list) is False:
+    if not isinstance(shape_data, list):
         shape_data = [shape_data]
 
     shapes_gj = []
@@ -341,7 +341,7 @@ def invert_nonrigid_transforms(itk_transforms: list):
 #         physical spacing of the final transformation in the transform sequence
 #         This is needed to map coordinates defined as pixel indices to physical coordinates and then back
 #     """
-#     if all([isinstance(t, RegTransform) for t in transformations]) is False:
+#     if not all([isinstance(t, RegTransform) for t in transformations]):
 #         _, transformations = wsireg_transforms_to_itk_composite(transformations)
 #     if compute_inverse:
 #         transformations = invert_nonrigid_transforms(transformations)
@@ -390,7 +390,7 @@ def invert_nonrigid_transforms(itk_transforms: list):
 #     """
 #     tformed_pts = []
 #     for pt in pt_data:
-#         if px_idx is True:
+#         if px_idx :
 #             pt = pt * source_res
 #         for idx, t in enumerate(itk_transforms):
 #             if idx == 0:
@@ -398,7 +398,7 @@ def invert_nonrigid_transforms(itk_transforms: list):
 #             else:
 #                 t_pt = t.inverse_transform.TransformPoint(t_pt)
 #         t_pt = np.array(t_pt)
-#         if output_idx is True:
+#         if output_idx :
 #             t_pt *= 1 / target_res
 #         tformed_pts.append(t_pt)
 #

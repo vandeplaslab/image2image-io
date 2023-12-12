@@ -262,6 +262,7 @@ class BaseReader:
     def scale_for_pyramid(self, pyramid: int = 0) -> tuple[float, float]:
         """Return scale for pyramid."""
         if pyramid < 0:
-            pyramid = range(1, self.n_in_pyramid + 1)[pyramid]
+            pyramid = list(range(self.n_in_pyramid))[pyramid]
+            # pyramid = range(self.n_in_pyramid)[pyramid] + 1
         resolution = self.resolution * 2**pyramid
         return resolution, resolution
