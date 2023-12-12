@@ -357,7 +357,7 @@ def tf_zarr_read_single_ch(image_filepath, channel_idx, is_rgb, is_rgb_interleav
     zarr_im = zarr_get_base_pyr_layer(zarr_im)
     try:
         im = da.squeeze(da.from_zarr(zarr_im))
-        if is_rgb and is_rgb_interleaved :
+        if is_rgb and is_rgb_interleaved:
             im = im[:, :, channel_idx].compute()
         elif len(im.shape) > 2:
             im = im[channel_idx, :, :].compute()
@@ -366,7 +366,7 @@ def tf_zarr_read_single_ch(image_filepath, channel_idx, is_rgb, is_rgb_interleav
 
     except ValueError:
         im = zarr_im
-        if is_rgb is True and is_rgb_interleaved :
+        if is_rgb is True and is_rgb_interleaved:
             im = im[:, :, channel_idx]
         elif len(im.shape) > 2:
             im = im[channel_idx, :, :].compute()
@@ -398,7 +398,9 @@ def compute_sub_res(zarray, ds_factor, tile_size, is_rgb, im_dtype) -> da.Array:
     return resampled_zarray_subres
 
 
-def prepare_ome_xml_str(y_size, x_size, n_ch, im_dtype, is_rgb, **ome_metadata):
+def prepare_ome_xml_str(
+    y_size: int, x_size: int, n_ch: int, im_dtype: np.dtype[ty.Any], is_rgb: bool, **ome_metadata: ty.Any
+) -> str:
     """Prepare OME-XML metadata."""
     from tifffile import OmeXml
 

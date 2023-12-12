@@ -9,7 +9,7 @@ if ty.TYPE_CHECKING:
     from skimage.transform import ProjectiveTransform
 
 
-def format_channel_names(channel_names, n_ch):
+def format_channel_names(channel_names: list[str], n_ch: int) -> list[str]:
     """
     Format channel names and ensure number of channel names matches number of channels or default
     to C1, C2, C3, etc.

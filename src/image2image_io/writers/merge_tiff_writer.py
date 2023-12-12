@@ -32,7 +32,34 @@ class Transformer(ty.Protocol):
 
 
 class MergeOmeTiffWriter:
-    """Class for writing multiple images into a single OME-TIFF."""
+    """Class for writing multiple images into a single OME-TIFF.
+
+    Attributes
+    ----------
+    x_size: int
+        Size of the merged image after transformation in x
+    y_size: int
+        Size of the merged image after transformation in y
+    y_spacing: float
+        Pixel spacing in microns after transformation in y
+    x_spacing: float
+        Pixel spacing in microns after transformation in x
+    tile_size: int
+        Size of tiles to be written
+    pyr_levels: list of tuples of int:
+        Size of down-sampled images in pyramid
+    n_pyr_levels: int
+        Number of downsamples in pyramid
+    PhysicalSizeY: float
+        physical size of image in micron for OME-TIFF in Y
+    PhysicalSizeX: float
+        physical size of image in micron for OME-TIFF in X
+    subifds: int
+        Number of sub-resolutions for pyramidal OME-TIFF
+    compression: str
+        tifffile string to pass to compression argument, defaults to "deflate" for minisblack
+        and "jpeg" for RGB type images
+    """
 
     x_size: int | None = None
     y_size: int | None = None
@@ -50,48 +77,23 @@ class MergeOmeTiffWriter:
         self,
         reader: MergeImages,
         transformers: list[Transformer] | None = None,
+        crop_mask: np.ndarray | None = None,
     ):
         """
-        Class for writing multiple images wiuth and without transforms to a singel OME-TIFF.
+        Class for writing multiple images with and without transforms to a single OME-TIFF.
 
         Parameters
         ----------
         reader: MergeImages
             MergeRegImage to be transformed
-        reg_transform_seqs: List of RegTransformSeq or None
+        transformers: List of RegTransformSeq or None
             Registration transformation sequences for each wsireg image to be merged
-
-        Attibutes
-        ---------
-        x_size: int
-            Size of the merged image after transformation in x
-        y_size: int
-            Size of the merged image after transformation in y
-        y_spacing: float
-            Pixel spacing in microns after transformation in y
-        x_spacing: float
-            Pixel spacing in microns after transformation in x
-        tile_size: int
-            Size of tiles to be written
-        pyr_levels: list of tuples of int:
-            Size of downsampled images in pyramid
-        n_pyr_levels: int
-            Number of downsamples in pyramid
-        PhysicalSizeY: float
-            physical size of image in micron for OME-TIFF in Y
-        PhysicalSizeX: float
-            physical size of image in micron for OME-TIFF in X
-        subifds: int
-            Number of sub-resolutions for pyramidal OME-TIFF
-        compression: str
-            tifffile string to pass to compression argument, defaults to "deflate" for minisblack
-            and "jpeg" for RGB type images
-
         """
         self.reader = reader
         self.transformers = transformers
+        self.crop_mask = crop_mask
 
-    def _check_transforms_and_readers(self, reader_names):
+    def _check_transforms_and_readers(self, reader_names: list[str]) -> None:
         """Make sure incoming data is kosher in dimensions."""
         if not isinstance(reader_names, list):
             raise ValueError("Require a list of image names for each image to merge")
@@ -102,7 +104,7 @@ class MergeOmeTiffWriter:
         if len(transformations) != len(self.reader.readers):
             raise ValueError("The number of transforms does not match number of images")
 
-    def _create_channel_names(self, sub_image_names):
+    def _create_channel_names(self, reader_names: list[str]) -> None:
         """Create channel names for merge data."""
 
         def _prepare_channel_names(name_: str, channel_names_: str) -> list[str]:
@@ -110,11 +112,11 @@ class MergeOmeTiffWriter:
 
         self.reader.channel_names = [
             _prepare_channel_names(name, channel_names)
-            for name, channel_names in zip(sub_image_names, self.reader.channel_names)
+            for name, channel_names in zip(reader_names, self.reader.channel_names)
         ]
         self.reader.channel_names = [item for sublist in self.reader.channel_names for item in sublist]
 
-    def _check_transforms_sizes_and_resolutions(self):
+    def _check_transforms_sizes_and_resolutions(self) -> None:
         """Check that all transforms as currently loaded output to the same size/resolution."""
         out_size = []
         out_spacing = []
@@ -143,17 +145,17 @@ class MergeOmeTiffWriter:
         write_pyramid: bool = True,
         tile_size: int = 512,
         compression: str = "default",
-    ):
+    ) -> None:
         """Prepare OME-XML and other data needed for saving."""
         if transformer:
             self.x_size, self.y_size = transformer.output_size
             self.x_spacing, self.y_spacing = transformer.output_spacing
+        elif self.crop_mask is not None:
+            self.y_size, self.x_size = self.crop_mask.shape
+            self.y_spacing, self.x_spacing = reader.resolution, reader.resolution
         else:
             self.y_size, self.x_size = reader.image_shape
-            self.y_spacing, self.x_spacing = (
-                reader.resolution,
-                reader.resolution,
-            )
+            self.y_spacing, self.x_spacing = reader.resolution, reader.resolution
 
         self.tile_size = tile_size
         # protect against too large tile size
@@ -193,7 +195,7 @@ class MergeOmeTiffWriter:
         else:
             self.compression = compression
 
-    def _get_merge_dtype(self):
+    def _get_merge_dtype(self) -> tuple[int, np.dtype[ty.Any]]:
         """Determine data type for merger. Will default to the largest
         dtype. If one image is np.uint8 and another np.uint16, the image at np.uint8
         will be cast to np.uint16.
@@ -286,9 +288,12 @@ class MergeOmeTiffWriter:
                     # transform
                     if self.transformers and self.transformers[reader_index]:
                         image = self.transformers[reader_index](image)
-
+                    # make sure we have numpy array
                     if isinstance(image, sitk.Image):
                         image = sitk.GetArrayFromImage(image)
+                    # apply crop mask
+                    if self.crop_mask is not None:
+                        image = self.crop_mask * image
 
                     # write OME-XML to the ImageDescription tag of the first page
                     description = self.omexml if channel_idx == 0 and reader_index == 0 else None
