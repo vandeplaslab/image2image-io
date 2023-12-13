@@ -1,3 +1,4 @@
+"""Writer functions."""
 from __future__ import annotations
 
 import typing as ty
@@ -69,7 +70,8 @@ def czi_to_ome_tiff(
 
     # iterate over each scene in the czi file
     for scene_index in range(n):
-        output_path = output_dir / f"{Path(path).stem}_scene={scene_index:02d}"
+        filename = path.name.replace(".czi", "") + (f"_scene={scene_index:02d}" if n > 1 else "")
+        output_path = output_dir / filename
         # skip if the output file already exists
         if output_path.with_suffix(".ome.tiff").exists():
             logger.info(f"Skipping {output_path} - already exists")
@@ -78,11 +80,6 @@ def czi_to_ome_tiff(
 
         # read the scene
         reader = CziSceneImageReader(path, scene_index=scene_index, auto_pyramid=False, init_pyramid=True)
-        # write the scene
-        # try:
-        # write_ome_tiff_alt(output_path, reader.pyramid[0], reader)
-        # except Exception:
-        #     logger.warning("Failed to write using default writer. Trying internal writer instead.")
         write_ome_tiff_alt(output_path, reader)
         yield key, scene_index + 1, n
 
@@ -92,29 +89,10 @@ def write_ome_tiff_alt(path: PathLike, reader: BaseReader) -> Path:
     from image2image_io.writers.tiff_writer import OmeTiffWriter
 
     path = Path(path)
+    filename = path.name.replace(".ome.tiff", "")
     writer = OmeTiffWriter(reader)
-    filename = Path(writer.write_image_by_plane(path.stem, path.parent, write_pyramid=True))
-    return filename
-
-
-# def write_ome_tiff(path: PathLike, array: np.ndarray, reader: BaseReader) -> Path:
-#     """Write OME-TIFF."""
-#     from wsireg.reg_images import NumpyRegImage
-#     from wsireg.writers.ome_tiff_writer import OmeTiffWriter
-#
-#     if array.ndim == 2:
-#         array = np.atleast_3d(array)
-#
-#     reg = NumpyRegImage(
-#         array,
-#         reader.resolution,
-#         channel_names=reader.channel_names,
-#     )
-#
-#     path = Path(path)
-#     writer = OmeTiffWriter(reg)
-#     filename = Path(writer.write_image_by_plane(path.stem, path.parent, write_pyramid=True))
-#     return filename
+    output_path = writer.write_image_by_plane(filename, path.parent, write_pyramid=True)
+    return output_path
 
 
 def images_to_fusion(
