@@ -25,12 +25,14 @@ class BaseReader:
     reader: str = "base"
     reader_type: str = "image"
     n_scenes: int = 1
+    _scene_ids: list[int] | None = None
     lazy: bool = False
     fh: ty.Any | None = None
     allow_extraction: bool = False
     _resolution: float = 1.0
     _channel_names: list[str]
     _channel_colors: list[str]
+    _channel_ids: list[int] | None = None
 
     def __init__(
         self, path: PathLike, key: str | None = None, reader_kws: dict | None = None, auto_pyramid: bool | None = None
@@ -86,6 +88,42 @@ class BaseReader:
     def channel_names(self) -> list[str]:
         """Return channel names."""
         return self._channel_names
+
+    @property
+    def channel_ids(self) -> list[int]:
+        """Return channel indices."""
+        if self._channel_ids is None:
+            self._channel_ids = list(range(len(self._channel_names)))
+        return self._channel_ids
+
+    @channel_ids.setter
+    def channel_ids(self, value: list[int]) -> None:
+        """Set channel indices."""
+        if not isinstance(value, list):
+            value = list(value)
+        assert len(value) <= len(
+            self._channel_names
+        ), f"Too many channels selected: {len(value)} > {len(self._channel_names)}"
+        assert max(value) < len(
+            self._channel_names
+        ), f"Channel index out of range: {max(value)} > {len(self._channel_names)}"
+        self._channel_ids = value
+
+    @property
+    def scene_ids(self) -> list[int]:
+        """Return channel indices."""
+        if self._scene_ids is None:
+            self._scene_ids = list(range(self.n_scenes))
+        return self._scene_ids
+
+    @scene_ids.setter
+    def scene_ids(self, value: list[int]) -> None:
+        """Set channel indices."""
+        if not isinstance(value, list):
+            value = list(value)
+        assert len(value) <= self.n_scenes, f"Too many channels selected: {len(value)} > {self.n_scenes}"
+        assert max(value) < self.n_scenes, f"Channel index out of range: {max(value)} > {self.n_scenes}"
+        self._scene_ids = value
 
     @property
     def channel_colors(self) -> list[str]:

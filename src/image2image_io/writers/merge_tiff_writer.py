@@ -108,7 +108,7 @@ class MergeOmeTiffWriter:
         """Create channel names for merge data."""
 
         def _prepare_channel_names(name_: str, channel_names_: str) -> list[str]:
-            return [f"{name_} - {c}" for c in channel_names_]
+            return [f"{c} - {name_}" for c in channel_names_]
 
         self.reader.channel_names = [
             _prepare_channel_names(name, channel_names)
