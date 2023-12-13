@@ -40,10 +40,6 @@ class MergeOmeTiffWriter:
         Size of the merged image after transformation in x
     y_size: int
         Size of the merged image after transformation in y
-    y_spacing: float
-        Pixel spacing in microns after transformation in y
-    x_spacing: float
-        Pixel spacing in microns after transformation in x
     tile_size: int
         Size of tiles to be written
     pyr_levels: list of tuples of int:
@@ -63,13 +59,11 @@ class MergeOmeTiffWriter:
 
     x_size: int | None = None
     y_size: int | None = None
-    y_spacing: int | float | None = None
-    x_spacing: int | float | None = None
     tile_size: int = 512
-    pyr_levels: list[tuple[int, int]] | None = None
-    n_pyr_levels: int | None = None
-    PhysicalSizeY: int | float | None = None
-    PhysicalSizeX: int | float | None = None
+    pyr_levels: list[tuple[int, int]]
+    n_pyr_levels: int
+    PhysicalSizeY: int | float
+    PhysicalSizeX: int | float
     subifds: int | None = None
     compression: str = "deflate"
 
@@ -78,6 +72,7 @@ class MergeOmeTiffWriter:
         reader: MergeImages,
         transformers: list[Transformer] | None = None,
         crop_mask: np.ndarray | None = None,
+        crop_bbox: tuple[int, int, int, int] | None = None,
     ):
         """
         Class for writing multiple images with and without transforms to a single OME-TIFF.
@@ -88,10 +83,39 @@ class MergeOmeTiffWriter:
             MergeRegImage to be transformed
         transformers: List of RegTransformSeq or None
             Registration transformation sequences for each wsireg image to be merged
+        crop_mask : np.ndarray or None
+            Crop mask to apply to images before writing.
+        crop_bbox : tuple of ints or None
+            Bounding box to crop images to before writing. Values should be x, y, width, height.
         """
         self.reader = reader
         self.transformers = transformers
         self.crop_mask = crop_mask
+        self.crop_bbox = crop_bbox
+        if self.crop_mask is not None and self.crop_bbox is not None:
+            raise ValueError("Cannot supply both crop_mask and crop_bbox")
+
+    @staticmethod
+    def _check_bbox(
+        crop_bbox: tuple[int, int, int, int] | None, transformer: Transformer | None, reader: BaseReader
+    ) -> tuple[int, int, int, int] | None:
+        """Check bbox."""
+        if crop_bbox is None:
+            return None
+        x, y, width, height = crop_bbox
+        if x < 0:
+            x = 0
+        if y < 0:
+            y = 0
+        if transformer is not None:
+            image_shape = transformer.output_size
+        else:
+            image_shape = reader.image_shape
+        if x + width > image_shape[1]:
+            width = image_shape[1] - x
+        if y + height > image_shape[0]:
+            height = image_shape[0] - y
+        return x, y, width, height
 
     def _check_transforms_and_readers(self, reader_names: list[str]) -> None:
         """Make sure incoming data is kosher in dimensions."""
@@ -149,13 +173,15 @@ class MergeOmeTiffWriter:
         """Prepare OME-XML and other data needed for saving."""
         if transformer:
             self.x_size, self.y_size = transformer.output_size
-            self.x_spacing, self.y_spacing = transformer.output_spacing
         elif self.crop_mask is not None:
             self.y_size, self.x_size = self.crop_mask.shape
-            self.y_spacing, self.x_spacing = reader.resolution, reader.resolution
         else:
             self.y_size, self.x_size = reader.image_shape
-            self.y_spacing, self.x_spacing = reader.resolution, reader.resolution
+
+        self.crop_bbox = self._check_bbox(self.crop_bbox, transformer, reader)
+
+        if self.crop_bbox is not None:
+            _, _, self.x_size, self.y_size = self.crop_bbox
 
         self.tile_size = tile_size
         # protect against too large tile size
@@ -166,11 +192,9 @@ class MergeOmeTiffWriter:
         self.n_pyr_levels = len(self.pyr_levels)
 
         if transformer:
-            self.PhysicalSizeY = self.y_spacing
-            self.PhysicalSizeX = self.x_spacing
+            self.PhysicalSizeX, self.PhysicalSizeY = transformer.output_spacing
         else:
-            self.PhysicalSizeY = reader.resolution
-            self.PhysicalSizeX = reader.resolution
+            self.PhysicalSizeX = self.PhysicalSizeY = reader.resolution
 
         channel_names = format_channel_names(self.reader.channel_names, self.reader.n_channels)
         self.omexml = prepare_ome_xml_str(
@@ -294,6 +318,9 @@ class MergeOmeTiffWriter:
                     # apply crop mask
                     if self.crop_mask is not None:
                         image = self.crop_mask * image
+                    elif self.crop_bbox is not None:
+                        x, y, width, height = self.crop_bbox
+                        image = image[y : y + height, x : x + width]
 
                     # write OME-XML to the ImageDescription tag of the first page
                     description = self.omexml if channel_idx == 0 and reader_index == 0 else None

@@ -30,53 +30,86 @@ class Transformer(ty.Protocol):
 
 
 class OmeTiffWriter:
-    """OME-TIFF writer class."""
+    """OME-TIFF writer class.
+
+    Attributes
+    ----------
+    x_size: int
+        Size of the output image after transformation in x
+    y_size: int
+        Size of the output image after transformation in y
+    tile_size: int
+        Size of tiles to be written
+    pyr_levels: list of tuples of int:
+        Size of down-sampled images in pyramid
+    n_pyr_levels: int
+        Number of downsamples in pyramid
+    PhysicalSizeY: float
+        physical size of image in micron for OME-TIFF in Y
+    PhysicalSizeX: float
+        physical size of image in micron for OME-TIFF in X
+    subifds: int
+        Number of sub-resolutions for pyramidal OME-TIFF
+    compression: str
+        tifffile string to pass to compression argument, defaults to "deflate" for minisblack
+        and "jpeg" for RGB type images
+    """
 
     x_size: int | None = None
     y_size: int | None = None
-    y_spacing: int | float | None = None
-    x_spacing: int | float | None = None
     tile_size: int = 512
-    pyr_levels: list[tuple[int, int]] | None = None
-    n_pyr_levels: int | None = None
-    PhysicalSizeY: int | float | None = None
-    PhysicalSizeX: int | float | None = None
+    pyr_levels: list[tuple[int, int]]
+    n_pyr_levels: int
+    PhysicalSizeY: int | float
+    PhysicalSizeX: int | float
     subifds: int | None = None
-    compression: str = "deflate"
+    compression: str | None = "deflate"
 
-    def __init__(self, reader: BaseReader, transformer: Transformer | None = None):
-        """
-        Class for managing writing images to OME-TIFF.
+    def __init__(
+        self,
+        reader: BaseReader,
+        transformer: Transformer | None = None,
+        crop_mask: np.ndarray | None = None,
+        crop_bbox: tuple[int, int, int, int] | None = None,
+    ):
+        """Class for managing writing images to OME-TIFF.
 
-        Attibutes
-        ---------
-        x_size: int
-            Size of the output image after transformation in x
-        y_size: int
-            Size of the output image after transformation in y
-        y_spacing: float
-            Pixel spacing in microns after transformation in y
-        x_spacing: float
-            Pixel spacing in microns after transformation in x
-        tile_size: int
-            Size of tiles to be written
-        pyr_levels: list of tuples of int:
-            Size of downsampled images in pyramid
-        n_pyr_levels: int
-            Number of downsamples in pyramid
-        PhysicalSizeY: float
-            physical size of image in micron for OME-TIFF in Y
-        PhysicalSizeX: float
-            physical size of image in micron for OME-TIFF in X
-        subifds: int
-            Number of sub-resolutions for pyramidal OME-TIFF
-        compression: str
-            tifffile string to pass to compression argument, defaults to "deflate" for minisblack
-            and "jpeg" for RGB type images
-
+        Parameters
+        ----------
+        reader: BaseReader
+            MergeRegImage to be transformed
+        transformer: Transformer or None
+            Registration transformation sequences for each wsireg image to be merged
+        crop_mask : np.ndarray or None
+            Crop mask to apply to images before writing.
+        crop_bbox : tuple of ints or None
+            Bounding box to crop images to before writing. Values should be x, y, width, height.
         """
         self.reader = reader
         self.transformer = transformer
+        self.crop_mask = crop_mask
+        self.crop_bbox = self._check_bbox(crop_bbox)
+        if self.crop_mask is not None and self.crop_bbox is not None:
+            raise ValueError("Cannot supply both crop_mask and crop_bbox")
+
+    def _check_bbox(self, crop_bbox: tuple[int, int, int, int] | None) -> tuple[int, int, int, int] | None:
+        """Check bbox."""
+        if crop_bbox is None:
+            return None
+        x, y, width, height = crop_bbox
+        if x < 0:
+            x = 0
+        if y < 0:
+            y = 0
+        if self.transformer is not None:
+            image_shape = self.transformer.output_size
+        else:
+            image_shape = self.reader.image_shape
+        if x + width > image_shape[1]:
+            width = image_shape[1] - x
+        if y + height > image_shape[0]:
+            height = image_shape[0] - y
+        return x, y, width, height
 
     def _prepare_image_info(
         self,
@@ -88,10 +121,13 @@ class OmeTiffWriter:
         """Get image info and OME-XML."""
         if self.transformer:
             self.x_size, self.y_size = self.transformer.output_size
-            self.y_spacing, self.x_spacing = self.transformer.output_spacing
+        elif self.crop_mask is not None:
+            self.y_size, self.x_size = self.crop_mask.shape
         else:
             self.y_size, self.x_size = self.reader.image_shape
-            self.y_spacing, self.x_spacing = None, None
+
+        if self.crop_bbox is not None:
+            _, _, self.x_size, self.y_size = self.crop_bbox
 
         self.tile_size = tile_size
         # protect against too large tile size
@@ -102,14 +138,11 @@ class OmeTiffWriter:
         self.n_pyr_levels = len(self.pyr_levels)
 
         if self.transformer:
-            self.PhysicalSizeX = self.x_spacing
-            self.PhysicalSizeY = self.y_spacing
+            self.PhysicalSizeX, self.PhysicalSizeY = self.transformer.output_spacing
         else:
-            self.PhysicalSizeX = self.reader.resolution
-            self.PhysicalSizeY = self.reader.resolution
+            self.PhysicalSizeX = self.PhysicalSizeY = self.reader.resolution
 
         channel_names = self.reader.channel_names
-
         self.omexml = prepare_ome_xml_str(
             self.y_size,
             self.x_size,
@@ -143,7 +176,7 @@ class OmeTiffWriter:
         """
         Write OME-TIFF image plane-by-plane to disk. WsiReg compatible RegImages all
         have methods to read an image channel-by-channel, thus each channel is read, transformed, and written to
-        reduce memory during write.
+        reduce memory during file writing.
         RGB images may run large memory footprints as they are interleaved before write, for RGB images,
         using the `OmeTiledTiffWriter` is recommended.
 
@@ -195,12 +228,12 @@ class OmeTiffWriter:
                 }
             logger.trace(f"TIFF options: {options}")
 
-            rgb_im_data = []
+            rgb_im_data: list[np.ndarray] = []
             for channel_idx in trange(self.reader.n_channels, desc="Writing channels..."):
                 image: np.ndarray = self.reader.get_channel(channel_idx)
                 image = np.squeeze(image)
-                image: sitk.Image = sitk.GetImageFromArray(image)
-                image.SetSpacing((self.reader.resolution, self.reader.resolution))
+                image: sitk.Image = sitk.GetImageFromArray(image)  # type: ignore[no-redef]
+                image.SetSpacing((self.reader.resolution, self.reader.resolution))  # type: ignore[attr-defined]
 
                 # transform
                 if self.transformer:
@@ -211,6 +244,12 @@ class OmeTiffWriter:
                 else:
                     if isinstance(image, sitk.Image):
                         image = sitk.GetArrayFromImage(image)
+                    # apply crop mask
+                    if self.crop_mask is not None:
+                        image = self.crop_mask * image
+                    elif self.crop_bbox is not None:
+                        x, y, width, height = self.crop_bbox
+                        image = image[y : y + height, x : x + width]
 
                     # write OME-XML to the ImageDescription tag of the first page
                     description = self.omexml if channel_idx == 0 else None
@@ -229,14 +268,21 @@ class OmeTiffWriter:
                                     f"Writing pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}"
                                 )
                                 tif.write(image, **options, subfiletype=1)
-                            logger.info(
-                                f"Wrote pyramid index {pyr_idx} : channel {channel_idx} took"
-                                f" {write_timer(since_last=True)}"
-                            )
+                                logger.info(
+                                    f"Wrote pyramid index {pyr_idx} : channel {channel_idx} took"
+                                    f" {write_timer(since_last=True)}"
+                                )
 
             if self.reader.is_rgb:
-                rgb_im_data = sitk.Compose(rgb_im_data)
-                rgb_im_data = sitk.GetArrayFromImage(rgb_im_data)
+                rgb_im_data: np.ndarray = sitk.GetArrayFromImage(  # type: ignore[no-redef]
+                    sitk.Compose(rgb_im_data),  # type: ignore[no-untyped-call]
+                )
+
+                if self.crop_mask is not None:
+                    rgb_im_data = np.atleast_3d(self.crop_mask) * rgb_im_data
+                elif self.crop_bbox is not None:
+                    x, y, width, height = self.crop_bbox
+                    rgb_im_data = rgb_im_data[y : y + height, x : x + width, :]  # type: ignore[call-overload]
 
                 # write OME-XML to the ImageDescription tag of the first page
                 description = self.omexml
@@ -249,7 +295,7 @@ class OmeTiffWriter:
                     **options,
                 )
 
-                logger.info(f"RGB shape: {rgb_im_data.shape}")
+                logger.info(f"RGB shape: {rgb_im_data.shape}")  # type: ignore[attr-defined]
                 if write_pyramid:
                     logger.info("Writing pyramid...")
                     for pyr_idx in range(1, self.n_pyr_levels):
