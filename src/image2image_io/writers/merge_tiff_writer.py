@@ -304,7 +304,7 @@ class MergeOmeTiffWriter:
         self._check_transforms_and_readers(reader_names)
         self._create_channel_names(reader_names)
         self._check_transforms_sizes_and_resolutions()
-        channel_ids: list[list[int]] = self._check_channel_ids(channel_ids)  # type: ignore[assignment]
+        channel_ids: list[list[int]] = self._check_channel_ids(channel_ids)  # type: ignore[no-redef]
 
         # make sure user did not provide filename with OME-TIFF
         name = name.replace(".ome", "").replace(".tiff", "").replace(".tif", "")

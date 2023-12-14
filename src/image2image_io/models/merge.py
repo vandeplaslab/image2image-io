@@ -1,13 +1,14 @@
 """Merge utility class."""
 from __future__ import annotations
 
+import typing as ty
 from pathlib import Path
 from warnings import warn
 
 import numpy as np
 
-from image2image_io._reader import get_simple_reader
-from image2image_io.readers import BaseReader
+if ty.TYPE_CHECKING:
+    from image2image_io.readers import BaseReader
 
 
 class MergeImages:
@@ -20,6 +21,8 @@ class MergeImages:
         channel_names: list[list[str]] | None = None,
         channel_colors: list[list[str]] | None = None,
     ):
+        from image2image_io._reader import get_simple_reader
+
         if not isinstance(paths_or_readers, list):
             raise ValueError("MergeImages requires a list of images to merge")
         if not isinstance(pixel_sizes, list):
