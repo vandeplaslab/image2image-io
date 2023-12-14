@@ -11,7 +11,7 @@ import SimpleITK as sitk
 from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import TiffWriter
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 from image2image_io.enums import SITK_TO_NP_DTYPE
 from image2image_io.models.merge import MergeImages
@@ -341,8 +341,7 @@ class MergeOmeTiffWriter:
                 channel_ids_ = channel_ids[reader_index]
                 if channel_ids_ is None:
                     channel_ids_ = list(range(0, reader.n_channels))
-                merge_n_channels = len(channel_ids_)
-                for channel_idx in trange(merge_n_channels, leave=False, desc=f"writing sub-image {reader_index}"):
+                for channel_idx in tqdm(channel_ids_, leave=False, desc=f"writing sub-image {reader_index}"):
                     if channel_idx not in channel_ids_:
                         logger.trace(f"Skipping channel {channel_idx}")
                         continue
