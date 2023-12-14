@@ -219,6 +219,8 @@ class OmeTiffWriter:
         name = name.replace(".ome", "").replace(".tiff", "").replace(".tif", "")
         output_file_name = str(Path(output_dir) / f"{name}.ome.tiff")
         logger.info(f"Saving to '{output_file_name}'")
+        logger.trace(f"Using transformer: {self.transformer}")
+
         self._prepare_image_info(
             name,
             write_pyramid=write_pyramid,
@@ -266,6 +268,7 @@ class OmeTiffWriter:
                 # transform
                 if self.transformer:
                     image = self.transformer(image)
+                    logger.trace(f"Transformed image shape: {image.GetSize()}")  # type: ignore[attr-defined]
 
                 # change dtype
                 if as_uint8:
