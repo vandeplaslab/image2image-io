@@ -322,6 +322,11 @@ class MergeOmeTiffWriter:
             compression=compression,
         )
 
+        if as_uint8:
+            logger.trace("Writing image data in 0-255 range as uint8")
+        if channel_ids:
+            logger.info(f"Writing channels: {channel_ids}")
+
         logger.trace(f"saving to {output_file_name}")
         with TiffWriter(output_file_name, bigtiff=True) as tif:
             options = {

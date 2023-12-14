@@ -229,6 +229,11 @@ class OmeTiffWriter:
         if channel_ids is None:
             channel_ids = list(range(self.reader.n_channels))
 
+        if as_uint8:
+            logger.trace("Writing image data in 0-255 range as uint8")
+        if channel_ids:
+            logger.info(f"Writing channels: {channel_ids}")
+
         with TiffWriter(output_file_name, bigtiff=True) as tif:
             if self.reader.is_rgb:
                 options = {
