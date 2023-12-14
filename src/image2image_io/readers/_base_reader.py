@@ -30,8 +30,8 @@ class BaseReader:
     fh: ty.Any | None = None
     allow_extraction: bool = False
     _resolution: float = 1.0
-    _channel_names: list[str]
-    _channel_colors: list[str]
+    _channel_names: list[str] | None = None
+    _channel_colors: list[str] | None = None
     _channel_ids: list[int] | None = None
 
     def __init__(
@@ -257,9 +257,15 @@ class BaseReader:
             channel_axis = None
             n_channels = 1
         # 3D images will be split into channels
+        elif ndim == 3:
+            if shape[2] == 3:
+                channel_axis = 2
+                n_channels = 3
+            else:
+                channel_axis = 0
+                n_channels = shape[0]
         else:
-            channel_axis = int(np.argmin(shape))
-            n_channels = shape[channel_axis]
+            raise ValueError(f"Array has unsupported shape: {shape}")
         return channel_axis, n_channels
 
     def get_channel(self, index: int, pyramid: int = 0) -> np.ndarray:

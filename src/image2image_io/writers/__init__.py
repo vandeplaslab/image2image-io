@@ -1,4 +1,5 @@
 """Init."""
-from .tiff_writer import OmeTiffWriter
+from image2image_io.writers.merge_tiff_writer import MergeOmeTiffWriter
+from image2image_io.writers.tiff_writer import OmeTiffWriter
 
-__all__ = ["OmeTiffWriter"]
+__all__ = ["OmeTiffWriter", "MergeOmeTiffWriter"]

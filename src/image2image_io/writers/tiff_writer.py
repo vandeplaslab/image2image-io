@@ -117,7 +117,7 @@ class OmeTiffWriter:
         write_pyramid: bool = True,
         tile_size: int = 512,
         compression: str | None = "default",
-        as_uint8: bool = True,
+        as_uint8: bool = False,
         channel_ids: list[int] | None = None,
     ) -> None:
         """Get image info and OME-XML."""
@@ -144,7 +144,7 @@ class OmeTiffWriter:
         else:
             self.PhysicalSizeX = self.PhysicalSizeY = self.reader.resolution
 
-        dtype = np.uint8 if as_uint8 else np.uint16
+        dtype = np.uint8 if as_uint8 else self.reader.dtype
         channel_names = self.reader.channel_names
         if channel_ids is not None:
             channel_names = [channel_names[i] for i in channel_ids]
@@ -173,12 +173,12 @@ class OmeTiffWriter:
 
     def write_image_by_plane(
         self,
-        image_name: str,
+        name: str,
         output_dir: Path | str = "",
         write_pyramid: bool = True,
         tile_size: int = 512,
         compression: str | None = "default",
-        as_uint8: bool = True,
+        as_uint8: bool = False,
         channel_ids: list[int] | None = None,
     ) -> Path:
         """
@@ -190,7 +190,7 @@ class OmeTiffWriter:
 
         Parameters
         ----------
-        image_name: str
+        name: str
             Name to be written WITHOUT extension
             for example if image_name = "cool_image" the file
             would be "cool_image.ome.tiff"
@@ -203,17 +203,23 @@ class OmeTiffWriter:
         compression: str
             tifffile string to pass to compression argument, defaults to "deflate" for minisblack
             and "jpeg" for RGB type images
+        as_uint8: bool
+            Whether to save the image in the 0-255 intensity range, substantially reducing file size at the cost of some
+            intensity information.
+        channel_ids: list of int
+            Channel indices to write to OME-TIFF, if None, all channels are written
 
         Returns
         -------
         output_file_name: str
             File path to the written OME-TIFF
-
         """
-        output_file_name = str(Path(output_dir) / f"{image_name}.ome.tiff")
+        # make sure user did not provide filename with OME-TIFF
+        name = name.replace(".ome", "").replace(".tiff", "").replace(".tif", "")
+        output_file_name = str(Path(output_dir) / f"{name}.ome.tiff")
         logger.info(f"Saving to '{output_file_name}'")
         self._prepare_image_info(
-            image_name,
+            name,
             write_pyramid=write_pyramid,
             tile_size=tile_size,
             compression=compression,
@@ -328,6 +334,15 @@ class OmeTiffWriter:
                         logger.info(f"Wrote pyramid index {pyr_idx} took {write_timer()}")
         return Path(output_file_name)
 
-    def write(self, name: str, output_dir: Path) -> Path:
+    def write(
+        self,
+        name: str,
+        output_dir: Path,
+        tile_size: int = 512,
+        as_uint8: bool = False,
+        channel_ids: list[int] | None = None,
+    ) -> Path:
         """Write image."""
-        return self.write_image_by_plane(name, output_dir)
+        return self.write_image_by_plane(
+            name, output_dir, tile_size=tile_size, channel_ids=channel_ids, as_uint8=as_uint8
+        )

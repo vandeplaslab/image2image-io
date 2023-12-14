@@ -9,10 +9,10 @@ if ty.TYPE_CHECKING:
     from skimage.transform import ProjectiveTransform
 
 
-def format_channel_names(channel_names: list[str], n_ch: int) -> list[str]:
-    """
-    Format channel names and ensure number of channel names matches number of channels or default
-    to C1, C2, C3, etc.
+def format_merge_channel_names(
+    channel_names: list[list[str]] | None, n_ch: int, channel_ids: list[list[int]] | None
+) -> list[str]:
+    """Format channel names and ensure number of channel names matches number of channels or default to C1, C2, C3, etc.
 
     Parameters
     ----------
@@ -20,14 +20,28 @@ def format_channel_names(channel_names: list[str], n_ch: int) -> list[str]:
         list of str that are channel names
     n_ch: int
         number of channels detected in image
+    channel_ids: list[list[int]] | None
+        list of channel ids
 
     Returns
     -------
     channel_names:
         list of str that are formatted
     """
-    if channel_names is None or n_ch != len(channel_names):
+    if channel_names is None:
         channel_names = [f"C{idx}" for idx in range(n_ch)]
+    if channel_ids is not None:
+        channel_names_ = []
+        if len(channel_ids) != len(channel_names):
+            raise ValueError("The number of channel ids does not match the number of channel names.")
+        for index, channel_ids_ in enumerate(channel_ids):
+            channel_names_.extend([channel_names[index][idx] for idx in channel_ids_])
+        channel_names = channel_names_
+    else:
+        if isinstance(channel_names, list) and isinstance(channel_names[0], list):
+            channel_names = [name for names in channel_names for name in names]
+        if n_ch != len(channel_names):
+            raise ValueError("The number of channels does not match the number of channel names.")
     return channel_names
 
 

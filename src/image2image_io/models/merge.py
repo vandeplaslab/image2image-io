@@ -1,0 +1,67 @@
+"""Merge utility class."""
+from __future__ import annotations
+
+from pathlib import Path
+from warnings import warn
+
+import numpy as np
+
+from image2image_io._reader import get_simple_reader
+from image2image_io.readers import BaseReader
+
+
+class MergeImages:
+    """Merge multiple images."""
+
+    def __init__(
+        self,
+        paths_or_readers: list[Path | str | BaseReader],
+        pixel_sizes: list[int | float],
+        channel_names: list[list[str]] | None = None,
+        channel_colors: list[list[str]] | None = None,
+    ):
+        if not isinstance(paths_or_readers, list):
+            raise ValueError("MergeImages requires a list of images to merge")
+        if not isinstance(pixel_sizes, list):
+            raise ValueError("MergeImages requires a list of image resolutions for each image to merge")
+
+        if channel_names is None:
+            channel_names = [None] * len(paths_or_readers)
+        if channel_colors is None:
+            channel_colors = [None] * len(paths_or_readers)
+
+        readers = []
+        for _index, (path, pixel_size, channel_names_, channel_colors_) in enumerate(
+            zip(paths_or_readers, pixel_sizes, channel_names, channel_colors)
+        ):
+            if isinstance(path, BaseReader):
+                reader = path
+            else:
+                reader: BaseReader = get_simple_reader(path)
+            reader._channel_colors = channel_colors_
+            reader._channel_names = channel_names_
+            reader.resolution = pixel_size
+            if reader.channel_names is None or len(reader.channel_names) != reader.n_channels:
+                reader._channel_names = [f"C{idx}" for idx in range(0, reader.n_channels)]
+            readers.append(reader)
+
+        if not all(im.dtype == readers[0].dtype for im in readers):
+            warn("MergeImages created with mixed data types, writing will cast to the largest data type", stacklevel=2)
+        if any(im.is_rgb for im in readers):
+            warn(
+                "MergeImages does not support writing merged interleaved RGB. Data will be written as multi-channel",
+                stacklevel=2,
+            )
+
+        self.readers: list[BaseReader] = readers
+        self.paths: list[str | Path | BaseReader] = paths_or_readers
+        self.dtype: np.dtype = self.readers[0].dtype
+        self.is_rgb: bool = False
+        self.n_channels: int = np.sum([reader.n_channels for reader in self.readers])
+        self.channel_names: list[list[str]] = [reader.channel_names for reader in self.readers]
+        self.original_size_transform = None
+
+    @property
+    def channel_names_flat(self) -> list[str]:
+        """Return flat channel names."""
+        return [name for names in self.channel_names for name in names]
