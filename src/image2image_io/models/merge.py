@@ -21,7 +21,8 @@ class MergeImages:
         channel_names: list[list[str]] | None = None,
         channel_colors: list[list[str]] | None = None,
     ):
-        from image2image_io._reader import BaseReader, get_simple_reader
+        from image2image_io._reader import get_simple_reader
+        from image2image_io.readers import BaseReader
 
         if not isinstance(paths_or_readers, list):
             raise ValueError("MergeImages requires a list of images to merge")
