@@ -363,6 +363,8 @@ class MergeOmeTiffWriter:
                     # transform
                     if self.transformers and self.transformers[reader_index]:
                         image = self.transformers[reader_index](image)  # type: ignore[assignment,arg-type]
+                        logger.trace(f"Transformed image shape: {image.GetSize()}")  # type: ignore[attr-defined]
+
                     # make sure we have numpy array
                     if isinstance(image, sitk.Image):
                         image = sitk.GetArrayFromImage(image)
