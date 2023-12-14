@@ -181,10 +181,11 @@ class OmeTiffWriter:
         as_uint8: bool = False,
         channel_ids: list[int] | None = None,
     ) -> Path:
-        """
-        Write OME-TIFF image plane-by-plane to disk. WsiReg compatible RegImages all
-        have methods to read an image channel-by-channel, thus each channel is read, transformed, and written to
-        reduce memory during file writing.
+        """Write OME-TIFF image plane-by-plane to disk.
+
+        WsiReg compatible RegImages all have methods to read an image channel-by-channel, thus each channel is read,
+        transformed, and written to reduce memory during file writing.
+
         RGB images may run large memory footprints as they are interleaved before write, for RGB images,
         using the `OmeTiledTiffWriter` is recommended.
 

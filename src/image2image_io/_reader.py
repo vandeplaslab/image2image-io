@@ -157,7 +157,7 @@ def is_supported(path: PathLike) -> bool:
     return path is not None
 
 
-def get_reader(path: Path, split_czi: bool | None = None) -> tuple[Path, dict[str, BaseReader]]:
+def get_reader(path: Path, split_czi: bool | None = None, quick: bool = False) -> tuple[Path, dict[str, BaseReader]]:
     """Get reader for the specified path."""
     path = Path(path)
     path = sanitize_read_path(path)  # type: ignore[assignment]
@@ -207,11 +207,11 @@ def get_reader(path: Path, split_czi: bool | None = None) -> tuple[Path, dict[st
     return path, readers
 
 
-def get_simple_reader(path: PathLike, init_pyramid: bool = True) -> BaseReader:
+def get_simple_reader(path: PathLike, init_pyramid: bool = True, quick: bool = False) -> BaseReader:
     """Get simple reader."""
     init_pyramid_ = CONFIG.init_pyramid
     CONFIG.init_pyramid = init_pyramid
-    path, readers = get_reader(path, split_czi=False)
+    path, readers = get_reader(path, split_czi=False, quick=quick)
     CONFIG.init_pyramid = init_pyramid_
     return next(iter(readers.values()))
 
