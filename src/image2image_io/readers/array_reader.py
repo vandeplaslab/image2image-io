@@ -19,14 +19,19 @@ class ArrayImageReader(BaseReader):
         key: str | None = None,
         resolution: float = 1.0,
         auto_pyramid: bool | None = None,
+        channel_names: list[str] | None = None,
     ):
         super().__init__(path, key, auto_pyramid=auto_pyramid)
         self.array = array
         self.resolution = resolution
+        if channel_names is not None:
+            self._channel_names = channel_names
 
     @property
     def channel_names(self) -> list[str]:
         """List of channel names."""
+        if self._channel_names is not None:
+            return self._channel_names
         if self.array.ndim == 2:
             return ["C0"]
         return [f"C{i}" for i in range(self.array.shape[2])]

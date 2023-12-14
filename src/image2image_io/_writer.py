@@ -84,6 +84,23 @@ def czi_to_ome_tiff(
         yield key, scene_index + 1, n
 
 
+def write_ome_tiff_from_array(path: PathLike, reader: BaseReader, array: np.ndarray) -> Path:
+    """Write OME-TIFF by also specifying an array."""
+    from image2image_io.readers.array_reader import ArrayImageReader
+    from image2image_io.writers.tiff_writer import OmeTiffWriter
+
+    if array.ndim == 2:
+        array = np.atleast_3d(array)
+
+    array_reader = ArrayImageReader("", array, resolution=reader.resolution, channel_names=reader.channel_names)
+
+    path = Path(path)
+    filename = path.name.replace(".ome.tiff", "")
+    writer = OmeTiffWriter(array_reader)
+    output_path = writer.write_image_by_plane(filename, path.parent, write_pyramid=True)
+    return output_path
+
+
 def write_ome_tiff_alt(path: PathLike, reader: BaseReader) -> Path:
     """Write OME-TIFF."""
     from image2image_io.writers.tiff_writer import OmeTiffWriter

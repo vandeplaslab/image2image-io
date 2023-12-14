@@ -117,6 +117,8 @@ class OmeTiffWriter:
         write_pyramid: bool = True,
         tile_size: int = 512,
         compression: str | None = "default",
+        as_uint8: bool = True,
+        channel_ids: list[int] | None = None,
     ) -> None:
         """Get image info and OME-XML."""
         if self.transformer:
@@ -142,12 +144,16 @@ class OmeTiffWriter:
         else:
             self.PhysicalSizeX = self.PhysicalSizeY = self.reader.resolution
 
+        dtype = np.uint8 if as_uint8 else np.uint16
         channel_names = self.reader.channel_names
+        if channel_ids is not None:
+            channel_names = [channel_names[i] for i in channel_ids]
+
         self.omexml = prepare_ome_xml_str(
             self.y_size,
             self.x_size,
-            self.reader.n_channels,
-            self.reader.dtype,
+            len(channel_names),
+            dtype,
             self.reader.is_rgb,
             PhysicalSizeX=self.PhysicalSizeX,
             PhysicalSizeY=self.PhysicalSizeY,
@@ -172,6 +178,8 @@ class OmeTiffWriter:
         write_pyramid: bool = True,
         tile_size: int = 512,
         compression: str | None = "default",
+        as_uint8: bool = True,
+        channel_ids: list[int] | None = None,
     ) -> Path:
         """
         Write OME-TIFF image plane-by-plane to disk. WsiReg compatible RegImages all
@@ -209,7 +217,11 @@ class OmeTiffWriter:
             write_pyramid=write_pyramid,
             tile_size=tile_size,
             compression=compression,
+            as_uint8=as_uint8,
+            channel_ids=channel_ids,
         )
+        if channel_ids is None:
+            channel_ids = list(range(self.reader.n_channels))
 
         with TiffWriter(output_file_name, bigtiff=True) as tif:
             if self.reader.is_rgb:
@@ -230,6 +242,10 @@ class OmeTiffWriter:
 
             rgb_im_data: list[np.ndarray] = []
             for channel_idx in trange(self.reader.n_channels, desc="Writing channels..."):
+                if channel_idx not in channel_ids:
+                    logger.trace(f"Skipping channel {channel_idx}")
+                    continue
+
                 image: np.ndarray = self.reader.get_channel(channel_idx)
                 image = np.squeeze(image)
                 image: sitk.Image = sitk.GetImageFromArray(image)  # type: ignore[no-redef]
@@ -238,6 +254,11 @@ class OmeTiffWriter:
                 # transform
                 if self.transformer:
                     image = self.transformer(image)
+
+                # change dtype
+                if as_uint8:
+                    image = sitk.RescaleIntensity(image, 0, 255)
+                    image = sitk.Cast(image, sitk.sitkUInt8)
 
                 if self.reader.is_rgb:
                     rgb_im_data.append(image)
