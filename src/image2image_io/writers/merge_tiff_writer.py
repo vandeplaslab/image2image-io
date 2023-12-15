@@ -70,7 +70,7 @@ class MergeOmeTiffWriter:
     def __init__(
         self,
         merge: MergeImages,
-        transformers: list[Transformer] | None = None,
+        transformers: list[Transformer | None] | None = None,
         crop_mask: np.ndarray | None = None,
         crop_bbox: tuple[int, int, int, int] | None = None,
     ):
@@ -124,14 +124,14 @@ class MergeOmeTiffWriter:
 
         transformations = self.transformers
         if transformations is None:
-            transformations = [None for i in range(len(self.merge.readers))]
+            transformations = [None for _ in range(len(self.merge.readers))]
         if len(transformations) != len(self.merge.readers):
             raise ValueError("The number of transforms does not match number of images")
 
     def _create_channel_names(self, reader_names: list[str]) -> None:
         """Create channel names for merge data."""
 
-        def _prepare_channel_names(name_: str, channel_names_: str) -> list[str]:
+        def _prepare_channel_names(name_: str, channel_names_: list[str]) -> list[str]:
             return [f"{c} - {name_}" for c in channel_names_]
 
         self.merge.channel_names = [
@@ -153,7 +153,7 @@ class MergeOmeTiffWriter:
                 out_spacing.append(transform.output_spacing)
             else:
                 out_size.append(reader.image_shape)
-                out_spacing.append(reader.resolution)
+                out_spacing.append((reader.resolution, reader.resolution))
 
         if not all(out_spacing):
             raise ValueError("All transforms output spacings and untransformed image spacings must match")
@@ -162,10 +162,12 @@ class MergeOmeTiffWriter:
 
     def _check_channel_ids(self, channel_ids: list[list[int] | None] | None) -> list[list[int]]:
         """Check channel ids."""
-        if channel_ids is None:
+        if channel_ids is None or not channel_ids:
             channel_ids = [list(range(0, reader.n_channels)) for reader in self.merge.readers]
         if len(channel_ids) != len(self.merge.readers):
-            raise ValueError("The number of channel_ids does not match number of images")
+            raise ValueError(
+                f"The number of channel_ids does not match number of images. Expected {len(self.merge.readers)} but got {len(channel_ids)}"
+            )
         channel_ids_ret = []
         for reader_index, channel_ids_ in enumerate(channel_ids):
             if channel_ids_ is None:
@@ -239,7 +241,7 @@ class MergeOmeTiffWriter:
             self.compression = compression
 
     def _get_merge_dtype(self, as_uint8: bool = False) -> tuple[int, np.dtype[ty.Any]]:
-        """Determine data type for merger. Will default to the largest. dtype.
+        """Determine the data type for merger - will default to the largest dtype.
 
         If one image is np.uint8 and another np.uint16, the image at np.uint8 will be cast to np.uint16.
         """
@@ -248,9 +250,9 @@ class MergeOmeTiffWriter:
             for r in self.merge.readers
         ]
 
-        merge_dtype_np = self.merge.readers[np.argmax(dtype_max_size)].dtype
-        merge_dtype_np = np.uint8 if as_uint8 else merge_dtype_np
-        merge_dtype_sitk = None
+        merge_dtype_np: np.dtype[ty.Any] = self.merge.readers[np.argmax(dtype_max_size)].dtype  # type: ignore[arg-type]
+        merge_dtype_np = np.uint8 if as_uint8 else merge_dtype_np  # type: ignore[assignment]
+        merge_dtype_sitk = 0
         for k, v in SITK_TO_NP_DTYPE.items():
             if k < 12:
                 if v == merge_dtype_np:
@@ -275,7 +277,7 @@ class MergeOmeTiffWriter:
         Parameters
         ----------
         name: str
-             Name to be written WITHOUT the extension for example if image_name = "cool_image" the file
+             Name to be written WITHOUT the extension, for example, if image_name = "cool_image" the file
              would be "cool_image.ome.tiff"
         reader_names: list of str
             Names added before each channel of a given image to distinguish it.
@@ -304,7 +306,8 @@ class MergeOmeTiffWriter:
         self._check_transforms_and_readers(reader_names)
         self._create_channel_names(reader_names)
         self._check_transforms_sizes_and_resolutions()
-        channel_ids: list[list[int]] = self._check_channel_ids(channel_ids)  # type: ignore[no-redef]
+        channel_ids_fixed: list[list[int]] = self._check_channel_ids(channel_ids)
+        assert isinstance(channel_ids_fixed, list), "channel_ids must be a list of lists"
 
         # make sure user did not provide filename with OME-TIFF
         name = name.replace(".ome", "").replace(".tiff", "").replace(".tif", "")
@@ -315,7 +318,7 @@ class MergeOmeTiffWriter:
             self.merge.readers[0],
             name,
             merge_dtype_np,
-            channel_ids=channel_ids,
+            channel_ids=channel_ids_fixed,
             transformer=transformer,
             write_pyramid=write_pyramid,
             tile_size=tile_size,
@@ -324,29 +327,32 @@ class MergeOmeTiffWriter:
 
         if as_uint8:
             logger.trace("Writing image data in 0-255 range as uint8")
-        if channel_ids:
-            logger.info(f"Writing channels: {channel_ids}")
+        if channel_ids_fixed:
+            logger.info(f"Writing channels: {channel_ids_fixed}")
 
-        logger.trace(f"saving to {output_file_name}")
+        options = {
+            "tile": (tile_size, tile_size),
+            "compression": self.compression,
+            "photometric": "minisblack",
+            "metadata": None,
+        }
+        logger.trace(f"TIFF options: {options}")
+
+        logger.trace(f"Writing to {output_file_name}")
         with TiffWriter(output_file_name, bigtiff=True) as tif:
-            options = {
-                "tile": (tile_size, tile_size),
-                "compression": self.compression,
-                "photometric": "minisblack",
-                "metadata": None,
-            }
-            logger.trace(f"TIFF options: {options}")
-
             for reader_index, reader in enumerate(tqdm(self.merge.readers, desc="writing sub-images")):
-                channel_ids_ = channel_ids[reader_index]
+                channel_ids_ = channel_ids_fixed[reader_index]
                 if channel_ids_ is None:
                     channel_ids_ = list(range(0, reader.n_channels))
-                for channel_idx in tqdm(channel_ids_, leave=False, desc=f"writing sub-image {reader_index}"):
-                    if channel_idx not in channel_ids_:
-                        logger.trace(f"Skipping channel {channel_idx}")
+                for channel_index in tqdm(
+                    channel_ids_, leave=False, desc=f"Exporting images for '{reader_names[reader_index]}'"
+                ):
+                    if channel_index not in channel_ids_:
+                        logger.trace(f"Skipped channel: {reader.channel_names[channel_index]} ({channel_index})")
                         continue
 
-                    image: np.ndarray = self.merge.readers[reader_index].get_channel(channel_idx)
+                    # retrieve channel data
+                    image: np.ndarray = reader.get_channel(channel_index)
                     image = np.squeeze(image)
                     image: sitk.Image = sitk.GetImageFromArray(image)  # type: ignore[no-redef]
                     image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[attr-defined]
@@ -355,18 +361,18 @@ class MergeOmeTiffWriter:
                     if as_uint8:
                         image = sitk.RescaleIntensity(image, 0, 255)  # type: ignore[no-untyped-call]
                         image = sitk.Cast(image, sitk.sitkUInt8)  # type: ignore[no-untyped-call]
-
-                    if image.GetPixelIDValue() != merge_dtype_sitk:  # type: ignore[attr-defined]
+                    elif image.GetPixelIDValue() != merge_dtype_sitk:  # type: ignore[attr-defined]
                         image = sitk.Cast(image, merge_dtype_sitk)  # type: ignore[no-untyped-call]
 
                     # transform
-                    if self.transformers and self.transformers[reader_index]:
-                        image = self.transformers[reader_index](image)  # type: ignore[assignment,arg-type]
+                    if self.transformers and callable(self.transformers[reader_index]):
+                        image = self.transformers[reader_index](image)  # type: ignore[assignment,arg-type,misc]
                         logger.trace(f"Transformed image shape: {image.GetSize()}")  # type: ignore[attr-defined]
 
                     # make sure we have numpy array
                     if isinstance(image, sitk.Image):
                         image = sitk.GetArrayFromImage(image)
+
                     # apply crop mask
                     if self.crop_mask is not None:
                         image = self.crop_mask * image
@@ -375,27 +381,27 @@ class MergeOmeTiffWriter:
                         image = image[y : y + height, x : x + width]
 
                     # write OME-XML to the ImageDescription tag of the first page
-                    description = self.omexml if channel_idx == 0 and reader_index == 0 else None
+                    description = self.omexml if channel_index == 0 and reader_index == 0 else None
 
                     # write channel data
-                    logger.trace(
-                        f"Writing sub-image index {reader_index} : {reader_names[reader_index]} - "
-                        f"channel index - {channel_idx} - shape: {image.shape}"
+                    msg = (
+                        f"Writing image for reader={reader_names[reader_index]} ({reader_index})"
+                        f" channel={reader.channel_names[channel_index]} ({channel_index})"
                     )
+                    past_msg = msg.replace("Writing", "Wrote")
+                    logger.trace(f"{msg} - {image.shape}...")
                     with MeasureTimer() as write_timer:
                         tif.write(image, subifds=self.subifds, description=description, **options)
-                    logger.trace(
-                        f"Wrote sub-image index {reader_index} : {reader_names[reader_index]} took {write_timer()}"
-                    )
-
-                    if write_pyramid:
-                        for pyr_idx in range(1, self.n_pyr_levels):
-                            with MeasureTimer() as write_timer:
-                                resize_shape = (self.pyr_levels[pyr_idx][0], self.pyr_levels[pyr_idx][1])
+                        logger.trace(f"{past_msg} in {write_timer()}")
+                        if write_pyramid:
+                            for pyramid_index in range(1, self.n_pyr_levels):
+                                resize_shape = (self.pyr_levels[pyramid_index][0], self.pyr_levels[pyramid_index][1])
                                 image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
-                                logger.info(f"pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}")
+                                logger.trace(f"{msg} pyramid index {pyramid_index} - {image.shape}...")
                                 tif.write(image, **options, subfiletype=1)
-                            logger.info(f"Wrote pyramid index {pyr_idx} took {write_timer()}")
+                                logger.trace(
+                                    f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}"
+                                )
             return Path(output_file_name)
 
     def write(

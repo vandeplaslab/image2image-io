@@ -10,7 +10,7 @@ import SimpleITK as sitk
 from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import TiffWriter
-from tqdm import trange
+from tqdm import tqdm
 
 from image2image_io.readers.utilities import get_pyramid_info, prepare_ome_xml_str
 
@@ -144,7 +144,7 @@ class OmeTiffWriter:
         else:
             self.PhysicalSizeX = self.PhysicalSizeY = self.reader.resolution
 
-        dtype = np.uint8 if as_uint8 else self.reader.dtype
+        dtype: np.dtype[ty.Any] = np.uint8 if as_uint8 else self.reader.dtype  # type: ignore[assignment]
         channel_names = self.reader.channel_names
         if channel_ids is not None:
             channel_names = [channel_names[i] for i in channel_ids]
@@ -237,110 +237,111 @@ class OmeTiffWriter:
         if channel_ids:
             logger.info(f"Writing channels: {channel_ids}")
 
-        with TiffWriter(output_file_name, bigtiff=True) as tif:
-            if self.reader.is_rgb:
-                options = {
-                    "tile": (self.tile_size, self.tile_size),
-                    "compression": self.compression,
-                    "photometric": "rgb",
-                    "metadata": None,
-                }
-            else:
-                options = {
-                    "tile": (self.tile_size, self.tile_size),
-                    "compression": self.compression,
-                    "photometric": "rgb" if self.reader.is_rgb else "minisblack",
-                    "metadata": None,
-                }
-            logger.trace(f"TIFF options: {options}")
+        if self.reader.is_rgb:
+            options = {
+                "tile": (self.tile_size, self.tile_size),
+                "compression": self.compression,
+                "photometric": "rgb",
+                "metadata": None,
+            }
+        else:
+            options = {
+                "tile": (self.tile_size, self.tile_size),
+                "compression": self.compression,
+                "photometric": "rgb" if self.reader.is_rgb else "minisblack",
+                "metadata": None,
+            }
+        logger.trace(f"TIFF options: {options}")
 
+        # write OME-XML to the ImageDescription tag of the first page
+        description = self.omexml
+
+        reader = self.reader
+        with TiffWriter(output_file_name, bigtiff=True) as tif:
             rgb_im_data: list[np.ndarray] = []
-            for channel_idx in trange(self.reader.n_channels, desc="Writing channels..."):
-                if channel_idx not in channel_ids:
-                    logger.trace(f"Skipping channel {channel_idx}")
+            for channel_index in tqdm(channel_ids, desc="Writing channels..."):
+                if channel_index not in channel_ids:
+                    logger.trace(f"Skipping channel {channel_index}")
                     continue
 
-                image: np.ndarray = self.reader.get_channel(channel_idx)
+                # load data
+                image: np.ndarray = reader.get_channel(channel_index)
                 image = np.squeeze(image)
                 image: sitk.Image = sitk.GetImageFromArray(image)  # type: ignore[no-redef]
-                image.SetSpacing((self.reader.resolution, self.reader.resolution))  # type: ignore[attr-defined]
+                image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[attr-defined]
 
                 # transform
-                if self.transformer:
-                    image = self.transformer(image)
+                if self.transformer and callable(self.transformer):
+                    image = self.transformer(image)  # type: ignore[assignment,arg-type]
                     logger.trace(f"Transformed image shape: {image.GetSize()}")  # type: ignore[attr-defined]
 
                 # change dtype
                 if as_uint8:
-                    image = sitk.RescaleIntensity(image, 0, 255)
-                    image = sitk.Cast(image, sitk.sitkUInt8)
+                    image = sitk.RescaleIntensity(image, 0, 255)  # type: ignore[no-untyped-call]
+                    image = sitk.Cast(image, sitk.sitkUInt8)  # type: ignore[no-untyped-call]
 
-                if self.reader.is_rgb:
+                # if the image is RGB, let's accumulate the image data and write it at the end
+                if reader.is_rgb:
                     rgb_im_data.append(image)
-                else:
-                    if isinstance(image, sitk.Image):
-                        image = sitk.GetArrayFromImage(image)
-                    # apply crop mask
-                    if self.crop_mask is not None:
-                        image = self.crop_mask * image
-                    elif self.crop_bbox is not None:
-                        x, y, width, height = self.crop_bbox
-                        image = image[y : y + height, x : x + width]
+                    continue
 
-                    # write OME-XML to the ImageDescription tag of the first page
-                    description = self.omexml if channel_idx == 0 else None
-                    # write channel data
-                    logger.info(f"Writing channel {channel_idx} - shape: {image.shape}")
-                    with MeasureTimer() as write_timer:
-                        tif.write(image, subifds=self.subifds, description=description, **options)
-                    logger.info(f"Writing channel {channel_idx} took {write_timer()}")
+                # convert to array if necessary
+                if isinstance(image, sitk.Image):
+                    image = sitk.GetArrayFromImage(image)
 
-                    if write_pyramid:
-                        with MeasureTimer() as write_timer:
-                            for pyr_idx in range(1, self.n_pyr_levels):
-                                resize_shape = (self.pyr_levels[pyr_idx][0], self.pyr_levels[pyr_idx][1])
-                                image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
-                                logger.info(
-                                    f"Writing pyramid index {pyr_idx} : channel {channel_idx} shape: {image.shape}"
-                                )
-                                tif.write(image, **options, subfiletype=1)
-                                logger.info(
-                                    f"Wrote pyramid index {pyr_idx} : channel {channel_idx} took"
-                                    f" {write_timer(since_last=True)}"
-                                )
-
-            if self.reader.is_rgb:
-                rgb_im_data: np.ndarray = sitk.GetArrayFromImage(  # type: ignore[no-redef]
-                    sitk.Compose(rgb_im_data),  # type: ignore[no-untyped-call]
-                )
-
+                # apply crop mask
                 if self.crop_mask is not None:
-                    rgb_im_data = np.atleast_3d(self.crop_mask) * rgb_im_data
+                    image = self.crop_mask * image
                 elif self.crop_bbox is not None:
                     x, y, width, height = self.crop_bbox
-                    rgb_im_data = rgb_im_data[y : y + height, x : x + width, :]  # type: ignore[call-overload]
+                    image = image[y : y + height, x : x + width]
 
-                # write OME-XML to the ImageDescription tag of the first page
-                description = self.omexml
+                msg = f"Writing image for channel={reader.channel_names[channel_index]} ({channel_index})"
+                past_msg = msg.replace("Writing", "Wrote")
+                # write channel data
+                logger.trace(f"{msg} - {image.shape}...")
+                with MeasureTimer() as write_timer:
+                    tif.write(image, subifds=self.subifds, description=description, **options)
+                    logger.trace(f"{past_msg} in {write_timer()}")
+                    if write_pyramid:
+                        for pyramid_index in range(1, self.n_pyr_levels):
+                            resize_shape = (self.pyr_levels[pyramid_index][0], self.pyr_levels[pyramid_index][1])
+                            image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
+                            logger.trace(f"{msg} pyramid index {pyramid_index} - {image.shape}...")
+                            tif.write(image, **options, subfiletype=1)
+                            logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
+
+            if reader.is_rgb and rgb_im_data:
+                image: np.ndarray = sitk.GetArrayFromImage(  # type: ignore[no-redef]
+                    sitk.Compose(rgb_im_data),  # type: ignore[no-untyped-call]
+                )
+                del rgb_im_data
+
+                if self.crop_mask is not None:
+                    image = np.atleast_3d(self.crop_mask) * image
+                elif self.crop_bbox is not None:
+                    x, y, width, height = self.crop_bbox
+                    image = image[y : y + height, x : x + width, :]
 
                 # write channel data
-                tif.write(
-                    rgb_im_data,
-                    subifds=self.subifds,
-                    description=description,
-                    **options,
-                )
+                msg = "Writing RGB image"
+                past_msg = msg.replace("Writing", "Wrote")
+                # write channel data
+                logger.trace(f"{msg} - {image.shape}...")
+                with MeasureTimer() as write_timer:
+                    tif.write(image, subifds=self.subifds, description=description, **options)
+                    logger.trace(f"{past_msg} in {write_timer()}")
 
-                logger.info(f"RGB shape: {rgb_im_data.shape}")  # type: ignore[attr-defined]
-                if write_pyramid:
-                    logger.info("Writing pyramid...")
-                    for pyr_idx in range(1, self.n_pyr_levels):
-                        with MeasureTimer() as write_timer:
-                            resize_shape = (self.pyr_levels[pyr_idx][0], self.pyr_levels[pyr_idx][1])
-                            rgb_im_data = cv2.resize(rgb_im_data, resize_shape, cv2.INTER_LINEAR)
-                            logger.info(f"pyramid index {pyr_idx} : shape: {resize_shape}")
-                            tif.write(rgb_im_data, **options, subfiletype=1)
-                        logger.info(f"Wrote pyramid index {pyr_idx} took {write_timer()}")
+                    if write_pyramid:
+                        logger.info("Writing pyramid...")
+                        for pyramid_index in range(1, self.n_pyr_levels):
+                            resize_shape = (self.pyr_levels[pyramid_index][0], self.pyr_levels[pyramid_index][1])
+                            image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
+                            logger.info(f"pyramid index {pyramid_index} : shape: {resize_shape}")
+                            logger.trace(f"{msg} pyramid index {pyramid_index} - {image.shape}...")
+                            tif.write(image, **options, subfiletype=1)
+                            logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
+
         return Path(output_file_name)
 
     def write(
