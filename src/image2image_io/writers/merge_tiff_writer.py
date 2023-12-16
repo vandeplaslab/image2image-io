@@ -131,8 +131,8 @@ class MergeOmeTiffWriter:
     def _create_channel_names(self, reader_names: list[str]) -> None:
         """Create channel names for merge data."""
 
-        def _prepare_channel_names(name_: str, channel_names_: list[str]) -> list[str]:
-            return [f"{c} - {name_}" for c in channel_names_]
+        def _prepare_channel_names(reader_name: str, channel_names_: list[str]) -> list[str]:
+            return [f"{channel_name} - {reader_name}" for channel_name in channel_names_]
 
         self.merge.channel_names = [
             _prepare_channel_names(name, channel_names)
@@ -218,10 +218,12 @@ class MergeOmeTiffWriter:
             self.PhysicalSizeX = self.PhysicalSizeY = reader.resolution
 
         channel_names = format_merge_channel_names(self.merge.channel_names, self.merge.n_channels, channel_ids)
+        logger.trace(f"Exporting: {channel_names}")
+        n_channels = len(channel_names)
         self.omexml = prepare_ome_xml_str(
             self.y_size,
             self.x_size,
-            len(channel_names),
+            n_channels,
             dtype,
             False,
             PhysicalSizeX=self.PhysicalSizeX,
@@ -311,7 +313,8 @@ class MergeOmeTiffWriter:
 
         # make sure user did not provide filename with OME-TIFF
         name = name.replace(".ome", "").replace(".tiff", "").replace(".tif", "")
-        output_file_name = str(Path(output_dir) / f"{name}.ome.tiff")
+        output_file_name = Path(output_dir) / f"{name}.ome.tiff"
+        tmp_output_file_name = Path(output_dir) / f"{name}.ome.tiff.tmp"
         logger.info(f"Saving to '{output_file_name}'")
         transformer = self.transformers[0] if self.transformers else None
         self._prepare_image_info(
@@ -339,7 +342,7 @@ class MergeOmeTiffWriter:
         logger.trace(f"TIFF options: {options}")
 
         logger.trace(f"Writing to {output_file_name}")
-        with TiffWriter(output_file_name, bigtiff=True) as tif:
+        with TiffWriter(tmp_output_file_name, bigtiff=True) as tif:
             for reader_index, reader in enumerate(tqdm(self.merge.readers, desc="writing sub-images")):
                 channel_ids_ = channel_ids_fixed[reader_index]
                 if channel_ids_ is None:
@@ -347,8 +350,9 @@ class MergeOmeTiffWriter:
                 for channel_index in tqdm(
                     channel_ids_, leave=False, desc=f"Exporting images for '{reader_names[reader_index]}'"
                 ):
+                    channel_name = self.merge.channel_names[reader_index][channel_index]
                     if channel_index not in channel_ids_:
-                        logger.trace(f"Skipped channel: {reader.channel_names[channel_index]} ({channel_index})")
+                        logger.trace(f"Skipped channel: {channel_name} ({channel_index})")
                         continue
 
                     # retrieve channel data
@@ -386,7 +390,7 @@ class MergeOmeTiffWriter:
                     # write channel data
                     msg = (
                         f"Writing image for reader={reader_names[reader_index]} ({reader_index})"
-                        f" channel={reader.channel_names[channel_index]} ({channel_index})"
+                        f" channel={channel_name} ({channel_index})"
                     )
                     past_msg = msg.replace("Writing", "Wrote")
                     logger.trace(f"{msg} - {image.shape}...")
@@ -402,6 +406,8 @@ class MergeOmeTiffWriter:
                                 logger.trace(
                                     f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}"
                                 )
+            # rename temporary file to final file
+            tmp_output_file_name.rename(output_file_name)
             return Path(output_file_name)
 
     def write(

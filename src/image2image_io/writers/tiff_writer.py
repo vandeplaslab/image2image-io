@@ -217,7 +217,8 @@ class OmeTiffWriter:
         """
         # make sure user did not provide filename with OME-TIFF
         name = name.replace(".ome", "").replace(".tiff", "").replace(".tif", "")
-        output_file_name = str(Path(output_dir) / f"{name}.ome.tiff")
+        output_file_name = Path(output_dir) / f"{name}.ome.tiff"
+        tmp_output_file_name = output_file_name.parent / f"{name}.ome.tiff.tmp"
         logger.info(f"Saving to '{output_file_name}'")
         logger.trace(f"Using transformer: {self.transformer}")
 
@@ -257,7 +258,7 @@ class OmeTiffWriter:
         description = self.omexml
 
         reader = self.reader
-        with TiffWriter(output_file_name, bigtiff=True) as tif:
+        with TiffWriter(tmp_output_file_name, bigtiff=True) as tif:
             rgb_im_data: list[np.ndarray] = []
             for channel_index in tqdm(channel_ids, desc="Writing channels..."):
                 if channel_index not in channel_ids:
@@ -342,6 +343,8 @@ class OmeTiffWriter:
                             tif.write(image, **options, subfiletype=1)
                             logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
 
+        # rename tmp file to output file
+        tmp_output_file_name.rename(output_file_name)
         return Path(output_file_name)
 
     def write(
