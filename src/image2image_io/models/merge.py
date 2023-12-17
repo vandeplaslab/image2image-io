@@ -6,6 +6,7 @@ from pathlib import Path
 from warnings import warn
 
 import numpy as np
+from loguru import logger
 
 if ty.TYPE_CHECKING:
     from image2image_io.readers import BaseReader
@@ -42,13 +43,15 @@ class MergeImages:
                 reader = path
             else:
                 reader: BaseReader = get_simple_reader(path)
-            reader._channel_colors = channel_colors_
-            reader._channel_names = channel_names_
+            if channel_colors_:
+                reader._channel_colors = channel_colors_
+            if channel_names_:
+                reader._channel_names = channel_names_
             reader.resolution = pixel_size
             if reader.channel_names is None or len(reader.channel_names) != reader.n_channels:
                 reader._channel_names = [f"C{idx}" for idx in range(0, reader.n_channels)]
+                logger.trace(f"Channel names not provided for {reader.path}, using {reader.channel_names}")
             readers.append(reader)
-
         if not all(im.dtype == readers[0].dtype for im in readers):
             warn("MergeImages created with mixed data types, writing will cast to the largest data type", stacklevel=2)
         if any(im.is_rgb for im in readers):

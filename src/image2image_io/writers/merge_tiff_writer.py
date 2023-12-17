@@ -305,10 +305,10 @@ class MergeOmeTiffWriter:
         """
         merge_dtype_sitk, merge_dtype_np = self._get_merge_dtype(as_uint8=as_uint8)
 
+        channel_ids_fixed: list[list[int]] = self._check_channel_ids(channel_ids)
         self._check_transforms_and_readers(reader_names)
         self._create_channel_names(reader_names)
         self._check_transforms_sizes_and_resolutions()
-        channel_ids_fixed: list[list[int]] = self._check_channel_ids(channel_ids)
         assert isinstance(channel_ids_fixed, list), "channel_ids must be a list of lists"
 
         # make sure user did not provide filename with OME-TIFF
@@ -340,10 +340,9 @@ class MergeOmeTiffWriter:
             "metadata": None,
         }
         logger.trace(f"TIFF options: {options}")
-
         logger.trace(f"Writing to {output_file_name}")
         with TiffWriter(tmp_output_file_name, bigtiff=True) as tif:
-            for reader_index, reader in enumerate(tqdm(self.merge.readers, desc="writing sub-images")):
+            for reader_index, reader in enumerate(tqdm(self.merge.readers, desc="Writing modality...")):
                 channel_ids_ = channel_ids_fixed[reader_index]
                 if channel_ids_ is None:
                     channel_ids_ = list(range(0, reader.n_channels))
