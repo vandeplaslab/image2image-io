@@ -8,6 +8,7 @@ from typing import List
 import cv2
 import numpy as np
 import SimpleITK as sitk
+from koyo.decorators import retry
 from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import TiffWriter
@@ -409,7 +410,7 @@ class MergeOmeTiffWriter:
                                     f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}"
                                 )
             # rename temporary file to final file
-            tmp_output_file_name.rename(output_file_name)
+            retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type
             return Path(output_file_name)
 
     def write(
