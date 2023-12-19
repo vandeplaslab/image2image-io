@@ -42,7 +42,7 @@ class GeoJSONReader(BaseReader):
         Parameters
         ----------
         output_size: tuple of int
-            Size of the mask in in tuple(x,y)
+            Size of the mask in tuple(x,y)
         with_index: bool
             Whether to write each mask instance as a label (1-n_shapes) or to write all as binary (255)
 

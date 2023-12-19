@@ -360,17 +360,20 @@ class MergeOmeTiffWriter:
                     image: sitk.Image = sitk.GetImageFromArray(image)  # type: ignore[no-redef]
                     image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[attr-defined]
 
+                    # transform
+                    if self.transformers and callable(self.transformers[reader_index]):
+                        with MeasureTimer() as timer:
+                            image = self.transformers[reader_index](image)  # type: ignore[assignment,arg-type,misc]
+                        logger.trace(
+                            f"Transformed image shape: {image.GetSize()} in {timer()}",  # type: ignore[attr-defined]
+                        )
+
                     # change dtype
                     if as_uint8:
                         image = sitk.RescaleIntensity(image, 0, 255)  # type: ignore[no-untyped-call]
                         image = sitk.Cast(image, sitk.sitkUInt8)  # type: ignore[no-untyped-call]
                     elif image.GetPixelIDValue() != merge_dtype_sitk:  # type: ignore[attr-defined]
                         image = sitk.Cast(image, merge_dtype_sitk)  # type: ignore[no-untyped-call]
-
-                    # transform
-                    if self.transformers and callable(self.transformers[reader_index]):
-                        image = self.transformers[reader_index](image)  # type: ignore[assignment,arg-type,misc]
-                        logger.trace(f"Transformed image shape: {image.GetSize()}")  # type: ignore[attr-defined]
 
                     # make sure we have numpy array
                     if isinstance(image, sitk.Image):

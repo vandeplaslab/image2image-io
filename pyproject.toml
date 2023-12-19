@@ -46,6 +46,8 @@ dependencies = [
     "SimpleITK",
     "opencv-python",
     "dicttoxml",
+    "appdirs",
+    "geojson"
 ]
 
 # extras

@@ -119,6 +119,7 @@ class OmeTiffWriter:
         compression: str | None = "default",
         as_uint8: bool = False,
         channel_ids: list[int] | None = None,
+        channel_names: list[str] | None = None,
     ) -> None:
         """Get image info and OME-XML."""
         if self.transformer:
@@ -145,9 +146,13 @@ class OmeTiffWriter:
             self.PhysicalSizeX = self.PhysicalSizeY = self.reader.resolution
 
         dtype: np.dtype[ty.Any] = np.uint8 if as_uint8 else self.reader.dtype  # type: ignore[assignment]
-        channel_names = self.reader.channel_names
+        if channel_names is None:
+            channel_names = self.reader.channel_names
         if channel_ids is not None:
-            channel_names = [channel_names[i] for i in channel_ids]
+            if len(channel_ids) != len(channel_names):
+                channel_names = [channel_names[i] for i in channel_ids]
+        if len(channel_names) != len(channel_ids):
+            raise ValueError("The number of channel ids and channel names does not match.")
 
         self.omexml = prepare_ome_xml_str(
             self.y_size,
@@ -180,6 +185,7 @@ class OmeTiffWriter:
         compression: str | None = "default",
         as_uint8: bool = False,
         channel_ids: list[int] | None = None,
+        channel_names: list[str] | None = None,
     ) -> Path:
         """Write OME-TIFF image plane-by-plane to disk.
 
@@ -209,6 +215,8 @@ class OmeTiffWriter:
             intensity information.
         channel_ids: list of int
             Channel indices to write to OME-TIFF, if None, all channels are written
+        channel_names: list of str
+            Channel names.
 
         Returns
         -------
@@ -222,6 +230,15 @@ class OmeTiffWriter:
         logger.info(f"Saving to '{output_file_name}'")
         logger.trace(f"Using transformer: {self.transformer}")
 
+        if channel_ids and channel_names:
+            if len(channel_ids) != len(channel_names):
+                raise ValueError("The number of channel ids and channel names must match when being specified.")
+
+        if channel_ids is None:
+            channel_ids = list(range(self.reader.n_channels))
+        if channel_names is None:
+            channel_names = self.reader.channel_names
+
         self._prepare_image_info(
             name,
             write_pyramid=write_pyramid,
@@ -229,14 +246,15 @@ class OmeTiffWriter:
             compression=compression,
             as_uint8=as_uint8,
             channel_ids=channel_ids,
+            channel_names=channel_names,
         )
-        if channel_ids is None:
-            channel_ids = list(range(self.reader.n_channels))
 
         if as_uint8:
             logger.trace("Writing image data in 0-255 range as uint8")
-        if channel_ids:
-            logger.info(f"Writing channels: {channel_ids}")
+
+        # some info about channels
+        logger.info(f"Writing channels ids: {channel_ids}")
+        logger.info(f"Writing channels: {channel_names}")
 
         if self.reader.is_rgb:
             options = {
@@ -260,7 +278,8 @@ class OmeTiffWriter:
         reader = self.reader
         with TiffWriter(tmp_output_file_name, bigtiff=True) as tif:
             rgb_im_data: list[np.ndarray] = []
-            for channel_index in tqdm(channel_ids, desc="Writing channels..."):
+            for index, channel_index in enumerate(tqdm(channel_ids, desc="Writing channels...")):
+                channel_name = channel_names[index]
                 if channel_index not in channel_ids:
                     logger.trace(f"Skipping channel {channel_index}")
                     continue
@@ -273,8 +292,11 @@ class OmeTiffWriter:
 
                 # transform
                 if self.transformer and callable(self.transformer):
-                    image = self.transformer(image)  # type: ignore[assignment,arg-type]
-                    logger.trace(f"Transformed image shape: {image.GetSize()}")  # type: ignore[attr-defined]
+                    with MeasureTimer() as timer:
+                        image = self.transformer(image)  # type: ignore[assignment,arg-type]
+                    logger.trace(
+                        f"Transformed image shape: {image.GetSize()} in {timer()}",  # type: ignore[attr-defined]
+                    )
 
                 # change dtype
                 if as_uint8:
@@ -297,7 +319,7 @@ class OmeTiffWriter:
                     x, y, width, height = self.crop_bbox
                     image = image[y : y + height, x : x + width]
 
-                msg = f"Writing image for channel={reader.channel_names[channel_index]} ({channel_index})"
+                msg = f"Writing image for channel={channel_name} ({channel_index})"
                 past_msg = msg.replace("Writing", "Wrote")
                 # write channel data
                 logger.trace(f"{msg} - {image.shape}...")
@@ -354,8 +376,14 @@ class OmeTiffWriter:
         tile_size: int = 512,
         as_uint8: bool = False,
         channel_ids: list[int] | None = None,
+        channel_names: list[str] | None = None,
     ) -> Path:
         """Write image."""
         return self.write_image_by_plane(
-            name, output_dir, tile_size=tile_size, channel_ids=channel_ids, as_uint8=as_uint8
+            name,
+            output_dir,
+            tile_size=tile_size,
+            channel_ids=channel_ids,
+            as_uint8=as_uint8,
+            channel_names=channel_names,
         )
