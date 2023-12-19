@@ -134,10 +134,15 @@ class MergeOmeTiffWriter:
         def _prepare_channel_names(reader_name: str, channel_names_: list[str]) -> list[str]:
             return [f"{channel_name} - {reader_name}" for channel_name in channel_names_]
 
-        self.merge.channel_names = [
-            _prepare_channel_names(name, channel_names)
-            for name, channel_names in zip(reader_names, self.merge.channel_names)
-        ]
+        all_channel_names = []
+        for channel_names in self.merge.channel_names:
+            all_channel_names.extend(channel_names)
+
+        if len(set(all_channel_names)) != self.merge.n_channels:
+            self.merge.channel_names = [
+                _prepare_channel_names(name, channel_names)
+                for name, channel_names in zip(reader_names, self.merge.channel_names)
+            ]
         # self.merge.channel_names = [item for sublist in self.merge.channel_names for item in sublist]
 
     def _check_transforms_sizes_and_resolutions(self) -> None:
