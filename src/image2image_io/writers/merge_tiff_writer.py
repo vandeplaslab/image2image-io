@@ -330,8 +330,8 @@ class MergeOmeTiffWriter:
 
         if as_uint8:
             logger.trace("Writing image data in 0-255 range as uint8")
-        if channel_ids_fixed:
-            logger.info(f"Writing channels: {channel_ids_fixed}")
+        logger.info(f"Writing channels: {channel_ids_fixed}")
+        logger.info(f"Writing channel names: {self.merge.channel_names}")
 
         options = {
             "tile": (tile_size, tile_size),
