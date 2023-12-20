@@ -404,7 +404,7 @@ class MergeOmeTiffWriter:
                     logger.trace(f"{msg} - {image.shape}...")
                     with MeasureTimer() as write_timer:
                         tif.write(image, subifds=self.subifds, description=description, **options)
-                        logger.trace(f"{past_msg} in {write_timer()}")
+                        logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
                         if write_pyramid:
                             for pyramid_index in range(1, self.n_pyr_levels):
                                 resize_shape = (self.pyr_levels[pyramid_index][0], self.pyr_levels[pyramid_index][1])
@@ -415,7 +415,7 @@ class MergeOmeTiffWriter:
                                     f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}"
                                 )
             # rename temporary file to final file
-            retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type
+            retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type]
             return Path(output_file_name)
 
     def write(
