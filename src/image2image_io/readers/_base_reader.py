@@ -46,6 +46,15 @@ class BaseReader:
         self.transform_data: TransformData = TransformData()
         self.transform_name = DEFAULT_TRANSFORM_NAME
 
+    def find_channel_name(self, name: str) -> int | None:
+        """Find cycle by name or part of the name."""
+        if name in self.channel_names:
+            return self.channel_names.index(name)
+        for i, n in enumerate(self.channel_names):
+            if name in n:
+                return i
+        return None
+
     @property
     def transform(self) -> np.ndarray:
         """Return transform."""
