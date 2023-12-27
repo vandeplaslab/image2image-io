@@ -224,7 +224,7 @@ class MergeOmeTiffWriter:
             self.PhysicalSizeX = self.PhysicalSizeY = reader.resolution
 
         channel_names = format_merge_channel_names(self.merge.channel_names, self.merge.n_channels, channel_ids)
-        logger.trace(f"Exporting: {channel_names}")
+        logger.trace(f"Exporting: {channel_names} for {channel_ids}")
         n_channels = len(channel_names)
         self.omexml = prepare_ome_xml_str(
             self.y_size,
@@ -347,6 +347,8 @@ class MergeOmeTiffWriter:
         }
         logger.trace(f"TIFF options: {options}")
         logger.trace(f"Writing to {output_file_name}")
+        ome_set = False
+        description = None
         with TiffWriter(tmp_output_file_name, bigtiff=True) as tif:
             for reader_index, reader in enumerate(tqdm(self.merge.readers, desc="Writing modality...")):
                 channel_ids_ = channel_ids_fixed[reader_index]
@@ -393,7 +395,9 @@ class MergeOmeTiffWriter:
                         image = image[y : y + height, x : x + width]
 
                     # write OME-XML to the ImageDescription tag of the first page
-                    description = self.omexml if channel_index == 0 and reader_index == 0 else None
+                    if not ome_set:
+                        description = self.omexml
+                        ome_set = True
 
                     # write channel data
                     msg = (
@@ -414,9 +418,9 @@ class MergeOmeTiffWriter:
                                 logger.trace(
                                     f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}"
                                 )
-            # rename temporary file to final file
-            retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type]
-            return Path(output_file_name)
+        # rename temporary file to final file
+        retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type]
+        return Path(output_file_name)
 
     def write(
         self,

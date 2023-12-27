@@ -55,6 +55,17 @@ class BaseReader:
                 return i
         return None
 
+    def print_info(self):
+        """Print information about the image."""
+        print(f"Image: {self.path}")
+        print(f"  - Resolution: {self.resolution}")
+        print(f"  - Shape: {self.shape}")
+        print(f"  - Channels: {self.n_channels}")
+        print(f"  - RGB: {self.is_rgb}")
+        for i, channel in enumerate(self.channel_names):
+            print(f"  - Channel {i}: {channel}")
+        print(f"  - Transform: {self.transform}")
+
     @property
     def transform(self) -> np.ndarray:
         """Return transform."""
