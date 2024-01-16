@@ -1,6 +1,7 @@
 """CZI file reader."""
 from __future__ import annotations
 
+import concurrent.futures
 import typing as ty
 import warnings
 from concurrent.futures import ThreadPoolExecutor
@@ -17,6 +18,7 @@ from czifile import DimensionEntryDV1, DirectoryEntryDV
 from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import create_output
+from tqdm import tqdm
 
 from image2image_io.readers.utilities import compute_sub_res
 
@@ -212,8 +214,13 @@ class CziFile(_CziFile):
 
         if max_workers > 1:
             self._fh.lock = True
-            with ThreadPoolExecutor(max_workers) as executor:
-                executor.map(func, self.filtered_subblock_directory)
+            with tqdm(total=len(self.filtered_subblock_directory), desc="Reading subblocks") as pbar:
+                with ThreadPoolExecutor(max_workers) as executor:
+                    futures = {
+                        executor.submit(func, directory_entry) for directory_entry in self.filtered_subblock_directory
+                    }
+                    for future in concurrent.futures.as_completed(futures):
+                        pbar.update()
             self._fh.lock = None
         else:
             for directory_entry in self.filtered_subblock_directory:
