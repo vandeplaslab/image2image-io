@@ -22,7 +22,9 @@ if ty.TYPE_CHECKING:
 
 
 def czis_to_ome_tiff(
-    paths: ty.Iterable[PathLike], output_dir: PathLike | None = None
+    paths: ty.Iterable[PathLike],
+    output_dir: PathLike | None = None,
+    as_uint8: bool = False,
 ) -> ty.Generator[tuple[str, int, int, int, int], None, None]:
     """Convert multiple CZI images to OME-TIFF."""
     from image2image_io.readers._czi import CziSceneFile
@@ -43,13 +45,13 @@ def czis_to_ome_tiff(
     current = 0
     for path_ in paths_:
         path_ = Path(path_)
-        for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(path_, output_dir):
+        for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(path_, output_dir, as_uint8):
             yield key, current_file_scene, total_file_scenes, current, total_n_scenes
             current += 1
 
 
 def czi_to_ome_tiff(
-    path: PathLike, output_dir: PathLike | None = None
+    path: PathLike, output_dir: PathLike | None = None, as_uint8: bool = False
 ) -> ty.Generator[tuple[str, int, int], None, None]:
     """Convert Czi image to OME-TIFF."""
     from image2image_io._reader import get_key
@@ -80,18 +82,20 @@ def czi_to_ome_tiff(
 
         # read the scene
         reader = CziSceneImageReader(path, scene_index=scene_index, auto_pyramid=False, init_pyramid=True)
-        write_ome_tiff_alt(output_path, reader)
+        write_ome_tiff_alt(output_path, reader, as_uint8=as_uint8)
         yield key, scene_index + 1, n
 
 
-def write_ome_tiff_from_array(path: PathLike, reader: BaseReader, array: np.ndarray, resolution: float = None, channel_names: list[str] = None) -> Path:
+def write_ome_tiff_from_array(
+    path: PathLike, reader: BaseReader, array: np.ndarray, resolution: float = None, channel_names: list[str] = None
+) -> Path:
     """Write OME-TIFF by also specifying an array."""
     from image2image_io.readers.array_reader import ArrayImageReader
     from image2image_io.writers.tiff_writer import OmeTiffWriter
 
     if array.ndim == 2:
         array = np.atleast_3d(array)
-    
+
     if reader:
         resolution = reader.resolution
         channel_names = reader.channel_names
@@ -105,14 +109,14 @@ def write_ome_tiff_from_array(path: PathLike, reader: BaseReader, array: np.ndar
     return output_path
 
 
-def write_ome_tiff_alt(path: PathLike, reader: BaseReader) -> Path:
+def write_ome_tiff_alt(path: PathLike, reader: BaseReader, as_uint8: bool = False) -> Path:
     """Write OME-TIFF."""
     from image2image_io.writers.tiff_writer import OmeTiffWriter
 
     path = Path(path)
     filename = path.name.replace(".ome.tiff", "")
     writer = OmeTiffWriter(reader)
-    output_path = writer.write_image_by_plane(filename, path.parent, write_pyramid=True)
+    output_path = writer.write_image_by_plane(filename, path.parent, write_pyramid=True, as_uint8=as_uint8)
     return output_path
 
 
