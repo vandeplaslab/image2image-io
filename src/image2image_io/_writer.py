@@ -40,12 +40,14 @@ def czis_to_ome_tiff(
             total_n_scenes += CziSceneFile.get_num_scenes(path_)
             paths_.append(path_)
 
-    current = 0
-    for path_ in paths_:
+    for current, path_ in enumerate(paths_):
         path_ = Path(path_)
-        for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(path_, output_dir):
-            yield key, current_file_scene, total_file_scenes, current, total_n_scenes
-            current += 1
+        try:
+            for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(path_, output_dir):
+                yield key, current_file_scene, total_file_scenes, current, total_n_scenes
+        except (ValueError, TypeError, OSError):
+            logger.error(f"Could not read Czi file {path_}")
+            continue
 
 
 def czi_to_ome_tiff(
