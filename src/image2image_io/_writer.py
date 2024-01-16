@@ -22,7 +22,10 @@ if ty.TYPE_CHECKING:
 
 
 def czis_to_ome_tiff(
-    paths: ty.Iterable[PathLike], output_dir: PathLike | None = None
+    paths: ty.Iterable[PathLike],
+    output_dir: PathLike | None = None,
+    as_uint8: bool = False,
+    metadata: dict[Path, dict[int, dict[str, list[int | str]]]] | None = None,
 ) -> ty.Generator[tuple[str, int, int, int, int], None, None]:
     """Convert multiple CZI images to OME-TIFF."""
     from image2image_io.readers._czi import CziSceneFile
@@ -42,8 +45,9 @@ def czis_to_ome_tiff(
 
     for current, path_ in enumerate(paths_):
         path_ = Path(path_)
+        reader_metadata = metadata.get(path_, None) if metadata else None
         try:
-            for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(path_, output_dir):
+            for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(path_, output_dir, as_uint8, reader_metadata):
                 yield key, current_file_scene, total_file_scenes, current, total_n_scenes
         except (ValueError, TypeError, OSError):
             logger.error(f"Could not read Czi file {path_}")
@@ -51,7 +55,10 @@ def czis_to_ome_tiff(
 
 
 def czi_to_ome_tiff(
-    path: PathLike, output_dir: PathLike | None = None
+    path: PathLike,
+    output_dir: PathLike | None = None,
+    as_uint8: bool = False,
+    metadata: dict[int, dict[str, list[int | str]]] | None = None,
 ) -> ty.Generator[tuple[str, int, int], None, None]:
     """Convert Czi image to OME-TIFF."""
     from image2image_io._reader import get_key
@@ -81,19 +88,36 @@ def czi_to_ome_tiff(
             continue
 
         # read the scene
-        reader = CziSceneImageReader(path, scene_index=scene_index, auto_pyramid=False, init_pyramid=True)
-        write_ome_tiff_alt(output_path, reader)
-        yield key, scene_index + 1, n
+        reader = CziSceneImageReader(path, scene_index=scene_index, auto_pyramid=False, init_pyramid=False)
+        scene_metadata: dict[str, list[int | str]] = (
+            metadata.get(scene_index, None)
+            if metadata
+            else dict(channel_ids=reader.channel_ids, channel_names=reader.channel_names)
+        )
+        if scene_metadata:
+            assert "channel_ids" in scene_metadata, "Channel IDs must be specified in metadata."
+            assert "channel_names" in scene_metadata, "Channel names must be specified in metadata."
+        if not scene_metadata["channel_ids"]:
+            yield key, scene_index + 1, n
+        else:
+            write_ome_tiff_alt(output_path, reader, as_uint8=as_uint8, **scene_metadata)
+            yield key, scene_index + 1, n
 
 
-def write_ome_tiff_from_array(path: PathLike, reader: BaseReader, array: np.ndarray, resolution: float = None, channel_names: list[str] = None) -> Path:
+def write_ome_tiff_from_array(
+    path: PathLike,
+    reader: BaseReader,
+    array: np.ndarray,
+    resolution: float | None = None,
+    channel_names: list[str] | None = None,
+) -> Path:
     """Write OME-TIFF by also specifying an array."""
     from image2image_io.readers.array_reader import ArrayImageReader
     from image2image_io.writers.tiff_writer import OmeTiffWriter
 
     if array.ndim == 2:
         array = np.atleast_3d(array)
-    
+
     if reader:
         resolution = reader.resolution
         channel_names = reader.channel_names
@@ -107,14 +131,27 @@ def write_ome_tiff_from_array(path: PathLike, reader: BaseReader, array: np.ndar
     return output_path
 
 
-def write_ome_tiff_alt(path: PathLike, reader: BaseReader) -> Path:
+def write_ome_tiff_alt(
+    path: PathLike,
+    reader: BaseReader,
+    as_uint8: bool = False,
+    channel_ids: list[int] | None = None,
+    channel_names: list[str] | None = None,
+) -> Path:
     """Write OME-TIFF."""
     from image2image_io.writers.tiff_writer import OmeTiffWriter
 
     path = Path(path)
     filename = path.name.replace(".ome.tiff", "")
     writer = OmeTiffWriter(reader)
-    output_path = writer.write_image_by_plane(filename, path.parent, write_pyramid=True)
+    output_path = writer.write_image_by_plane(
+        filename,
+        path.parent,
+        write_pyramid=True,
+        as_uint8=as_uint8,
+        channel_ids=channel_ids,
+        channel_names=channel_names,
+    )
     return output_path
 
 
