@@ -27,6 +27,7 @@ class TransformData(BaseModel):
     moving_points: ty.Optional[np.ndarray] = None
     # affine transformation matrix
     affine: ty.Optional[np.ndarray] = None
+    initial_affine: ty.Optional[np.ndarray] = None
 
     # Type of transformation
     transformation_type: str = "affine"
@@ -40,6 +41,7 @@ class TransformData(BaseModel):
             "moving_pixel_size_um": self.moving_resolution,
             "matrix_yx_um": self.compute().params.tolist(),
             "matrix_yx_px": self.compute(px=True).params.tolist(),
+            "initial_matrix_yx_um": self.initial_affine.tolist() if self.initial_affine is not None else [],
         }
 
     @property
@@ -59,6 +61,12 @@ class TransformData(BaseModel):
         if self.transform is None:
             raise ValueError("No transformation found.")
         return self.transform(coords)  # type: ignore[no-any-return]
+
+    def initial_transform(self, coords: np.ndarray) -> np.ndarray:
+        """Transform coordinates."""
+        if self.initial_affine is None:
+            return coords
+        return AffineTransform(matrix=self.initial_affine)(coords)  # type: ignore[no-any-return]
 
     def inverse(self, coords: np.ndarray) -> np.ndarray:
         """Inverse transformation of coordinates."""
@@ -88,15 +96,24 @@ class TransformData(BaseModel):
             if self.affine is None:
                 self.affine = np.eye(3)
                 logger.warning("Transform has not been specified - using identity matrix.")
-            return AffineTransform(matrix=self.affine)
+            affine = self.affine
+            if self.initial_affine is not None:
+                affine = np.dot(self.initial_affine, affine)
+            return AffineTransform(matrix=affine)
 
+        # apply initial affine transformation
+        if self.initial_affine is not None:
+            moving_points = self.initial_transform(moving_points)
+            fixed_points = self.initial_transform(fixed_points)
+        # swap yx to xy
         if not yx:
             moving_points = moving_points[:, ::-1]
             fixed_points = fixed_points[:, ::-1]
+        # convert to pixels
         if not px:
             moving_points = moving_points * moving_resolution
             fixed_points = fixed_points * self.fixed_resolution
-
+        # compute transform
         transform = compute_transform(
             moving_points,  # source
             fixed_points,  # destination
@@ -104,30 +121,6 @@ class TransformData(BaseModel):
         )
         self.moving_resolution = moving_resolution
         return transform
-
-    #
-    # @classmethod
-    # def from_i2r(cls, path: PathLike) -> "TransformData":
-    #     """Load directly from i2r."""
-    #     from image2image.models.transformation import load_transform_from_file
-    #
-    #     (
-    #         transformation_type,
-    #         _fixed_paths,
-    #         _fixed_paths_missing,
-    #         fixed_points,
-    #         _moving_paths,
-    #         _moving_paths_missing,
-    #         moving_points,
-    #         fixed_resolution,
-    #         _moving_resolution,
-    #     ) = load_transform_from_file(path)
-    #     return TransformData(
-    #         fixed_points=fixed_points,
-    #         moving_points=moving_points,
-    #         transformation_type=transformation_type,
-    #         fixed_resolution=fixed_resolution,
-    #     )
 
     @classmethod
     def from_array(cls, matrix: np.ndarray) -> "TransformData":
