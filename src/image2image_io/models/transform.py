@@ -27,8 +27,6 @@ class TransformData(BaseModel):
     moving_points: ty.Optional[np.ndarray] = None
     # affine transformation matrix
     affine: ty.Optional[np.ndarray] = None
-    initial_affine: ty.Optional[np.ndarray] = None
-
     # Type of transformation
     transformation_type: str = "affine"
 
@@ -41,7 +39,6 @@ class TransformData(BaseModel):
             "moving_pixel_size_um": self.moving_resolution,
             "matrix_yx_um": self.compute().params.tolist(),
             "matrix_yx_px": self.compute(px=True).params.tolist(),
-            "initial_matrix_yx_um": self.initial_affine.tolist() if self.initial_affine is not None else [],
         }
 
     @property
@@ -61,12 +58,6 @@ class TransformData(BaseModel):
         if self.transform is None:
             raise ValueError("No transformation found.")
         return self.transform(coords)  # type: ignore[no-any-return]
-
-    def initial_transform(self, coords: np.ndarray) -> np.ndarray:
-        """Transform coordinates."""
-        if self.initial_affine is None:
-            return coords
-        return AffineTransform(matrix=self.initial_affine)(coords)  # type: ignore[no-any-return]
 
     def inverse(self, coords: np.ndarray) -> np.ndarray:
         """Inverse transformation of coordinates."""
@@ -97,14 +88,8 @@ class TransformData(BaseModel):
                 self.affine = np.eye(3)
                 logger.warning("Transform has not been specified - using identity matrix.")
             affine = self.affine
-            if self.initial_affine is not None:
-                affine = np.dot(self.initial_affine, affine)
             return AffineTransform(matrix=affine)
 
-        # apply initial affine transformation
-        if self.initial_affine is not None:
-            moving_points = self.initial_transform(moving_points)
-            fixed_points = self.initial_transform(fixed_points)
         # swap yx to xy
         if not yx:
             moving_points = moving_points[:, ::-1]
@@ -133,7 +118,7 @@ class TransformData(BaseModel):
 class TransformModel(BaseModel):
     """Model containing transformation data."""
 
-    transforms: ty.Optional[ty.Dict[PathLike, TransformData]] = None
+    transforms: ty.Optional[ty.Dict[Path, TransformData]] = None
 
     class Config:
         """Config."""
@@ -177,6 +162,13 @@ class TransformModel(BaseModel):
         name_or_path = Path(name_or_path)
         if name_or_path in self.transforms:
             del self.transforms[name_or_path]
+            logger.info(f"Removed '{name_or_path.name}' from list of transformations")
+        else:
+            for path in self.transforms:
+                if path.name == name_or_path.name:
+                    del self.transforms[path]
+                    logger.info(f"Removed '{path.name}' from list of transformations")
+                    break
 
     def get_matrix(self, name_or_path: PathLike) -> ty.Optional[TransformData]:
         """Get transformation matrix."""

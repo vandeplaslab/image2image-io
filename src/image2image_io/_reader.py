@@ -17,7 +17,7 @@ from image2image_io.wrapper import ImageWrapper
 if ty.TYPE_CHECKING:
     from image2image_io.readers._base_reader import BaseReader
     from image2image_io.readers.array_reader import ArrayImageReader
-    from image2image_io.readers.coordinate_reader import CoordinateImageReader, LazyCoordinateImagerReader
+    from image2image_io.readers.coordinate_reader import CoordinateImageReader, LazyCoordinateImageReader
     from image2image_io.readers.czi_reader import CziImageReader, CziSceneImageReader
     from image2image_io.readers.geojson_reader import GeoJSONReader
     from image2image_io.readers.tiff_reader import TiffImageReader
@@ -340,7 +340,7 @@ def _read_centroids_h5_coordinates(path: PathLike) -> tuple[Path, dict[str, Coor
     return _read_centroids_h5_coordinates_without_metadata(path)
 
 
-def _read_centroids_h5_coordinates_lazy(path: PathLike) -> tuple[Path, dict[str, LazyCoordinateImagerReader]]:
+def _read_centroids_h5_coordinates_lazy(path: PathLike) -> tuple[Path, dict[str, LazyCoordinateImageReader]]:
     """Read centroids data from HDF5 file."""
     path = Path(path)
     assert path.suffix in H5_EXTENSIONS, "Only .h5 files are supported"
@@ -380,7 +380,7 @@ def _read_centroids_h5_coordinates_with_metadata(
 
 def _read_centroids_h5_coordinates_with_metadata_lazy(
     path: Path, metadata_file: Path
-) -> tuple[Path, dict[str, LazyCoordinateImagerReader]]:
+) -> tuple[Path, dict[str, LazyCoordinateImageReader]]:
     import h5py
 
     from image2image_io.utils.lazy import LazyImageWrapper
@@ -400,7 +400,7 @@ def _read_centroids_h5_coordinates_with_metadata_lazy(
     lazy_wrapper = LazyImageWrapper(path, "Array/array", mzs, x, y)
     key = get_key(path)
     mzs = [format_mz(mz) for mz in mzs]  # generate labels
-    reader = LazyCoordinateImagerReader(
+    reader = LazyCoordinateImageReader(
         path, x, y, resolution=resolution, lazy_wrapper=lazy_wrapper, key=key, channel_names=mzs
     )
     return path, {path.name: reader}
@@ -431,10 +431,10 @@ def _read_centroids_h5_coordinates_without_metadata(path: Path) -> tuple[Path, d
 
 def _read_centroids_h5_coordinates_without_metadata_lazy(
     path: Path,
-) -> tuple[Path, dict[str, LazyCoordinateImagerReader]]:
+) -> tuple[Path, dict[str, LazyCoordinateImageReader]]:
     import h5py
 
-    from image2image_io.readers.coordinate_reader import LazyCoordinateImagerReader
+    from image2image_io.readers.coordinate_reader import LazyCoordinateImageReader
     from image2image_io.utils.lazy import LazyImageWrapper
     from image2image_io.utils.utilities import format_mz
 
@@ -447,7 +447,7 @@ def _read_centroids_h5_coordinates_without_metadata_lazy(
     lazy_wrapper = LazyImageWrapper(path, "Array/array", mzs, x, y)
     key = get_key(path)
     mzs = [format_mz(mz) for mz in mzs]  # generate labels
-    reader = LazyCoordinateImagerReader(
+    reader = LazyCoordinateImageReader(
         path, x, y, resolution=resolution, lazy_wrapper=lazy_wrapper, key=key, channel_names=mzs
     )
     return path, {path.name: reader}

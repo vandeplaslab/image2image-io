@@ -10,7 +10,6 @@ from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
 
-from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
 from image2image_io.utils.lazy import LazyImageWrapper
 from image2image_io.utils.utilities import format_mz
@@ -114,8 +113,6 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):
 
     def get_dask_pyr(self) -> list[np.ndarray]:
         """Get dask representation of the pyramid."""
-        if not self.is_fixed and CONFIG.view_type == "random":
-            return [self.get_random_image()]
         return [self.get_image()]
 
     def get_channel_axis_and_n_channels(self) -> tuple[int | None, int]:
@@ -138,7 +135,7 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):
         return [self.data[name]]
 
 
-class LazyCoordinateImagerReader(BaseReader, CoordinateImagerMixin):  # type: ignore[misc]
+class LazyCoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ignore[misc]
     """Lazy coordinate image reader."""
 
     lazy = True
@@ -167,8 +164,6 @@ class LazyCoordinateImagerReader(BaseReader, CoordinateImagerMixin):  # type: ig
 
     def get_dask_pyr(self) -> list[np.ndarray]:
         """Get dask representation of the pyramid."""
-        if not self.is_fixed and CONFIG.view_type == "random":
-            return [self.get_random_image()]
         return [self.get_image()]
 
     def get_image(self) -> np.ndarray:
