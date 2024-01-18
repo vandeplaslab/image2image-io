@@ -217,6 +217,7 @@ class BaseReader:
         """Close the file handle."""
         if self.fh and hasattr(self.fh, "close"):
             self.fh.close()
+        del self.fh
         self.fh = None
         self._pyramid = None
 
@@ -334,3 +335,15 @@ class BaseReader:
     def __del__(self):
         """Close the file handle."""
         self.close()
+
+    def to_ome_tiff(
+        self,
+        path: PathLike,
+        as_uint8: bool = False,
+        channel_ids: list[int] | None = None,
+        channel_names: list[str] | None = None,
+    ) -> Path:
+        """Write image as OME-TIFF."""
+        from image2image_io._writer import write_ome_tiff_alt
+
+        return write_ome_tiff_alt(path, self, as_uint8=as_uint8, channel_names=channel_names, channel_ids=channel_ids)
