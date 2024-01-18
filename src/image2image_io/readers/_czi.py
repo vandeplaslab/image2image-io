@@ -4,7 +4,7 @@ from __future__ import annotations
 import typing as ty
 import warnings
 from concurrent.futures import ThreadPoolExecutor
-from functools import cached_property
+from functools import cached_property, partial
 from multiprocessing import cpu_count
 from pathlib import Path
 from xml.etree import ElementTree
@@ -18,8 +18,8 @@ from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import create_output
 from tqdm import tqdm
-from image2image_io.config import CONFIG
 
+from image2image_io.config import CONFIG
 from image2image_io.readers.utilities import compute_sub_res
 
 logger = logger.bind(src="CZI")
@@ -54,7 +54,7 @@ class CziFile(_CziFile):
         if max_workers is None:
             max_workers = cpu_count() // 2
 
-        def func(directory_entry, resize=resize, order=order, start=self.start, out=out):
+        def func(directory_entry, resize=resize, order=order, start=self.start, out=out, pbar=None):
             """Read, decode, and copy subblock data."""
             subblock = directory_entry.data_segment()
             tile = subblock.data(resize=resize, order=order)
@@ -69,12 +69,14 @@ class CziFile(_CziFile):
         if max_workers > 1:
             self._fh.lock = True
             with tqdm(total=len(self.filtered_subblock_directory), desc="Reading subblocks") as pbar:
+                func_ = partial(func, pbar=pbar)
                 with ThreadPoolExecutor(max_workers) as executor:
-                    executor.map(func, self.filtered_subblock_directory)
+                    executor.map(func_, self.filtered_subblock_directory)
             self._fh.lock = None
         else:
-            for directory_entry in self.filtered_subblock_directory:
-                func(directory_entry)
+            with tqdm(total=len(self.filtered_subblock_directory), desc="Reading subblocks") as pbar:
+                for directory_entry in self.filtered_subblock_directory:
+                    func(directory_entry, pbar=pbar)
 
         if hasattr(out, "flush"):
             out.flush()
