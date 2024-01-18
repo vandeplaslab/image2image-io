@@ -294,7 +294,7 @@ class OmeTiffWriter:
                 image: sitk.Image = np.squeeze(reader.get_channel(channel_index))  # type: ignore[assignment]
                 if self.transformer or as_uint8:
                     # load data
-                    image = sitk.GetImageFromArray(image)  # type: ignore[arg-type,no-redef]
+                    image = sitk.GetImageFromArray(image)  # type: ignore[arg-type]
                     image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[no-untyped-call]
 
                     # transform
@@ -313,6 +313,9 @@ class OmeTiffWriter:
                     # convert to array if necessary
                     if isinstance(image, sitk.Image):
                         image: np.ndarray = sitk.GetArrayFromImage(image)  # type: ignore[no-redef]
+
+                # ensure that the image is a numpy array and not e.g. dask/zarr array
+                image = np.asarray(image)  # type: ignore[assignment]
 
                 # if the image is RGB, let's accumulate the image data and write it at the end
                 if reader.is_rgb:

@@ -8,7 +8,6 @@ import zarr
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
-from tifffile import xml2dict
 
 from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
@@ -57,7 +56,12 @@ class CziMixin:
 
     def xml_metadata(self) -> dict[str, ty.Any]:
         """Return XML metadata."""
-        return xml2dict(self.fh.metadata())  # type: ignore[no-any-return]
+        from image2image_io.utils.utilities import xmlstr_to_dict
+
+        # from tifffile import xml2dict
+
+        return xmlstr_to_dict(self.fh.metadata())
+        # return xml2dict(self.fh.metadata())  # type: ignore[no-any-return]
 
     def _get_image_info(self) -> tuple:
         # if RGB need to get 0
