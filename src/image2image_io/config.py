@@ -26,11 +26,11 @@ class Config(BaseConfig):
         in_app=True,
     )
     only_last_pyramid: bool = Field(False, title="Only last pyramid", description="Only use last pyramid.", in_app=True)
-
     view_type: ViewType = Field(ViewType.RANDOM, title="View type", description="IMS view type.", in_app=False)
     show_transformed: bool = Field(
         True, title="Show transformed", description="If checked, transformed moving image will be shown.", in_app=False
     )
+    multicore: bool = Field(True, title="Multicore", description="Use multicore processing.", in_app=False)
 
     @validator("view_type", pre=True, allow_reuse=True)
     def _validate_view_type(value: ty.Union[str, ViewType]) -> ViewType:  # type: ignore[misc]

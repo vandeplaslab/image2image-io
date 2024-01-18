@@ -18,6 +18,7 @@ from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import create_output
 from tqdm import tqdm
+from image2image_io.config import CONFIG
 
 from image2image_io.readers.utilities import compute_sub_res
 
@@ -26,154 +27,6 @@ logger = logger.bind(src="CZI")
 
 class CziFile(_CziFile):
     """Sub-class of CziFile with added functionality to only read certain channels."""
-
-    # def sub_asarray(
-    #     self,
-    #     resize: bool = True,
-    #     order: int = 0,
-    #     out: np.ndarray | None = None,
-    #     max_workers: int | None = None,
-    #     channel_idx: int | None = None,
-    #     as_uint8: bool = False,
-    #     zarr_fp=None,
-    #     ds_factor: int = 1,
-    # ) -> da.Array | np.ndarray:
-    #     """Return image data from file(s) as numpy array.
-    #
-    #     Parameters
-    #     ----------
-    #     resize: bool
-    #         If True (default), resize sub/supersampled subblock data.
-    #     order: int
-    #         The order of spline interpolation used to resize sub/supersampled
-    #         subblock data. Default is 0 (nearest neighbor).
-    #     out: numpy.ndarray, str, or file-like object; optional
-    #         Buffer where image data will be saved.
-    #         If numpy.ndarray, a writable array of compatible dtype and shape.
-    #         If str or open file, the file name or file object used to
-    #         create a memory-map to an array stored in a binary file on disk.
-    #     max_workers: int
-    #         Maximum number of threads to read and decode subblock data. By default up to half the CPU cores are used.
-    #     channel_idx: int or list of int
-    #         The indices of the channels to extract
-    #     as_uint8: bool
-    #         byte-scale image data to np.uint8 data type
-    #     zarr_fp: str
-    #         path to zarr file to save data to
-    #     ds_factor: int
-    #         Downsampling factor to apply to data
-    #
-    #     Parameters
-    #     ----------
-    #     out:np.ndarray
-    #         image read with selected parameters as np.ndarray
-    #     """
-    #     import cv2
-    #
-    #     out_shape = list(self.shape)
-    #     start = list(self.start)
-    #
-    #     ch_dim_idx = self.axes.index("C")
-    #
-    #     if channel_idx is not None:
-    #         if isinstance(channel_idx, int):
-    #             channel_idx = [channel_idx]
-    #
-    #         if out_shape[ch_dim_idx] == 1:
-    #             channel_idx = None
-    #
-    #         else:
-    #             out_shape[ch_dim_idx] = len(channel_idx)
-    #             min_ch_seq = {}
-    #             for idx, i in enumerate(channel_idx):
-    #                 min_ch_seq.update({i: idx})
-    #
-    #     if as_uint8 :
-    #         out_dtype = np.uint8
-    #     else:
-    #         out_dtype = self.dtype
-    #
-    #     if zarr_fp is not None:
-    #         if ds_factor > 1:
-    #             out_shape[3] = out_shape[3] // ds_factor
-    #             out_shape[4] = out_shape[4] // ds_factor
-    #             out_shape = tuple(out_shape)
-    #             start[3] = start[3] // ds_factor
-    #             start[4] = start[4] // ds_factor
-    #         rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
-    #         root = zarr.open_group(zarr_fp, mode="a")
-    #         pyramid_seq = str(int(np.log2(ds_factor)))
-    #         chunking = (1, 1, 1, 1024, 1024, rgb_chunk)
-    #         out = root.create_dataset(
-    #             pyramid_seq,
-    #             shape=tuple(out_shape),
-    #             chunks=chunking,
-    #             dtype=out_dtype,
-    #             overwrite=True,
-    #         )
-    #
-    #     elif out is None:
-    #         out = create_output(None, tuple(out_shape), out_dtype)
-    #
-    #     if max_workers is None:
-    #         max_workers = multiprocessing.cpu_count() - 1
-    #
-    #     def func(directory_entry, resize=resize, order=order, start=start, out=out):
-    #         """Read, decode, and copy subblock data."""
-    #         subblock = directory_entry.data_segment()
-    #         dvstart = list(directory_entry.start)
-    #         czi_c_idx = [de.dimension for de in subblock.dimension_entries].index("C")
-    #         subblock_ch_idx = subblock.dimension_entries[czi_c_idx].start
-    #         if channel_idx is not None:
-    #             if subblock_ch_idx in channel_idx:
-    #                 subblock.dimension_entries[czi_c_idx].start
-    #                 tile = subblock.data(resize=resize, order=order)
-    #                 dvstart[ch_dim_idx] = min_ch_seq.get(subblock_ch_idx)
-    #             else:
-    #                 return
-    #         else:
-    #             tile = subblock.data(resize=resize, order=order)
-    #
-    #         if ds_factor > 1:
-    #             tile = np.squeeze(tile)
-    #
-    #             w = tile.shape[0] // ds_factor
-    #             h = tile.shape[0] // ds_factor
-    #             tile_ds = cv2.resize(np.squeeze(tile), dsize=(w, h), interpolation=cv2.INTER_LINEAR)
-    #
-    #             tile_ds = np.reshape(tile_ds, (1, 1, 1, tile_ds.shape[0], tile_ds.shape[1], rgb_chunk))
-    #             tile = tile_ds
-    #             dvstart[3] = dvstart[3] // ds_factor
-    #             dvstart[4] = dvstart[4] // ds_factor
-    #
-    #         if as_uint8 :
-    #             tile = (tile / 256).astype("uint8")
-    #
-    #         index = tuple(slice(i - j, i - j + k) for i, j, k in zip(tuple(dvstart), tuple(start), tile.shape))
-    #
-    #         try:
-    #             out[index] = tile
-    #         except ValueError as e:
-    #             error = e
-    #             corr_shape = str(error).split("shape ")[1].split(", got")[0].strip("(").strip(")")
-    #             corr_shape.split(",")
-    #             cor_shape = tuple([slice(int(t)) for t in corr_shape.split(",")])
-    #             tile = tile[cor_shape]
-    #             index = tuple(slice(i - j, i - j + k) for i, j, k in zip(tuple(dvstart), tuple(start), tile.shape))
-    #             out[index] = tile
-    #
-    #     if max_workers > 1:
-    #         self._fh.lock = True
-    #         with ThreadPoolExecutor(max_workers) as executor:
-    #             executor.map(func, self.filtered_subblock_directory)
-    #         self._fh.lock = None
-    #     else:
-    #         for directory_entry in self.filtered_subblock_directory:
-    #             func(directory_entry)
-    #
-    #     if hasattr(out, "flush"):
-    #         out.flush()
-    #     return out
 
     def asarray_alt(self, resize=True, order=0, out=None, max_workers=None):
         """Return image data from file(s) as numpy array.
@@ -243,17 +96,18 @@ class CziFile(_CziFile):
         chunking = (1, 1, 1, tile_size, tile_size, rgb_chunk)
         out_shape = list(self.shape)
         out_dtype = self.dtype
+        synchronizer = None if CONFIG.multicore else zarr.ThreadSynchronizer()
         out = root.create_dataset(
             pyramid_seq,
             shape=tuple(out_shape),
             chunks=chunking,
             dtype=out_dtype,
             overwrite=True,
-            synchronizer=zarr.ThreadSynchronizer(),
+            synchronizer=synchronizer,
         )
 
         with MeasureTimer() as timer:
-            self.as_tzcyx0_array(out=out, max_workers=cpu_count())
+            self.as_tzcyx0_array(out=out, max_workers=cpu_count() if CONFIG.multicore else 1)
             z_array = da.squeeze(da.from_zarr(zarr.open(zarr_fp)[0]))
             dask_pyr.append(da.squeeze(z_array))
         logger.trace(f"Loaded data in {timer()} ({z_array.shape})")
