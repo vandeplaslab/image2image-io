@@ -279,7 +279,12 @@ class OmeTiffWriter:
         reader = self.reader
         with TiffWriter(tmp_output_file_name, bigtiff=True) as tif:
             rgb_im_data: list[np.ndarray] = []
-            for index, channel_index in enumerate(tqdm(channel_ids, desc="Writing channels...")):
+            for index, channel_index in enumerate(
+                tqdm(
+                    channel_ids,
+                    desc="Writing channels..." if not reader.is_rgb else "Collecting channels...",
+                )
+            ):
                 channel_name = channel_names[index]
                 if channel_index not in channel_ids:
                     logger.trace(f"Skipping channel {channel_index}")
