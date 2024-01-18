@@ -278,7 +278,7 @@ class OmeTiffWriter:
 
         reader = self.reader
         with TiffWriter(tmp_output_file_name, bigtiff=True) as tif:
-            rgb_im_data: list[np.ndarray] = []
+            rgb_im_data: list[sitk.Image] = []
             for index, channel_index in enumerate(
                 tqdm(
                     channel_ids,
@@ -291,17 +291,15 @@ class OmeTiffWriter:
                     continue
 
                 # load data
-                image: np.ndarray = reader.get_channel(channel_index)
-                image = np.squeeze(image)
-                image: sitk.Image = sitk.GetImageFromArray(image)  # type: ignore[no-redef]
-                image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[attr-defined]
+                image: sitk.Image = sitk.GetImageFromArray(np.squeeze(reader.get_channel(channel_index)))
+                image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[no-untyped-call]
 
                 # transform
                 if self.transformer and callable(self.transformer):
                     with MeasureTimer() as timer:
-                        image = self.transformer(image)  # type: ignore[assignment,arg-type]
+                        image = self.transformer(image)
                     logger.trace(
-                        f"Transformed image shape: {image.GetSize()} in {timer()}",  # type: ignore[attr-defined]
+                        f"Transformed image shape: {image.GetSize()} in {timer()}",  # type: ignore[no-untyped-call]
                     )
 
                 # change dtype
@@ -316,7 +314,7 @@ class OmeTiffWriter:
 
                 # convert to array if necessary
                 if isinstance(image, sitk.Image):
-                    image = sitk.GetArrayFromImage(image)
+                    image: np.ndarray = sitk.GetArrayFromImage(image)  # type: ignore[assignment]
 
                 # apply crop mask
                 if self.crop_mask is not None:
@@ -342,7 +340,7 @@ class OmeTiffWriter:
 
             if reader.is_rgb and rgb_im_data:
                 image: np.ndarray = sitk.GetArrayFromImage(  # type: ignore[no-redef]
-                    sitk.Compose(rgb_im_data),  # type: ignore[no-untyped-call]
+                    sitk.Compose(*rgb_im_data),  # type: ignore[no-untyped-call]
                 )
                 del rgb_im_data
 
