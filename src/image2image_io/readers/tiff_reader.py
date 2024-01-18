@@ -17,6 +17,7 @@ from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.tiff_utils import (
     ometiff_ch_names,
     ometiff_xy_pixel_sizes,
+    qptiff_channel_names,
     svs_xy_pixel_sizes,
     tifftag_xy_pixel_sizes,
 )
@@ -109,15 +110,23 @@ class TiffImageReader(BaseReader):
 
     def _get_channel_names(self):
         channel_names = []
-        if self.fh.ome_metadata:
+        if any(suffix in self.path.name for suffix in [".qptiff", ".qptiff.intermediate", ".qptiff.raw"]):
+            channel_names = qptiff_channel_names(self.fh)
+        if self.fh.ome_metadata and not channel_names:
             channel_names = ometiff_ch_names(from_xml(self.fh.ome_metadata, parser="lxml"), self.largest_series)
             if self.n_channels > len(channel_names):
                 channel_names = []
 
-        if not channel_names:
-            channel_names = []
-            for idx, _ch in enumerate(range(self.n_channels)):
-                channel_names.append(f"C{str(idx + 1).zfill(2)}")
+        if not channel_names or len(channel_names) != self.n_channels:
+            logger.warning(
+                f"Number of channels ({self.n_channels}) does not match number of channel names ({channel_names})"
+            )
+            if self.is_rgb:
+                channel_names = ["R", "G", "B"]
+            else:
+                channel_names = []
+                for idx, _ch in enumerate(range(self.n_channels)):
+                    channel_names.append(f"C{str(idx + 1).zfill(2)}")
         return channel_names
 
     def _get_image_info(self):

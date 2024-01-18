@@ -2,11 +2,39 @@
 from __future__ import annotations
 
 import typing as ty
+from collections import defaultdict
+from xml.etree import ElementTree as ET
 
 import numpy as np
 
 if ty.TYPE_CHECKING:
     from skimage.transform import ProjectiveTransform
+
+
+def xmlstr_to_dict(xmlstr: str) -> dict:
+    """Convert xml string to dict."""
+    return etree_to_dict(ET.fromstring(xmlstr))
+
+
+def etree_to_dict(t: ET) -> dict:
+    d = {t.tag: {} if t.attrib else None}
+    children = list(t)
+    if children:
+        dd = defaultdict(list)
+        for dc in map(etree_to_dict, children):
+            for k, v in dc.items():
+                dd[k].append(v)
+        d = {t.tag: {k: v[0] if len(v) == 1 else v for k, v in dd.items()}}
+    if t.attrib:
+        d[t.tag].update(("@" + k, v) for k, v in t.attrib.items())
+    if t.text:
+        text = t.text.strip()
+        if children or t.attrib:
+            if text:
+                d[t.tag]["#text"] = text
+        else:
+            d[t.tag] = text
+    return d
 
 
 def format_merge_channel_names(

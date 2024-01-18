@@ -3,6 +3,8 @@
 Taken from:
 https://github.com/NHPatterson/napari-imsmicrolink/blob/master/src/napari_imsmicrolink/utils/tifffile_meta.py
 """
+from __future__ import annotations
+
 import typing as ty
 
 from ome_types.model import OME
@@ -10,7 +12,31 @@ from pint import UnitRegistry
 from tifffile import TiffFile
 
 
-def tifftag_xy_pixel_sizes(rdr: TiffFile, series_idx: int, level_idx: int) -> ty.Tuple[float, ...]:
+def qptiff_channel_names(tif: TiffFile, series_index: int = 0) -> list[str]:
+    """Retrieve filenames from qptiff."""
+    from image2image_io.utils.utilities import xmlstr_to_dict
+
+    channel_names = []
+    pages = tif.series[series_index].pages
+    if not pages:
+        return channel_names
+    for index, page in enumerate(pages):
+        xml = page.tags["ImageDescription"].value
+        xml_dict = xmlstr_to_dict(xml)
+        if "PerkinElmer-QPI-ImageDescription" in xml_dict:
+            xml_dict = xml_dict["PerkinElmer-QPI-ImageDescription"]
+            channel_name = []
+            if "Biomarker" in xml_dict:
+                channel_name.append(xml_dict["Biomarker"])
+            if "Name" in xml_dict:
+                channel_name.append(xml_dict["Name"])
+            channel_name = " - ".join(channel_name)  # type: ignore[assignment]
+            channel_name += f" (C{index})"
+            channel_names.append(channel_name)
+    return channel_names
+
+
+def tifftag_xy_pixel_sizes(rdr: TiffFile, series_idx: int, level_idx: int) -> tuple[float, ...]:
     """Resolution data is stored in the TIFF tags in pixels per cm, this is converted to microns per pixel."""
     # pages are accessed because they contain the tiff tag
     # subset by series -> level -> first page contains all tags
@@ -40,7 +66,7 @@ def tifftag_xy_pixel_sizes(rdr: TiffFile, series_idx: int, level_idx: int) -> ty
     return x_res_um, y_res_um
 
 
-def svs_xy_pixel_sizes(rdr: TiffFile, series_idx: int, level_idx: int) -> ty.Tuple[float, ...]:
+def svs_xy_pixel_sizes(rdr: TiffFile, series_idx: int, level_idx: int) -> tuple[float, ...]:
     """Get resolution data stored in ImageDescription of SVS."""
     # pages are accessed because they contain the tiff tag
     # subset by series -> level -> first page contains all tags
