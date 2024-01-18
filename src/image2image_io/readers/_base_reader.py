@@ -330,3 +330,7 @@ class BaseReader:
             # pyramid = range(self.n_in_pyramid)[pyramid] + 1
         resolution = self.resolution * 2**pyramid
         return resolution, resolution
+
+    def __del__(self):
+        """Close the file handle."""
+        self.close()
