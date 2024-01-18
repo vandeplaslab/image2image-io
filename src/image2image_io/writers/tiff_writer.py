@@ -339,9 +339,10 @@ class OmeTiffWriter:
                             logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
 
             if reader.is_rgb and rgb_im_data:
-                image: np.ndarray = sitk.GetArrayFromImage(  # type: ignore[no-redef]
-                    sitk.Compose(*rgb_im_data),  # type: ignore[no-untyped-call]
-                )
+                image: np.ndarray = np.dstack(rgb_im_data)
+                # image: np.ndarray = sitk.GetArrayFromImage(  # type: ignore[no-redef]
+                #     sitk.Compose(*rgb_im_data),  # type: ignore[no-untyped-call]
+                # )
                 del rgb_im_data
 
                 if self.crop_mask is not None:
