@@ -1,7 +1,6 @@
 """CZI file reader."""
 from __future__ import annotations
 
-import concurrent.futures
 import typing as ty
 import warnings
 from concurrent.futures import ThreadPoolExecutor
@@ -211,16 +210,14 @@ class CziFile(_CziFile):
                 out[index] = tile
             except ValueError as e:
                 warnings.warn(str(e))
+            with pbar.get_lock():
+                pbar.update()
 
         if max_workers > 1:
             self._fh.lock = True
             with tqdm(total=len(self.filtered_subblock_directory), desc="Reading subblocks") as pbar:
                 with ThreadPoolExecutor(max_workers) as executor:
-                    futures = {
-                        executor.submit(func, directory_entry) for directory_entry in self.filtered_subblock_directory
-                    }
-                    for future in concurrent.futures.as_completed(futures):
-                        pbar.update()
+                    executor.map(func, self.filtered_subblock_directory)
             self._fh.lock = None
         else:
             for directory_entry in self.filtered_subblock_directory:
