@@ -217,7 +217,6 @@ class BaseReader:
         """Close the file handle."""
         if self.fh and hasattr(self.fh, "close"):
             self.fh.close()
-        del self.fh
         self.fh = None
         self._pyramid = None
 
