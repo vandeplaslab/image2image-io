@@ -349,7 +349,7 @@ class MergeOmeTiffWriter:
         logger.trace(f"Writing to {output_file_name}")
         ome_set = False
         description = None
-        with TiffWriter(tmp_output_file_name, bigtiff=True) as tif:
+        with TiffWriter(tmp_output_file_name, bigtiff=True) as tif, MeasureTimer() as main_timer:
             for reader_index, reader in enumerate(tqdm(self.merge.readers, desc="Writing modality...")):
                 channel_ids_ = channel_ids_fixed[reader_index]
                 if channel_ids_ is None:
@@ -363,8 +363,7 @@ class MergeOmeTiffWriter:
                         continue
 
                     # retrieve channel data
-                    image: np.ndarray = reader.get_channel(channel_index)
-                    image = np.squeeze(image)
+                    image: np.ndarray = np.squeeze(reader.get_channel(channel_index))
                     image: sitk.Image = sitk.GetImageFromArray(image)  # type: ignore[no-redef]
                     image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[attr-defined]
 
@@ -418,8 +417,10 @@ class MergeOmeTiffWriter:
                                 logger.trace(
                                     f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}"
                                 )
+        logger.trace(f"Exported OME-TIFF in {main_timer()}")
         # rename temporary file to final file
         retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type]
+        logger.trace(f"Renamed tmp file to output file ({output_file_name})")
         return Path(output_file_name)
 
     def write(

@@ -277,7 +277,7 @@ class OmeTiffWriter:
         description = self.omexml
 
         reader = self.reader
-        with TiffWriter(tmp_output_file_name, bigtiff=True) as tif:
+        with TiffWriter(tmp_output_file_name, bigtiff=True) as tif, MeasureTimer() as main_timer:
             rgb_im_data: list[np.ndarray] = []
             for index, channel_index in enumerate(
                 tqdm(
@@ -290,26 +290,29 @@ class OmeTiffWriter:
                     logger.trace(f"Skipping channel {channel_index}")
                     continue
 
-                # load data
-                image: sitk.Image = sitk.GetImageFromArray(np.squeeze(reader.get_channel(channel_index)))
-                image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[no-untyped-call]
+                # check whether we actually need to do any pre-processing
+                image: sitk.Image = np.squeeze(reader.get_channel(channel_index))  # type: ignore[assignment]
+                if self.transformer or as_uint8:
+                    # load data
+                    image = sitk.GetImageFromArray(image)  # type: ignore[arg-type,no-redef]
+                    image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[no-untyped-call]
 
-                # transform
-                if self.transformer and callable(self.transformer):
-                    with MeasureTimer() as timer:
-                        image = self.transformer(image)
-                    logger.trace(
-                        f"Transformed image shape: {image.GetSize()} in {timer()}",  # type: ignore[no-untyped-call]
-                    )
+                    # transform
+                    if self.transformer and callable(self.transformer):
+                        with MeasureTimer() as timer:
+                            image = self.transformer(image)
+                        logger.trace(
+                            f"Transformed image shape: {image.GetSize()} in {timer()}",  # type: ignore[no-untyped-call]
+                        )
 
-                # change dtype
-                if as_uint8:
-                    image = sitk.RescaleIntensity(image, 0, 255)  # type: ignore[no-untyped-call]
-                    image = sitk.Cast(image, sitk.sitkUInt8)  # type: ignore[no-untyped-call]
+                    # change dtype
+                    if as_uint8:
+                        image = sitk.RescaleIntensity(image, 0, 255)  # type: ignore[no-untyped-call]
+                        image = sitk.Cast(image, sitk.sitkUInt8)  # type: ignore[no-untyped-call]
 
-                # convert to array if necessary
-                if isinstance(image, sitk.Image):
-                    image: np.ndarray = sitk.GetArrayFromImage(image)  # type: ignore[no-redef]
+                    # convert to array if necessary
+                    if isinstance(image, sitk.Image):
+                        image: np.ndarray = sitk.GetArrayFromImage(image)  # type: ignore[no-redef]
 
                 # if the image is RGB, let's accumulate the image data and write it at the end
                 if reader.is_rgb:
@@ -370,9 +373,10 @@ class OmeTiffWriter:
                             )
                             tif.write(image, **options, subfiletype=1)
                             logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
-
+        logger.trace(f"Exported OME-TIFF in {main_timer()}")
         # rename tmp file to output file
         retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type]
+        logger.trace(f"Renamed tmp file to output file ({output_file_name})")
         return Path(output_file_name)
 
     def write(
