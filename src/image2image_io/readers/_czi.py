@@ -54,7 +54,7 @@ class CziFile(_CziFile):
         if max_workers is None:
             max_workers = cpu_count() // 2
 
-        def func(directory_entry, resize=resize, order=order, start=self.start, out=out, pbar=None):
+        def func(directory_entry, resize=resize, order=order, start=self.start, out=out):
             """Read, decode, and copy subblock data."""
             subblock = directory_entry.data_segment()
             tile = subblock.data(resize=resize, order=order)
@@ -69,14 +69,13 @@ class CziFile(_CziFile):
         if max_workers > 1:
             self._fh.lock = True
             with tqdm(total=len(self.filtered_subblock_directory), desc="Reading subblocks") as pbar:
-                func_ = partial(func, pbar=pbar)
                 with ThreadPoolExecutor(max_workers) as executor:
-                    executor.map(func_, self.filtered_subblock_directory)
+                    executor.map(func, self.filtered_subblock_directory)
             self._fh.lock = None
         else:
             with tqdm(total=len(self.filtered_subblock_directory), desc="Reading subblocks") as pbar:
                 for directory_entry in self.filtered_subblock_directory:
-                    func(directory_entry, pbar=pbar)
+                    func(directory_entry)
 
         if hasattr(out, "flush"):
             out.flush()
