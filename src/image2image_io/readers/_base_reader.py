@@ -278,9 +278,9 @@ class BaseReader:
             n_channels = 1
         # 3D images will be split into channels
         elif ndim == 3:
-            if shape[2] == 3:
+            if shape[2] in [3, 4]:
                 channel_axis = 2
-                n_channels = 3
+                n_channels = shape[2]
             else:
                 channel_axis = 0
                 n_channels = shape[0]
