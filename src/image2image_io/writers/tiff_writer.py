@@ -152,7 +152,7 @@ class OmeTiffWriter:
         if channel_ids is not None:
             if len(channel_ids) != len(channel_names):
                 channel_names = [channel_names[i] for i in channel_ids]
-        if len(channel_names) != len(channel_ids):
+        if len(channel_names) != len(channel_ids):  # type: ignore[arg-type]
             raise ValueError("The number of channel ids and channel names does not match.")
 
         self.omexml = prepare_ome_xml_str(
@@ -278,7 +278,7 @@ class OmeTiffWriter:
 
         reader = self.reader
         with TiffWriter(tmp_output_file_name, bigtiff=True) as tif:
-            rgb_im_data: list[sitk.Image] = []
+            rgb_im_data: list[np.ndarray] = []
             for index, channel_index in enumerate(
                 tqdm(
                     channel_ids,
@@ -307,14 +307,14 @@ class OmeTiffWriter:
                     image = sitk.RescaleIntensity(image, 0, 255)  # type: ignore[no-untyped-call]
                     image = sitk.Cast(image, sitk.sitkUInt8)  # type: ignore[no-untyped-call]
 
-                # if the image is RGB, let's accumulate the image data and write it at the end
-                if reader.is_rgb:
-                    rgb_im_data.append(image)
-                    continue
-
                 # convert to array if necessary
                 if isinstance(image, sitk.Image):
-                    image: np.ndarray = sitk.GetArrayFromImage(image)  # type: ignore[assignment]
+                    image: np.ndarray = sitk.GetArrayFromImage(image)  # type: ignore[no-redef]
+
+                # if the image is RGB, let's accumulate the image data and write it at the end
+                if reader.is_rgb:
+                    rgb_im_data.append(image)  # type: ignore[arg-type]
+                    continue
 
                 # apply crop mask
                 if self.crop_mask is not None:
@@ -326,7 +326,7 @@ class OmeTiffWriter:
                 msg = f"Writing image for channel={channel_name} ({channel_index})"
                 past_msg = msg.replace("Writing", "Wrote")
                 # write channel data
-                logger.trace(f"{msg} - {image.shape}...")
+                logger.trace(f"{msg} - {image.shape}...")  # type: ignore[attr-defined]
                 with MeasureTimer() as write_timer:
                     tif.write(image, subifds=self.subifds, description=description, **options)
                     logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
@@ -334,15 +334,14 @@ class OmeTiffWriter:
                         for pyramid_index in range(1, self.n_pyr_levels):
                             resize_shape = (self.pyr_levels[pyramid_index][0], self.pyr_levels[pyramid_index][1])
                             image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
-                            logger.trace(f"{msg} pyramid index {pyramid_index} - {image.shape}...")
+                            logger.trace(
+                                f"{msg} pyramid index {pyramid_index} - {image.shape}...",  # type: ignore[attr-defined]
+                            )
                             tif.write(image, **options, subfiletype=1)
                             logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
 
             if reader.is_rgb and rgb_im_data:
-                image: np.ndarray = np.dstack(rgb_im_data)
-                # image: np.ndarray = sitk.GetArrayFromImage(  # type: ignore[no-redef]
-                #     sitk.Compose(*rgb_im_data),  # type: ignore[no-untyped-call]
-                # )
+                image: np.ndarray = np.dstack(rgb_im_data)  # type: ignore[no-redef]
                 del rgb_im_data
 
                 if self.crop_mask is not None:
@@ -355,7 +354,7 @@ class OmeTiffWriter:
                 msg = "Writing RGB image"
                 past_msg = msg.replace("Writing", "Wrote")
                 # write channel data
-                logger.trace(f"{msg} - {image.shape}...")
+                logger.trace(f"{msg} - {image.shape}...")  # type: ignore[attr-defined]
                 with MeasureTimer() as write_timer:
                     tif.write(image, subifds=self.subifds, description=description, **options)
                     logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
@@ -366,7 +365,9 @@ class OmeTiffWriter:
                             resize_shape = (self.pyr_levels[pyramid_index][0], self.pyr_levels[pyramid_index][1])
                             image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
                             logger.info(f"pyramid index {pyramid_index} : shape: {resize_shape}")
-                            logger.trace(f"{msg} pyramid index {pyramid_index} - {image.shape}...")
+                            logger.trace(
+                                f"{msg} pyramid index {pyramid_index} - {image.shape}...",  # type: ignore[attr-defined]
+                            )
                             tif.write(image, **options, subfiletype=1)
                             logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
 
