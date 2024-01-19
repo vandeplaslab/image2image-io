@@ -182,7 +182,7 @@ def image_to_fusion(
         filename = output_dir / path.stem.replace(".ome", "")
         yield from write_reader_to_txt(reader, filename, key=key)
         logger.trace(f"Exported Fusion CSV for {path}")
-        if not filename.with_suffix(".xm").exists():
+        if not filename.with_suffix(".xml").exists():
             write_reader_to_xml(reader, filename)
             logger.trace(f"Exported XML metadata for {path}")
         del reader
