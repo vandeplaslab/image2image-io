@@ -61,7 +61,6 @@ class CziMixin:
         # from tifffile import xml2dict
 
         return xmlstr_to_dict(self.fh.metadata())
-        # return xml2dict(self.fh.metadata())  # type: ignore[no-any-return]
 
     def _get_image_info(self) -> tuple:
         # if RGB need to get 0

@@ -47,7 +47,9 @@ def czis_to_ome_tiff(
         path_ = Path(path_)
         reader_metadata = metadata.get(path_, None) if metadata else None
         try:
-            for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(path_, output_dir, as_uint8, reader_metadata):
+            for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(
+                path_, output_dir, as_uint8, reader_metadata
+            ):
                 yield key, current_file_scene, total_file_scenes, current, total_n_scenes
         except (ValueError, TypeError, OSError):
             logger.error(f"Could not read Czi file {path_}")

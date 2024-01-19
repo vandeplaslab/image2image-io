@@ -97,7 +97,7 @@ class CziFile(_CziFile):
         chunking = (1, 1, 1, tile_size, tile_size, rgb_chunk)
         out_shape = list(self.shape)
         out_dtype = self.dtype
-        synchronizer = None if CONFIG.multicore else zarr.ThreadSynchronizer()
+        synchronizer = zarr.ThreadSynchronizer() if CONFIG.multicore else None
         out = root.create_dataset(
             pyramid_seq,
             shape=tuple(out_shape),
