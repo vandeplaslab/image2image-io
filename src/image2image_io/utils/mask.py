@@ -61,7 +61,7 @@ def write_masks(
     import h5py
 
     # need the following attributes to be valid
-    assert mask.max() == 1, "Expected binary mask."
+    assert mask.max() <= 1, "Expected binary mask."
     assert mask.ndim == 2, "Expected 2D mask."
     # turn into a binary mask
     mask = mask.astype(bool)
