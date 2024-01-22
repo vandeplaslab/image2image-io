@@ -141,8 +141,8 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         self.resolution = self._get_pixel_size()
         self._channel_names = self._get_channel_names()
         logger.trace(
-            f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution:.3f}; n_ch={len(self._channel_names)};"
-            f" scene={scene_index}"
+            f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution:.3f}; n_ch={len(self._channel_names)}"
+            f"; scene={scene_index}"
         )
 
         init_pyramid = init_pyramid if init_pyramid is not None else CONFIG.init_pyramid

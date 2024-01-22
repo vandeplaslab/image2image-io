@@ -405,30 +405,6 @@ def invert_nonrigid_transforms(itk_transforms: list):
 #     return np.stack(tformed_pts)
 
 
-def get_int_dtype(value: int):
-    """
-    Determine the appropriate bit precision for indexed image.
-
-    Parameters
-    ----------
-    value:int
-        number of shapes
-
-    Returns
-    -------
-    dtype:np.dtype
-        apppropriate data type for index mask
-    """
-    if value <= np.iinfo(np.uint8).max:
-        return np.uint8
-    if value <= np.iinfo(np.uint16).max:
-        return np.uint16
-    if value <= np.iinfo(np.uint32).max:
-        return np.int32
-    else:
-        raise ValueError("Too many shapes")
-
-
 def get_all_shape_coords(shapes: list):
     """Get all shape coordinates from a list of shapes."""
     return np.vstack([np.squeeze(sh["geometry"]["coordinates"][0]) for sh in shapes])

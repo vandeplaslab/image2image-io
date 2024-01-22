@@ -21,7 +21,7 @@ from image2image_io.readers.tiff_utils import (
     svs_xy_pixel_sizes,
     tifftag_xy_pixel_sizes,
 )
-from image2image_io.readers.utilities import get_tifffile_info, guess_rgb, tf_zarr_read_single_ch, tifffile_to_dask
+from image2image_io.readers.utilities import get_tifffile_info, guess_rgb, tifffile_to_dask
 
 logger = logger.bind(src="Tiff")
 

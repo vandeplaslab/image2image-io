@@ -4,7 +4,7 @@ from __future__ import annotations
 import typing as ty
 import warnings
 from concurrent.futures import ThreadPoolExecutor
-from functools import cached_property, partial
+from functools import cached_property
 from multiprocessing import cpu_count
 from pathlib import Path
 from xml.etree import ElementTree
@@ -62,7 +62,7 @@ class CziFile(_CziFile):
             try:
                 out[index] = tile
             except ValueError as e:
-                warnings.warn(str(e))
+                warnings.warn(str(e), stacklevel=2)
             with pbar.get_lock():
                 pbar.update()
 

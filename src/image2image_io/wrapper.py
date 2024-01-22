@@ -58,7 +58,7 @@ class ImageWrapper:
 
     def is_loaded(self, path: PathLike) -> bool:
         """Check if the path is loaded."""
-        from image2image_io._reader import sanitize_read_path
+        from image2image_io.readers import sanitize_read_path
 
         path = Path(path)
         for reader in self.reader_iter():

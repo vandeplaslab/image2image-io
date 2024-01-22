@@ -35,7 +35,8 @@ class ArrayImageReader(BaseReader):
         if self.array.ndim == 2:
             return ["C0"]
         _, n_channels = self.get_channel_axis_and_n_channels()
-        return [f"C{i}" for i in range(n_channels)]
+        self._channel_names = [f"C{i}" for i in range(n_channels)]
+        return self._channel_names
 
     @property
     def pyramid(self) -> list:

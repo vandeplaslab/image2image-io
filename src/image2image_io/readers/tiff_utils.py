@@ -5,8 +5,6 @@ https://github.com/NHPatterson/napari-imsmicrolink/blob/master/src/napari_imsmic
 """
 from __future__ import annotations
 
-import typing as ty
-
 from ome_types.model import OME
 from pint import UnitRegistry
 from tifffile import TiffFile

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import typing as ty
 from pathlib import Path
-from typing import List
 
 import cv2
 import numpy as np
@@ -172,7 +171,8 @@ class MergeOmeTiffWriter:
             channel_ids = [list(range(0, reader.n_channels)) for reader in self.merge.readers]
         if len(channel_ids) != len(self.merge.readers):
             raise ValueError(
-                f"The number of channel_ids does not match number of images. Expected {len(self.merge.readers)} but got {len(channel_ids)}"
+                f"The number of channel_ids does not match number of images. Expected {len(self.merge.readers)} but"
+                f" got {len(channel_ids)}"
             )
         channel_ids_ret = []
         for reader_index, channel_ids_ in enumerate(channel_ids):

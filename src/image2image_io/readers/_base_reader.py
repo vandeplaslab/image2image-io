@@ -199,13 +199,30 @@ class BaseReader:
         """Return name of the input path."""
         return self.path.stem
 
-    def flat_array(self, index: int = 0) -> tuple[np.ndarray, tuple[int, int]]:
+    def flat_array(
+        self, channel_indices: list[int] | None = None, index: int = 0
+    ) -> tuple[np.ndarray, tuple[int, int]]:
         """Return a flat array."""
         from image2image_io.utils.utilities import get_shape_of_image
 
         array = self.pyramid[index]
         if hasattr(array, "compute"):
             array = array.compute()
+
+        if channel_indices is not None:
+            channel_indices = list(channel_indices)
+            assert all(channel_index in self.channel_ids for channel_index in channel_indices), "Invalid channel index"
+        else:
+            channel_indices = self.channel_ids
+
+        # sub-select channels
+        if array.ndim == 3:
+            if self.is_rgb:
+                array = array[:, :, channel_indices]
+            else:
+                array = array[channel_indices, :, :]
+
+        # reshape array
         n_channels, _, shape = get_shape_of_image(array)
         if array.ndim == 3:
             array = array.reshape(-1, n_channels)
@@ -343,6 +360,6 @@ class BaseReader:
         channel_names: list[str] | None = None,
     ) -> Path:
         """Write image as OME-TIFF."""
-        from image2image_io._writer import write_ome_tiff_alt
+        from image2image_io.writers import write_ome_tiff_alt
 
         return write_ome_tiff_alt(path, self, as_uint8=as_uint8, channel_names=channel_names, channel_ids=channel_ids)
