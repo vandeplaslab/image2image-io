@@ -129,6 +129,11 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):
             return self.data[key]
         return np.dstack([self.data[key] for key in self.data])
 
+    def get_channel(self, index: int, pyramid: int = 0) -> np.ndarray:
+        """Return channel."""
+        image = self.get_channel_pyramid(index)[pyramid]
+        return image
+
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
         """Return channel pyramid."""
         name = self.channel_names[index]
