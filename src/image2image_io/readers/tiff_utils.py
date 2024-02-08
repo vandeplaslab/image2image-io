@@ -6,7 +6,6 @@ https://github.com/NHPatterson/napari-imsmicrolink/blob/master/src/napari_imsmic
 from __future__ import annotations
 
 from ome_types.model import OME
-from pint import UnitRegistry
 from tifffile import TiffFile
 
 
@@ -14,7 +13,7 @@ def qptiff_channel_names(tif: TiffFile, series_index: int = 0) -> list[str]:
     """Retrieve filenames from qptiff."""
     from image2image_io.utils.utilities import xmlstr_to_dict
 
-    channel_names = []
+    channel_names: list[str] = []
     pages = tif.series[series_index].pages
     if not pages:
         return channel_names
@@ -30,7 +29,7 @@ def qptiff_channel_names(tif: TiffFile, series_index: int = 0) -> list[str]:
                 channel_name.append(xml_dict["Name"])
             channel_name = " - ".join(channel_name)  # type: ignore[assignment]
             channel_name += f" (C{index})"
-            channel_names.append(channel_name)
+            channel_names.append(channel_name)  # type: ignore[arg-type]
     return channel_names
 
 
@@ -83,6 +82,8 @@ def svs_xy_pixel_sizes(rdr: TiffFile, series_idx: int, level_idx: int) -> tuple[
 
 def ometiff_xy_pixel_sizes(ome_metadata: OME, series_idx: int):
     """Get resolution data stored in OME metadata."""
+    from pint import UnitRegistry
+
     ps_x = ome_metadata.images[series_idx].pixels.physical_size_x
     ps_y = ome_metadata.images[series_idx].pixels.physical_size_y
     ps_unit = ome_metadata.images[series_idx].pixels.physical_size_x_unit

@@ -76,6 +76,7 @@ def czi_to_ome_tiff(
     output_dir: PathLike | None = None,
     as_uint8: bool = False,
     metadata: dict[int, dict[str, list[int | str]]] | None = None,
+    scenes: list[int] | None = None,
 ) -> ty.Generator[tuple[str, int, int], None, None]:
     """Convert Czi image to OME-TIFF."""
     from image2image_io.readers import get_key
@@ -89,13 +90,18 @@ def czi_to_ome_tiff(
     output_dir = Path(output_dir)
     try:
         n = CziSceneFile.get_num_scenes(path)
-        yield key, 0, n
     except Exception as e:
         logger.error(f"Could not read Czi file {path} - {e}")
         return
+    if scenes is None:
+        scenes = list(range(n))
+    assert min(scenes) >= 0, "Scene index must be greater than or equal to 0."
+    assert max(scenes) <= n, "Scene index must be less than the total number of scenes in the file."
+    yield key, 0, len(scenes)
 
     # iterate over each scene in the czi file
-    for scene_index in range(n):
+    for scene_index in scenes:
+        logger.debug(f"Converting scene {scene_index + 1}/{n} from {path}...")
         filename = path.name.replace(".czi", "") + (f"_scene={scene_index:02d}" if n > 1 else "")
         output_path = output_dir / filename
         # skip if the output file already exists

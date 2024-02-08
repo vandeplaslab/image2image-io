@@ -27,6 +27,11 @@ class GeoJSONReader(BaseReader):
 
         self.geojson_data, self.shape_data = read_geojson(self.path)
 
+    @property
+    def display_name(self) -> str:
+        """Retrieve display name from the path."""
+        return self.path.stem
+
     def to_mask(self, output_shape: tuple[int, int], with_index: bool = False) -> np.ndarray:
         """Convert to mask."""
         from image2image_io.utils.mask import polygons_to_mask, shapes_to_polygons
