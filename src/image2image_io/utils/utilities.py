@@ -138,7 +138,7 @@ def reshape_fortran(x: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
     return x.T.reshape(shape[::-1]).T
 
 
-def reshape(x: np.ndarray, y: np.ndarray, array: np.ndarray, fill_value: float = 0) -> np.ndarray:
+def reshape(x: np.ndarray, y: np.ndarray, array: np.ndarray, fill_value: float = np.nan) -> np.ndarray:
     """Reshape array."""
     xmin, xmax = np.min(x), np.max(x)
     ymin, ymax = np.min(y), np.max(y)
@@ -149,7 +149,7 @@ def reshape(x: np.ndarray, y: np.ndarray, array: np.ndarray, fill_value: float =
     return new_array
 
 
-def reshape_batch(x: np.ndarray, y: np.ndarray, array: np.ndarray, fill_value: float = 0) -> np.ndarray:
+def reshape_batch(x: np.ndarray, y: np.ndarray, array: np.ndarray, fill_value: float = np.nan) -> np.ndarray:
     """Batch reshaping of images."""
     if array.ndim != 2:
         raise ValueError("Expected 2-D array.")
