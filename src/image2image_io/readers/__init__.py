@@ -389,7 +389,8 @@ def _read_centroids_h5_coordinates_with_metadata(
             mzs = f["Array"]["xs"][:]  # retrieve m/zs
             labels = [format_mz(mz) for mz in mzs]  # generate labels
         else:
-            labels = f["Annotations/annotations/annotation"][:]
+            labels = f["Annotations/annotations/annotations"][:]
+            labels = [label.decode() for label in labels]
         centroids = f["Array"]["array"][:]  # retrieve ion images
     centroids = reshape_batch(x, y, centroids)  # reshape images
     reader.data.update(dict(zip(labels, centroids)))
@@ -418,7 +419,8 @@ def _read_centroids_h5_coordinates_with_metadata_lazy(
             mzs = f["Array"]["xs"][:]  # retrieve m/zs
             labels = [format_mz(mz) for mz in mzs]  # generate labels
         else:
-            labels = f["Annotations/annotations/annotation"][:]
+            labels = f["Annotations/annotations/annotations"][:]
+            labels = [label.decode() for label in labels]
     lazy_wrapper = LazyImageWrapper(path, "Array/array", labels, x, y)
     key = get_key(path)
     reader = LazyCoordinateImageReader(
@@ -442,7 +444,8 @@ def _read_centroids_h5_coordinates_without_metadata(path: Path) -> tuple[Path, d
             mzs = f["Array"]["xs"][:]  # retrieve m/zs
             labels = [format_mz(mz) for mz in mzs]  # generate labels
         else:
-            labels = f["Annotations/annotations/annotation"][:]
+            labels = f["Annotations/annotations/annotations"][:]
+            labels = [label.decode() for label in labels]
         centroids = f["Array"]["array"][:]  # retrieve ion images
         tic = np.random.randint(128, 255, len(x), dtype=np.uint8)
     tic = reshape(x, y, tic)
@@ -471,7 +474,8 @@ def _read_centroids_h5_coordinates_without_metadata_lazy(
             mzs = f["Array"]["xs"][:]  # retrieve m/zs
             labels = [format_mz(mz) for mz in mzs]  # generate labels
         else:
-            labels = f["Annotations/annotations/annotation"][:]
+            labels = f["Annotations/annotations/annotations"][:]
+            labels = [label.decode() for label in labels]
     lazy_wrapper = LazyImageWrapper(path, "Array/array", labels, x, y)
     key = get_key(path)
     reader = LazyCoordinateImageReader(
