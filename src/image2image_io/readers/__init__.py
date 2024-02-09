@@ -385,11 +385,14 @@ def _read_centroids_h5_coordinates_with_metadata(
     y = reader.y
 
     with h5py.File(path, "r") as f:
-        mzs = f["Array"]["xs"][:]  # retrieve m/zs
+        if "xs" in f["Array"]:
+            mzs = f["Array"]["xs"][:]  # retrieve m/zs
+            labels = [format_mz(mz) for mz in mzs]  # generate labels
+        else:
+            labels = f["Annotations/annotations/annotation"][:]
         centroids = f["Array"]["array"][:]  # retrieve ion images
-    mzs = [format_mz(mz) for mz in mzs]  # generate labels
     centroids = reshape_batch(x, y, centroids)  # reshape images
-    reader.data.update(dict(zip(mzs, centroids)))
+    reader.data.update(dict(zip(labels, centroids)))
     return path, {path.name: reader}
 
 
@@ -411,12 +414,15 @@ def _read_centroids_h5_coordinates_with_metadata_lazy(
     resolution = reader_.resolution
 
     with h5py.File(path, "r") as f:
-        mzs = f["Array"]["xs"][:]  # retrieve m/zs
-    lazy_wrapper = LazyImageWrapper(path, "Array/array", mzs, x, y)
+        if "xs" in f["Array"]:
+            mzs = f["Array"]["xs"][:]  # retrieve m/zs
+            labels = [format_mz(mz) for mz in mzs]  # generate labels
+        else:
+            labels = f["Annotations/annotations/annotation"][:]
+    lazy_wrapper = LazyImageWrapper(path, "Array/array", labels, x, y)
     key = get_key(path)
-    mzs = [format_mz(mz) for mz in mzs]  # generate labels
     reader = LazyCoordinateImageReader(
-        path, x, y, resolution=resolution, lazy_wrapper=lazy_wrapper, key=key, channel_names=mzs
+        path, x, y, resolution=resolution, lazy_wrapper=lazy_wrapper, key=key, channel_names=labels
     )
     return path, {path.name: reader}
 
@@ -432,15 +438,18 @@ def _read_centroids_h5_coordinates_without_metadata(path: Path) -> tuple[Path, d
         x = f["Misc/Spatial/x_coordinates"][:]
         y = f["Misc/Spatial/y_coordinates"][:]
         resolution = float(f["Misc/Spatial"].attrs["pixel_size"])
-        mzs = f["Array"]["xs"][:]  # retrieve m/zs
+        if "xs" in f["Array"]:
+            mzs = f["Array"]["xs"][:]  # retrieve m/zs
+            labels = [format_mz(mz) for mz in mzs]  # generate labels
+        else:
+            labels = f["Annotations/annotations/annotation"][:]
         centroids = f["Array"]["array"][:]  # retrieve ion images
-    tic = np.random.randint(128, 255, len(x), dtype=np.uint8)
+        tic = np.random.randint(128, 255, len(x), dtype=np.uint8)
     tic = reshape(x, y, tic)
     key = get_key(path)
     reader = CoordinateImageReader(path, x, y, resolution=resolution, array_or_reader=tic, key=key)
-    mzs = [format_mz(mz) for mz in mzs]  # generate labels
     centroids = reshape_batch(x, y, centroids)  # reshape images
-    reader.data.update(dict(zip(mzs, centroids)))
+    reader.data.update(dict(zip(labels, centroids)))
     return path, {path.name: reader}
 
 
@@ -458,12 +467,15 @@ def _read_centroids_h5_coordinates_without_metadata_lazy(
         x = f["Misc/Spatial/x_coordinates"][:]
         y = f["Misc/Spatial/y_coordinates"][:]
         resolution = float(f["Misc/Spatial"].attrs["pixel_size"])
-        mzs = f["Array"]["xs"][:]  # retrieve m/zs
-    lazy_wrapper = LazyImageWrapper(path, "Array/array", mzs, x, y)
+        if "xs" in f["Array"]:
+            mzs = f["Array"]["xs"][:]  # retrieve m/zs
+            labels = [format_mz(mz) for mz in mzs]  # generate labels
+        else:
+            labels = f["Annotations/annotations/annotation"][:]
+    lazy_wrapper = LazyImageWrapper(path, "Array/array", labels, x, y)
     key = get_key(path)
-    mzs = [format_mz(mz) for mz in mzs]  # generate labels
     reader = LazyCoordinateImageReader(
-        path, x, y, resolution=resolution, lazy_wrapper=lazy_wrapper, key=key, channel_names=mzs
+        path, x, y, resolution=resolution, lazy_wrapper=lazy_wrapper, key=key, channel_names=labels
     )
     return path, {path.name: reader}
 
