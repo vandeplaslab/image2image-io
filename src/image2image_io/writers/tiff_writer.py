@@ -64,7 +64,7 @@ class OmeTiffWriter:
     PhysicalSizeY: int | float
     PhysicalSizeX: int | float
     subifds: int | None = None
-    compression: str | None = "deflate"
+    compression: str | None = "default"
 
     def __init__(
         self,
