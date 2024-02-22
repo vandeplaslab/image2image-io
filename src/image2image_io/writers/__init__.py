@@ -129,7 +129,7 @@ def czi_to_ome_tiff(
 
 def write_ome_tiff_from_array(
     path: PathLike,
-    reader: BaseReader,
+    reader: BaseReader | None,
     array: np.ndarray,
     resolution: float | None = None,
     channel_names: list[str] | None = None,
