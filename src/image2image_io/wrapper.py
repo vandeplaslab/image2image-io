@@ -217,7 +217,10 @@ class ImageWrapper:
     @property
     def min_resolution(self) -> float:
         """Return minimum resolution."""
-        return min([reader.resolution for reader in self.reader_iter()])
+        resolutions = [reader.resolution for reader in self.reader_iter()]
+        if resolutions:
+            return min(resolutions)
+        return 1.0
 
     @staticmethod
     def get_affine(reader: BaseReader, moving_resolution: float) -> np.ndarray:
