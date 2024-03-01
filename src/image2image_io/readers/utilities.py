@@ -163,6 +163,9 @@ def tf_get_largest_series(image_filepath):
         )
     else:
         largest_series = np.argmax([np.prod(np.asarray(series.shape), dtype=np.int64) for series in tf_im.series])
+    tf_im.close()
+    tf_im.filehandle.close()
+    del tf_im
     return largest_series
 
 

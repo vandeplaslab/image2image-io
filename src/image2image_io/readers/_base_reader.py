@@ -11,6 +11,23 @@ from koyo.typing import PathLike
 from image2image_io.enums import DEFAULT_TRANSFORM_NAME
 from image2image_io.models.transform import TransformData
 from image2image_io.readers.utilities import guess_rgb
+from loguru import logger
+
+def check_if_open(path: Path):
+    """Check if file is open."""
+    import psutil
+
+    # using psutil to check if file is open in the current process
+    current_process_id = psutil.Process().pid
+    proc = psutil.Process(current_process_id)
+    for file in proc.open_files():
+        if file.path == str(path):
+            logger.warning(f"File {path} is still open in the current process...")
+
+
+
+
+logger = logger.bind(src="Reader")
 
 
 class BaseReader:
@@ -234,8 +251,12 @@ class BaseReader:
         """Close the file handle."""
         if self.fh and hasattr(self.fh, "close"):
             self.fh.close()
+        if self.fh and hasattr(self.fh, "filehandle"):
+            self.fh.filehandle.close()
         self.fh = None
         self._pyramid = None
+        check_if_open(self.path)
+        logger.trace("Closed file handles")
 
     @property
     def pyramid(self) -> list:
