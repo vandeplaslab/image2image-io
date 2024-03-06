@@ -36,8 +36,8 @@ class ImageWrapper:
             key_or_reader = key_or_reader.key
         if key_or_reader in self.data:
             reader = self.data.pop(key_or_reader, None)
-            if reader and hasattr(reader, "close"):
-                reader.close()
+            # if reader and hasattr(reader, "close"):
+            #     reader.close()
             del reader
 
     def remove_path(self, path: PathLike) -> list[str]:
