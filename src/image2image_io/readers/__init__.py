@@ -222,12 +222,17 @@ def get_reader(path: Path, split_czi: bool | None = None, quick: bool = False) -
     return path, readers
 
 
-def get_simple_reader(path: PathLike, init_pyramid: bool = True, quick: bool = False) -> BaseReader:
+def get_simple_reader(
+    path: PathLike, init_pyramid: bool = True, auto_pyramid: bool = True, quick: bool = False
+) -> BaseReader:
     """Get simple reader."""
     init_pyramid_ = CONFIG.init_pyramid
     CONFIG.init_pyramid = init_pyramid
+    auto_pyramid_ = CONFIG.auto_pyramid
+    CONFIG.auto_pyramid = auto_pyramid
     path, readers = get_reader(path, split_czi=False, quick=quick)
     CONFIG.init_pyramid = init_pyramid_
+    CONFIG.auto_pyramid = auto_pyramid_
     return next(iter(readers.values()))
 
 
