@@ -7,11 +7,13 @@ from pathlib import Path
 
 import numpy as np
 from koyo.typing import PathLike
+from loguru import logger
 
+from image2image_io.config import CONFIG
 from image2image_io.enums import DEFAULT_TRANSFORM_NAME
 from image2image_io.models.transform import TransformData
 from image2image_io.readers.utilities import guess_rgb
-from loguru import logger
+
 
 def check_if_open(path: Path):
     """Check if file is open."""
@@ -23,8 +25,6 @@ def check_if_open(path: Path):
     for file in proc.open_files():
         if file.path == str(path):
             logger.warning(f"File {path} is still open in the current process...")
-
-
 
 
 logger = logger.bind(src="Reader")
@@ -169,7 +169,9 @@ class BaseReader:
 
     def channel_to_index(self, channel: str) -> int:
         """Return index of a channel."""
-        return self.channel_names.index(channel)
+        if channel in self.channel_names:
+            return self.channel_names.index(channel)
+        return -1
 
     @property
     def n_channels(self) -> int:
@@ -328,7 +330,7 @@ class BaseReader:
 
     def get_channel(self, index: int, pyramid: int = 0) -> np.ndarray:
         """Return channel."""
-        array = self.pyramid[pyramid]
+        array: np.ndarray = self.pyramid[pyramid]
         channel_axis, n_channels = self.get_channel_axis_and_n_channels()
         if channel_axis is None:
             return array
@@ -338,14 +340,15 @@ class BaseReader:
             return array[:, index]
         elif channel_axis == 2:
             return array[:, :, index]
-        else:
-            raise ValueError(f"Array has unsupported shape: {array.shape}")
+        raise ValueError(f"Array has unsupported shape: {array.shape}")
 
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
         """Return channel pyramid."""
         array = self.pyramid
         channel_axis, n_channels = self.get_channel_axis_and_n_channels()
         if channel_axis is None:
+            return array
+        if self.is_rgb and not CONFIG.split_rgb:
             return array
         if channel_axis == 0:
             return [a[index] for a in array]

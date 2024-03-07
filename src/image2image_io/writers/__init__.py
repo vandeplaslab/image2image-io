@@ -75,7 +75,7 @@ def images_to_ome_tiff(
 
     # get total number of scenes
     total_n_scenes, paths = get_total_n_scenes(paths)
-
+    current_total_scene = 0
     for current, path_ in enumerate(tqdm(paths, desc="Converting to OME-TIFF...", total=len(paths))):
         path_ = Path(path_)
         if path_.suffix == ".czi":
@@ -84,7 +84,8 @@ def images_to_ome_tiff(
                 for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(
                     path_, output_dir, as_uint8, tile_size, reader_metadata
                 ):
-                    yield key, current_file_scene, total_file_scenes, current, total_n_scenes
+                    yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes
+                    current_total_scene += 1
             except (ValueError, TypeError, OSError) as err:
                 logger.error(f"Could not read Czi file {path_} ({err})")
                 logger.exception(err)
@@ -95,7 +96,8 @@ def images_to_ome_tiff(
                 for key, current_file_scene, total_file_scenes in image_to_ome_tiff(
                     path_, output_dir, as_uint8, tile_size, reader_metadata
                 ):
-                    yield key, current_file_scene, total_file_scenes, current, total_n_scenes
+                    yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes
+                    current_total_scene += 1
             except (ValueError, TypeError, OSError) as err:
                 logger.error(f"Could not read {path_.suffix} file {path_} ({err})")
                 logger.exception(err)
@@ -153,29 +155,19 @@ def czis_to_ome_tiff(
     metadata: MetadataDict | None = None,
 ) -> ty.Generator[tuple[str, int, int, int, int], None, None]:
     """Convert multiple CZI images to OME-TIFF."""
-    from image2image_io.readers._czi import CziSceneFile
-
     # calculate true total number of scenes
-    total_n_scenes = 0
-    paths_ = []
-    for path_ in paths:
-        path_ = Path(path_)
-        if path_.is_dir():
-            for path__ in path_.glob("**/*.czi"):
-                total_n_scenes += CziSceneFile.get_num_scenes(path__)
-                paths_.append(path__)
-        else:
-            total_n_scenes += CziSceneFile.get_num_scenes(path_)
-            paths_.append(path_)
+    total_n_scenes, paths_ = get_total_n_scenes(paths)
 
-    for current, path_ in enumerate(paths_):
+    current_total_scene = 0
+    for path_ in paths_:
         path_ = Path(path_)
         reader_metadata = metadata.get(path_, None) if metadata else None
         try:
             for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(
                 path_, output_dir, as_uint8, tile_size, reader_metadata
             ):
-                yield key, current_file_scene, total_file_scenes, current, total_n_scenes
+                yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes
+                current_total_scene += 1
         except (ValueError, TypeError, OSError):
             logger.error(f"Could not read Czi file {path_}")
             continue

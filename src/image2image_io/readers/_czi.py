@@ -68,12 +68,16 @@ class CziFile(_CziFile):
 
         if max_workers > 1:
             self._fh.lock = True
-            with tqdm(total=len(self.filtered_subblock_directory), desc="Reading subblocks") as pbar:
+            with tqdm(
+                total=len(self.filtered_subblock_directory), desc="Reading subblocks", mininterval=0.5, unit="block"
+            ) as pbar:
                 with ThreadPoolExecutor(max_workers) as executor:
                     executor.map(func, self.filtered_subblock_directory)
             self._fh.lock = None
         else:
-            with tqdm(total=len(self.filtered_subblock_directory), desc="Reading subblocks") as pbar:
+            with tqdm(
+                total=len(self.filtered_subblock_directory), desc="Reading subblocks", mininterval=0.5, unit="block"
+            ) as pbar:
                 for directory_entry in self.filtered_subblock_directory:
                     func(directory_entry)
 

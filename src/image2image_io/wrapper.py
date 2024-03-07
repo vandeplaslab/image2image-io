@@ -7,6 +7,7 @@ import numpy as np
 from koyo.typing import PathLike
 from loguru import logger
 
+from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
 
 
@@ -129,11 +130,15 @@ class ImageWrapper:
             if reader.reader_type == "shapes":
                 yield reader_name, reader, 0
             else:
-                if reader.channel_names:
-                    for index, _ in enumerate(reader.channel_names):
-                        yield reader_name, reader, index
+                # spetial case for RGB images
+                if reader.is_rgb and not CONFIG.split_rgb:
+                    yield reader_name, reader, None
                 else:
-                    yield from self._reader_channel_iter(reader_name, reader)
+                    if reader.channel_names:
+                        for index, _ in enumerate(reader.channel_names):
+                            yield reader_name, reader, index
+                    else:
+                        yield from self._reader_channel_iter(reader_name, reader)
                     # for reader_name_, index in self._reader_channel_iter(reader_name, reader):
                     #     # for reader_name_, _, _, index in self._reader_image_iter(reader_name, reader):
                     #     yield reader_name_, reader, index
@@ -178,7 +183,7 @@ class ImageWrapper:
         channel_axis, n_channels = reader.get_channel_axis_and_n_channels()
 
         for channel_index in range(n_channels):
-            # 2D image
+            # 2D image or is RGB image
             if channel_axis is None:
                 yield reader_name, reader, array, channel_index
             # 3D image where the first axis corresponds to different channels
@@ -206,9 +211,12 @@ class ImageWrapper:
     def channel_names(self) -> list[str]:
         """Return list of channel names."""
         names = []
-        for key, reader_or_array, index in self.reader_channel_iter():
+        for key, reader, index in self.reader_channel_iter():
             try:
-                channel_names = [reader_or_array.channel_names[index]]
+                if reader.is_rgb and not CONFIG.split_rgb:
+                    channel_names = ["RGB"]
+                else:
+                    channel_names = [reader.channel_names[index]]
             except IndexError:
                 channel_names = [f"C{index}"]
             names.extend([f"{name} | {key}" for name in channel_names])
