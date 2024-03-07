@@ -69,6 +69,7 @@ def images_to_ome_tiff(
     as_uint8: bool = False,
     tile_size: int = 512,
     metadata: MetadataDict | None = None,
+    extras: dict[Path, dict[str, int | float | None]] | None = None
 ) -> ty.Generator[tuple[str, int, int, int, int], None, None]:
     """Convert multiple images to OME-TIFF."""
     output_dir = Path(output_dir) if output_dir else None
