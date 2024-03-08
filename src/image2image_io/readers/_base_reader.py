@@ -284,7 +284,8 @@ class BaseReader:
             array_ = array[top:bottom, left:right]
         elif array.ndim == 3:
             shape = array.shape
-            channel_axis = int(np.argmin(shape))
+            channel_axis, _ = self.get_channel_axis_and_n_channels()
+            # channel_axis = int(np.argmin(shape))
             if channel_axis == 0:
                 array_ = array[:, top:bottom, left:right]
             elif channel_axis == 1:

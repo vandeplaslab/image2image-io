@@ -237,14 +237,14 @@ def write_ome_tiff_from_array(
     array: np.ndarray,
     resolution: float | None = None,
     channel_names: list[str] | None = None,
-    compression: str | None = "deflate",
+    compression: str | None = "default",
 ) -> Path:
     """Write OME-TIFF by also specifying an array."""
     from image2image_io.readers.array_reader import ArrayImageReader
     from image2image_io.writers.tiff_writer import OmeTiffWriter
 
     if array.ndim == 2:
-        array = np.atleast_3d(array)
+        array = array[np.newaxis, ...]
 
     if reader:
         resolution = reader.resolution
