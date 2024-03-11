@@ -251,13 +251,13 @@ class BaseReader:
 
     def close(self) -> None:
         """Close the file handle."""
-        if self.fh and hasattr(self.fh, "close"):
+        if self.fh and hasattr(self.fh, "close") and callable(self.fh.close):
             self.fh.close()
         if self.fh and hasattr(self.fh, "filehandle"):
             self.fh.filehandle.close()
         self.fh = None
         self._pyramid = None
-        check_if_open(self.path)
+        # check_if_open(self.path)
         logger.trace("Closed file handles")
 
     @property
