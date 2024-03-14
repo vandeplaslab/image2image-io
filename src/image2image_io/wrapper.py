@@ -129,6 +129,8 @@ class ImageWrapper:
         for reader_name, reader in self.data.items():
             if reader.reader_type == "shapes":
                 yield reader_name, reader, 0
+            elif reader.reader_type == "points":
+                yield reader_name, reader, 0
             else:
                 # spetial case for RGB images
                 if reader.is_rgb and not CONFIG.split_rgb:
@@ -149,6 +151,8 @@ class ImageWrapper:
         """Iterator to add channels."""
         for reader_name, reader_or_array in self.data.items():
             if reader_or_array.reader_type == "shapes":
+                yield reader_name, reader_or_array, None, 0
+            elif reader_or_array.reader_type == "points":
                 yield reader_name, reader_or_array, None, 0
             else:
                 yield from self._reader_image_iter(reader_name, reader_or_array)
@@ -217,7 +221,7 @@ class ImageWrapper:
                     channel_names = ["RGB"]
                 else:
                     channel_names = [reader.channel_names[index]]
-            except IndexError:
+            except (IndexError, NotImplementedError):
                 channel_names = [f"C{index}"]
             names.extend([f"{name} | {key}" for name in channel_names])
         return names

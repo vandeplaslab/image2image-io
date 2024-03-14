@@ -3,11 +3,13 @@
 Copied from:
 https://github.com/NHPatterson/napari-imsmicrolink/blob/master/src/napari_imsmicrolink/data/tifffile_reader.py
 """
+
 from __future__ import annotations
 
 import warnings
 from pathlib import Path
 
+import numpy as np
 from loguru import logger
 from ome_types import from_xml
 from tifffile import TiffFile
@@ -63,15 +65,20 @@ class TiffImageReader(BaseReader):
     @property
     def n_channels(self):
         """Return number of channels."""
-        return self.im_dims[2] if self.is_rgb else self.im_dims[0]
+        _, n_channels = self.get_channel_axis_and_n_channels()
+        return self.im_dims[2] if self.is_rgb else n_channels
 
     def get_dask_pyr(self):
         """Get instance of Dask pyramid."""
         d_pyr = tifffile_to_dask(self.path, self.largest_series)
+        channel_axis, _ = self.get_channel_axis_and_n_channels(shape=d_pyr[0].shape)
         if self.is_rgb and guess_rgb(d_pyr[0].shape):
             d_pyr[0] = d_pyr[0].rechunk((2048, 2048, 1))
         elif len(d_pyr[0].shape) > 2:
-            d_pyr[0] = d_pyr[0].rechunk((1, 2048, 2048))
+            if channel_axis == 0:
+                d_pyr[0] = d_pyr[0].rechunk((1, 2048, 2048))
+            else:
+                d_pyr[0] = d_pyr[0].rechunk((2048, 2048, 1))
         else:
             d_pyr[0] = d_pyr[0].rechunk((2048, 2048))
         return d_pyr
@@ -141,14 +148,17 @@ class TiffImageReader(BaseReader):
             largest_series = 0
         return im_dims, im_dtype, largest_series
 
-    def get_channel_axis_and_n_channels(self) -> tuple[int | None, int]:
+    def get_channel_axis_and_n_channels(self, shape: tuple | None = None) -> tuple[int | None, int]:
         """Return channel axis and number of channels."""
-        shape = self.shape
+        if shape is None:
+            shape = self.shape
         ndim = len(shape)
         # 2D images will be returned as they are
         if ndim == 3:
             if self.is_rgb:
                 return 2, 3
+            elif np.argmin(shape) == 2:
+                return 2, shape[2]
             else:
                 return 0, shape[0]
         return None, 1
