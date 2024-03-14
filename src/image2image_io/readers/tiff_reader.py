@@ -118,9 +118,9 @@ class TiffImageReader(BaseReader):
                 channel_names = []
 
         if not channel_names or len(channel_names) != self.n_channels:
-            logger.warning(
-                f"Number of channels ({self.n_channels}) does not match number of channel names ({channel_names})"
-            )
+            # logger.warning(
+            #     f"Number of channels ({self.n_channels}) does not match number of channel names ({channel_names})"
+            # )
             if self.is_rgb:
                 channel_names = ["R", "G", "B"]
             else:
