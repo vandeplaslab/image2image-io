@@ -77,13 +77,11 @@ def get_alternative_path(path: PathLike) -> Path:
     return path
 
 
-def sanitize_read_path(path: PathLike, raise_error: bool = True) -> Path | None:
+def sanitize_read_path(path: PathLike, raise_on_error: bool = True) -> Path | None:
     """Sanitize the path that can be read by the reader."""
     path = Path(path)
-    if not path.exists():
-        if raise_error:
-            raise FileNotFoundError(f"File does not exist: {path}")
-        return None
+    if not path.exists() and raise_on_error:
+        raise FileNotFoundError(f"File does not exist: {path}")
     suffix = path.suffix.lower()
     if suffix not in (
         TIFF_EXTENSIONS
@@ -96,7 +94,7 @@ def sanitize_read_path(path: PathLike, raise_error: bool = True) -> Path | None:
         + IMSPY_EXTENSIONS
         + GEOJSON_EXTENSIONS
     ):
-        if raise_error:
+        if raise_on_error:
             raise ValueError(f"Unsupported file format: {path.suffix} ({path})")
         return None
     if suffix in BRUKER_EXTENSIONS:
@@ -163,10 +161,10 @@ def get_key(path: Path, scene_index: int | None = None) -> str:
     return name
 
 
-def is_supported(path: PathLike) -> bool:
+def is_supported(path: PathLike, raise_on_error: bool = True) -> bool:
     """Check whether the file is supported."""
     path = Path(path)
-    path = sanitize_read_path(path)  # type: ignore[assignment]
+    path = sanitize_read_path(path, raise_on_error)  # type: ignore[assignment]
     if not path:
         raise UnsupportedFileFormatError("Could not sanitize path - are you sure this file is supported?")
     return path is not None

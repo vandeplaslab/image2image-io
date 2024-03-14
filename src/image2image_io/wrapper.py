@@ -63,7 +63,7 @@ class ImageWrapper:
 
         path = Path(path)
         for reader in self.reader_iter():
-            if reader.path == path or reader.path == sanitize_read_path(path, raise_error=False):
+            if reader.path == path or reader.path == sanitize_read_path(path, raise_on_error=False):
                 return True
         return False
 
