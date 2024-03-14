@@ -1,4 +1,5 @@
 """Base image wrapper."""
+
 from __future__ import annotations
 
 import math
@@ -14,8 +15,10 @@ from image2image_io.enums import DEFAULT_TRANSFORM_NAME
 from image2image_io.models.transform import TransformData
 from image2image_io.readers.utilities import guess_rgb
 
+logger = logger.bind(src="Reader")
 
-def check_if_open(path: Path):
+
+def check_if_open(path: Path) -> None:
     """Check if file is open."""
     import psutil
 
@@ -25,9 +28,6 @@ def check_if_open(path: Path):
     for file in proc.open_files():
         if file.path == str(path):
             logger.warning(f"File {path} is still open in the current process...")
-
-
-logger = logger.bind(src="Reader")
 
 
 class BaseReader:
@@ -309,9 +309,10 @@ class BaseReader:
         transformed_mask = transform_mask(array, transform, self.image_shape)
         return transformed_mask
 
-    def get_channel_axis_and_n_channels(self) -> tuple[int | None, int]:
+    def get_channel_axis_and_n_channels(self, shape: tuple | None = None) -> tuple[int | None, int]:
         """Return channel axis and number of channels."""
-        shape = self.shape
+        if shape is None:
+            shape = self.shape
         ndim = len(shape)
         # 2D images will be returned as they are
         if ndim == 2:
@@ -319,7 +320,10 @@ class BaseReader:
             n_channels = 1
         # 3D images will be split into channels
         elif ndim == 3:
-            if shape[2] in [3, 4]:
+            if shape[2] in [3, 4]:  # rgb
+                channel_axis = 2
+                n_channels = shape[2]
+            elif np.argmin(shape) == 2:
                 channel_axis = 2
                 n_channels = shape[2]
             else:

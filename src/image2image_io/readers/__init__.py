@@ -1,4 +1,5 @@
 """Init."""
+
 from __future__ import annotations
 
 import typing as ty
@@ -56,6 +57,7 @@ H5_EXTENSIONS = [".h5", ".hdf5"]
 IMSPY_EXTENSIONS = [".data"]
 NPY_EXTENSIONS = [".npy"]
 GEOJSON_EXTENSIONS = [".geojson", ".json"]
+POINTS_EXTENSIONS = [".csv", ".parquet"]
 SUPPORTED_IMAGE_FORMATS = [
     *IMAGE_EXTENSIONS,
     *TIFF_EXTENSIONS,
@@ -100,6 +102,7 @@ def sanitize_read_path(path: PathLike, raise_error: bool = True) -> Path | None:
         + H5_EXTENSIONS
         + IMSPY_EXTENSIONS
         + GEOJSON_EXTENSIONS
+        + POINTS_EXTENSIONS
     ):
         if raise_error:
             raise ValueError(f"Unsupported file format: {path.suffix} ({path})")
@@ -222,6 +225,9 @@ def get_reader(path: Path, split_czi: bool | None = None, quick: bool = False) -
     elif suffix in GEOJSON_EXTENSIONS:
         logger.trace(f"Reading GeoJSON file: {path}")
         path, readers = _read_geojson(path)  # type: ignore
+    elif suffix in POINTS_EXTENSIONS:
+        logger.trace(f"Reading points file: {path}")
+        path, readers = _read_points(path)  # type: ignore
     else:
         raise UnsupportedFileFormatError(f"Unsupported file format: '{suffix}'")
     return path, readers
@@ -257,6 +263,16 @@ def _read_geojson(path: PathLike) -> tuple[Path, dict[str, GeoJSONReader]]:
     assert path.exists(), f"File does not exist: {path}"
     key = get_key(path)
     return path, {path.name: GeoJSONReader(path, key=key)}
+
+
+def _read_points(path: PathLike) -> tuple[Path, dict[str, GeoJSONReader]]:
+    """Read GeoJSON file."""
+    from image2image_io.readers.points_reader import PointsReader
+
+    path = Path(path)
+    assert path.exists(), f"File does not exist: {path}"
+    key = get_key(path)
+    return path, {path.name: PointsReader(path, key=key)}
 
 
 def _read_single_scene_czi(path: PathLike, **kwargs: ty.Any) -> tuple[Path, dict[str, CziImageReader]]:

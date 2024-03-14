@@ -1,4 +1,5 @@
 """Writer functions."""
+
 from __future__ import annotations
 
 import typing as ty
@@ -69,7 +70,7 @@ def images_to_ome_tiff(
     as_uint8: bool = False,
     tile_size: int = 512,
     metadata: MetadataDict | None = None,
-    extras: dict[Path, dict[str, int | float | None]] | None = None
+    extras: dict[Path, dict[str, int | float | None]] | None = None,
 ) -> ty.Generator[tuple[str, int, int, int, int], None, None]:
     """Convert multiple images to OME-TIFF."""
     output_dir = Path(output_dir) if output_dir else None
@@ -247,8 +248,8 @@ def write_ome_tiff_from_array(
         array = array[np.newaxis, ...]
 
     if reader:
-        resolution = reader.resolution
-        channel_names = reader.channel_names
+        resolution = resolution or reader.resolution
+        channel_names = channel_names or reader.channel_names
     resolution = resolution or 1.0
 
     array_reader = ArrayImageReader("", array, resolution=resolution, channel_names=channel_names)
