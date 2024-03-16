@@ -212,6 +212,15 @@ class ImageWrapper:
         for _, reader_or_array in self.data.items():
             yield reader_or_array
 
+    def dataset_names(self, reader_type: tuple[str, ...] = ("all",)) -> list[str]:
+        """Return list of channel names."""
+        names = []
+        show_all = "all" in reader_type
+        for key, reader in self.data.items():
+            if show_all or reader.reader_type in reader_type:
+                names.append(key)
+        return names
+
     def channel_names(self) -> list[str]:
         """Return list of channel names."""
         names = []

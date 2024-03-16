@@ -57,7 +57,7 @@ H5_EXTENSIONS = [".h5", ".hdf5"]
 IMSPY_EXTENSIONS = [".data"]
 NPY_EXTENSIONS = [".npy"]
 GEOJSON_EXTENSIONS = [".geojson", ".json"]
-POINTS_EXTENSIONS = [".csv", ".parquet"]
+POINTS_EXTENSIONS = [".csv", ".txt", ".parquet"]
 SUPPORTED_IMAGE_FORMATS = [
     *IMAGE_EXTENSIONS,
     *TIFF_EXTENSIONS,

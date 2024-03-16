@@ -17,13 +17,17 @@ def read_points(path: PathLike) -> pd.DataFrame:
     path = Path(path)
     if path.suffix == ".csv":
         df = pd.read_csv(path)
+    elif path.suffix == ".txt":
+        df = pd.read_csv(path, delimiter="\t")
+    elif path.suffix == ".tsv":
+        df = pd.read_csv(path, delimiter="\t")
     elif path.suffix == ".parquet":
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
     for col in ["x", "y"]:
         if col not in df.columns:
-            raise ValueError(f"Missing required columns: {col}")
+            raise ValueError(f"Missing required columns: {col}. Available columns: {df.columns}")
     x = df["x"].values
     y = df["y"].values
     return x, y, df.drop(columns=["x", "y"])
