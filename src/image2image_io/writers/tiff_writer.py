@@ -1,4 +1,5 @@
 """Writer."""
+
 from __future__ import annotations
 
 import typing as ty
@@ -119,7 +120,7 @@ class OmeTiffWriter:
         tile_size: int = 512,
         compression: str | None = "default",
         as_uint8: bool = False,
-        channel_ids: list[int] | None = None,
+        channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
     ) -> None:
         """Get image info and OME-XML."""
@@ -185,7 +186,7 @@ class OmeTiffWriter:
         tile_size: int = 512,
         compression: str | None = "default",
         as_uint8: bool = False,
-        channel_ids: list[int] | None = None,
+        channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
     ) -> Path:
         """Write OME-TIFF image plane-by-plane to disk.
@@ -290,8 +291,15 @@ class OmeTiffWriter:
                     logger.trace(f"Skipping channel {channel_index}")
                     continue
 
+                # if channel_index is int, then it's simple, otherwise, let's get maximum intensity projection
+                if isinstance(channel_index, int):
+                    image: sitk.Image = np.squeeze(reader.get_channel(channel_index))  # type: ignore[assignment]
+                else:
+                    images: list[sitk.Image] = [np.squeeze(reader.get_channel(i)) for i in channel_index]
+                    images = np.dstack(images)  # type: ignore[assignment]
+                    image = np.max(images, axis=2)  # type: ignore[assignment]
+
                 # check whether we actually need to do any pre-processing
-                image: sitk.Image = np.squeeze(reader.get_channel(channel_index))  # type: ignore[assignment]
                 if self.transformer or as_uint8:
                     # load data
                     image = sitk.GetImageFromArray(image)  # type: ignore[arg-type]
@@ -388,7 +396,7 @@ class OmeTiffWriter:
         output_dir: Path,
         tile_size: int = 512,
         as_uint8: bool = False,
-        channel_ids: list[int] | None = None,
+        channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
     ) -> Path:
         """Write image."""
