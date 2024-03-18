@@ -71,6 +71,7 @@ def images_to_ome_tiff(
     tile_size: int = 512,
     metadata: MetadataDict | None = None,
     extras: dict[Path, dict[str, int | float | None]] | None = None,
+    overwrite: bool = False,
 ) -> ty.Generator[tuple[str, int, int, int, int], None, None]:
     """Convert multiple images to OME-TIFF."""
     output_dir = Path(output_dir) if output_dir else None
@@ -84,7 +85,12 @@ def images_to_ome_tiff(
             reader_metadata = metadata.get(path_, None) if metadata else None
             try:
                 for key, current_file_scene, total_file_scenes in czi_to_ome_tiff(
-                    path_, output_dir, as_uint8, tile_size, reader_metadata
+                    path_,
+                    output_dir=output_dir,
+                    as_uint8=as_uint8,
+                    tile_size=tile_size,
+                    metadata=reader_metadata,
+                    overwrite=overwrite,
                 ):
                     yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes
                     current_total_scene += 1
@@ -96,7 +102,12 @@ def images_to_ome_tiff(
             reader_metadata = metadata.get(path_, None) if metadata else None
             try:
                 for key, current_file_scene, total_file_scenes in image_to_ome_tiff(
-                    path_, output_dir, as_uint8, tile_size, reader_metadata
+                    path_,
+                    output_dir=output_dir,
+                    as_uint8=as_uint8,
+                    tile_size=tile_size,
+                    metadata=reader_metadata,
+                    overwrite=overwrite,
                 ):
                     yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes
                     current_total_scene += 1
@@ -112,6 +123,7 @@ def image_to_ome_tiff(
     as_uint8: bool = False,
     tile_size: int = 512,
     metadata: dict[int, dict[str, list[int | str]]] | None = None,
+    overwrite: bool = False,
 ) -> ty.Generator[tuple[str, int, int], None, None]:
     """Convert image of any type to OME-TIFF."""
     from image2image_io.readers import get_key, get_simple_reader
@@ -127,7 +139,7 @@ def image_to_ome_tiff(
     filename = path.name.replace(".ome.tiff", "").replace(suffix, "")
     output_path = output_dir / filename
     # skip if the output file already exists
-    if output_path.with_suffix(".ome.tiff").exists():
+    if output_path.with_suffix(".ome.tiff").exists() and not overwrite:
         logger.info(f"Skipping {output_path} - already exists")
         yield key, 1, 1
         return
@@ -182,6 +194,7 @@ def czi_to_ome_tiff(
     tile_size: int = 512,
     metadata: dict[int, dict[str, list[int | str]]] | None = None,
     scenes: list[int] | None = None,
+    overwrite: bool = False,
 ) -> ty.Generator[tuple[str, int, int], None, None]:
     """Convert Czi image to OME-TIFF."""
     from image2image_io.readers import get_key
@@ -210,7 +223,7 @@ def czi_to_ome_tiff(
         filename = path.name.replace(".czi", "") + (f"_scene={scene_index:02d}" if n > 1 else "")
         output_path = output_dir / filename
         # skip if the output file already exists
-        if output_path.with_suffix(".ome.tiff").exists():
+        if output_path.with_suffix(".ome.tiff").exists() and not overwrite:
             logger.info(f"Skipping {output_path} - already exists")
             yield key, scene_index + 1, n
             continue
