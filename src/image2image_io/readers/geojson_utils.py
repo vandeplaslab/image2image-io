@@ -1,4 +1,5 @@
 """Geo-JSON reader."""
+
 from __future__ import annotations
 
 import json
@@ -139,7 +140,11 @@ def read_geojson(json_file: PathLike) -> tuple[list, list]:
                     gj_data = json.loads(data.decode("utf-8"))
 
     if isinstance(gj_data, dict):
-        gj_data = [gj_data]
+        # handle GeoPandas GeoJSON
+        if "type" in gj_data and "features" in gj_data:
+            gj_data = gj_data["features"]
+        else:
+            gj_data = [gj_data]
 
     shapes_np = [geojson_to_numpy(s) for s in gj_data]
     gj_data = [add_unnamed(gj) for gj in gj_data]

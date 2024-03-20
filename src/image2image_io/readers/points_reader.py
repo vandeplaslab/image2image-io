@@ -25,9 +25,7 @@ def read_points(path: PathLike) -> pd.DataFrame:
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
-    for col in ["x", "y"]:
-        if col not in df.columns:
-            raise ValueError(f"Missing required columns: {col}. Available columns: {df.columns}")
+
     x = df["x"].values
     y = df["y"].values
     return x, y, df.drop(columns=["x", "y"])
@@ -46,9 +44,9 @@ class PointsReader(BaseReader):
         auto_pyramid: bool | None = None,
     ):
         super().__init__(path, key=key, auto_pyramid=auto_pyramid)
-        self._channel_names = [self.path.stem]
 
         self.x, self.y, self.df = read_points(self.path)
+        self._channel_names = list(self.df.columns)
 
     @property
     def display_name(self) -> str:
@@ -64,10 +62,16 @@ class PointsReader(BaseReader):
         """Parse data."""
         return self.x, self.y, self.df
 
-    def to_points_kwargs(self, **kwargs: ty.Any) -> dict:
+    def to_points_kwargs(self, channel_name: str, **kwargs: ty.Any) -> dict:
         """Return data so it's compatible with Shapes layer."""
         x, y, df = self.parse_data()
-        kws = {"data": np.c_[y, x], "scale": self.scale, "affine": self.transform, "properties": df}
+        kws = {
+            "data": np.c_[y, x],
+            "scale": self.scale,
+            "affine": self.transform,
+            "features": df,
+            "face_color": channel_name,
+        }
         kws.update(kwargs)
         return kws
 

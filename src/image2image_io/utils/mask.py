@@ -1,4 +1,5 @@
 """Create mask(s) for image(s) based on shapes."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -107,3 +108,22 @@ def write_masks(
                     )
                     continue
                 grp.create_dataset(f"{meta_name}", data=meta_data)
+
+
+def is_polygon_valid(x: np.ndarray, y: np.ndarray | None = None) -> bool:
+    """Check whether the polygons are valid."""
+    p = Polygon(x) if y is None else Polygon((x, y))
+    return p.is_valid and p.is_simple  # type: ignore[no-any-return]
+
+
+def remove_invalid(
+    shape_data: list[dict[str, np.ndarray | str]],
+) -> tuple[list[int], list[dict[str, np.ndarray | str]]]:
+    """Remove invalid polygons."""
+    keep, valid_shapes = [], []
+    for index, shape in enumerate(shape_data):
+        if is_polygon_valid(shape["array"], None):
+            valid_shapes.append(shape)
+            keep.append(index)
+    logger.warning(f"Removed {len(shape_data) - len(valid_shapes)} invalid polygons.")
+    return keep, valid_shapes

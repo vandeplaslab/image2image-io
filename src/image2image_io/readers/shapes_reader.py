@@ -1,7 +1,9 @@
 """GeoJSON reader for image2image."""
+
 from __future__ import annotations
 
 import typing as ty
+from pathlib import Path
 
 import numpy as np
 from koyo.typing import PathLike
@@ -10,7 +12,67 @@ from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.geojson_utils import get_int_dtype, read_geojson, shape_reader
 
 
-class GeoJSONReader(BaseReader):
+def is_txt_and_has_columns(path: PathLike, columns: list[str]) -> bool:
+    """Check if a text file has the required columns."""
+    import pandas as pd
+
+    path = Path(path)
+    if path.suffix == ".csv":
+        df = pd.read_csv(path, nrows=1)
+    elif path.suffix == ".txt":
+        df = pd.read_csv(path, delimiter="\t", nrows=1)
+    elif path.suffix == ".tsv":
+        df = pd.read_csv(path, delimiter="\t", nrows=1)
+    elif path.suffix == ".parquet":
+        df = pd.read_parquet(path)
+    else:
+        raise ValueError(f"Invalid file extension: {path.suffix}")
+    return all(col in df.columns for col in columns)
+
+
+def read_shapes(path: PathLike) -> tuple:
+    """Read shapes."""
+    import pandas as pd
+
+    path = Path(path)
+    if path.suffix == ".csv":
+        df = pd.read_csv(path)
+    elif path.suffix == ".txt":
+        df = pd.read_csv(path, delimiter="\t")
+    elif path.suffix == ".tsv":
+        df = pd.read_csv(path, delimiter="\t")
+    elif path.suffix == ".parquet":
+        df = pd.read_parquet(path)
+    else:
+        raise ValueError(f"Invalid file extension: {path.suffix}")
+    for col in ["vertex_x", "vertex_y", "cell"]:
+        if col not in df.columns:
+            raise ValueError(f"Missing required columns: {col}. Available columns: {df.columns}")
+
+    shapes_geojson, shape_data = [], []
+    for group, indices in df.groupby("cell").groups.items():
+        dff = df.iloc[indices]
+        shape_data.append(
+            {
+                "array": np.c_[dff["vertex_x"].values, dff["vertex_y"].values].astype(np.float32),
+                "shape_type": "polygon",
+                "shape_name": group,
+            }
+        )
+        shapes_geojson.append({"geometry": {"type": "Polygon"}, "properties": {"classification": {"name": group}}})
+    return shapes_geojson, shape_data
+
+
+def read_data(path: Path) -> dict[str, dict[str, np.ndarray]]:
+    """Read data."""
+    if path.suffix in [".json", ".geojson"]:
+        geojson_data, shape_data = read_geojson(path)
+    else:
+        geojson_data, shape_data = read_shapes(path)
+    return geojson_data, shape_data
+
+
+class ShapesReader(BaseReader):
     """GeoJSON reader for image2image."""
 
     reader_type = "shapes"
@@ -23,14 +85,20 @@ class GeoJSONReader(BaseReader):
         auto_pyramid: bool | None = None,
     ):
         super().__init__(path, key=key, auto_pyramid=auto_pyramid)
+        self.geojson_data, self.shape_data = read_data(self.path)
         self._channel_names = [self.path.stem]
-
-        self.geojson_data, self.shape_data = read_geojson(self.path)
 
     @property
     def display_name(self) -> str:
         """Retrieve display name from the path."""
         return self.path.stem
+
+    def remove_invalid(self) -> None:
+        """Remove invalid shapes."""
+        from image2image_io.utils.mask import remove_invalid
+
+        keep, self.shape_data = remove_invalid(self.shape_data)
+        self.geojson_data = [self.geojson_data[i] for i in keep]
 
     def to_mask(self, output_shape: tuple[int, int], with_index: bool = False) -> np.ndarray:
         """Convert to mask."""

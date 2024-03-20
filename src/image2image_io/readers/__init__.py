@@ -16,7 +16,7 @@ from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.array_reader import ArrayImageReader
 from image2image_io.readers.coordinate_reader import CoordinateImageReader, LazyCoordinateImageReader
 from image2image_io.readers.czi_reader import CziImageReader, CziSceneImageReader
-from image2image_io.readers.geojson_reader import GeoJSONReader
+from image2image_io.readers.shapes_reader import ShapesReader, is_txt_and_has_columns
 from image2image_io.readers.tiff_reader import TiffImageReader
 from image2image_io.utils.utilities import get_yx_coordinates_from_shape, reshape, reshape_batch
 from image2image_io.wrapper import ImageWrapper
@@ -27,7 +27,7 @@ __all__ = [
     "CziImageReader",
     "CziSceneImageReader",
     "CoordinateImageReader",
-    "GeoJSONReader",
+    "ShapesReader",
     "LazyCoordinateImageReader",
     "TiffImageReader",
     "sanitize_path",
@@ -220,12 +220,13 @@ def get_reader(path: Path, split_czi: bool | None = None, quick: bool = False) -
         else:
             # path, readers = _read_centroids_h5_coordinates(path)  # type: ignore
             path, readers = _read_centroids_h5_coordinates_lazy(path)  # type: ignore
-    elif suffix in GEOJSON_EXTENSIONS:
-        logger.trace(f"Reading GeoJSON file: {path}")
-        path, readers = _read_geojson(path)  # type: ignore
-    elif suffix in POINTS_EXTENSIONS:
-        logger.trace(f"Reading points file: {path}")
-        path, readers = _read_points(path)  # type: ignore
+    elif suffix in GEOJSON_EXTENSIONS + POINTS_EXTENSIONS:
+        if suffix in GEOJSON_EXTENSIONS or is_txt_and_has_columns(path, ["vertex_x", "vertex_y", "cell"]):
+            logger.trace(f"Reading GeoJSON file: {path}")
+            path, readers = _read_geojson(path)
+        else:
+            logger.trace(f"Reading points file: {path}")
+            path, readers = _read_points(path)  # type: ignore
     else:
         raise UnsupportedFileFormatError(f"Unsupported file format: '{suffix}'")
     return path, readers
@@ -253,17 +254,17 @@ def _check_multi_scene_czi(path: PathLike) -> bool:
     return bool(CziSceneFile.get_num_scenes(path) > 1)
 
 
-def _read_geojson(path: PathLike) -> tuple[Path, dict[str, GeoJSONReader]]:
+def _read_geojson(path: PathLike) -> tuple[Path, dict[str, ShapesReader]]:
     """Read GeoJSON file."""
-    from image2image_io.readers.geojson_reader import GeoJSONReader
+    from image2image_io.readers.shapes_reader import ShapesReader
 
     path = Path(path)
     assert path.exists(), f"File does not exist: {path}"
     key = get_key(path)
-    return path, {path.name: GeoJSONReader(path, key=key)}
+    return path, {path.name: ShapesReader(path, key=key)}
 
 
-def _read_points(path: PathLike) -> tuple[Path, dict[str, GeoJSONReader]]:
+def _read_points(path: PathLike) -> tuple[Path, dict[str, ShapesReader]]:
     """Read GeoJSON file."""
     from image2image_io.readers.points_reader import PointsReader
 
