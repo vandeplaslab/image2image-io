@@ -143,7 +143,10 @@ class ShapesReader(BaseReader):
     def to_shapes(self) -> tuple[str, dict[str, np.ndarray | str]]:
         """Convert to shapes that can be exported to Shapes layer."""
         _, shape_types, shape_names, shape_arrays, *_ = self.parse_data()
-        shape_types = [s.lower() for s in shape_types]  # expected polygon not Polygon
+        if len(shape_types) > 1_000:
+            shape_types = ["path"] * len(shape_types)
+        else:
+            shape_types = [s.lower() for s in shape_types]  # expected polygon not Polygon
         return shape_names[0], {"shape_types": shape_types, "shape_data": shape_arrays}
 
     def parse_data(self) -> tuple:
@@ -172,7 +175,7 @@ class ShapesReader(BaseReader):
             "data": shape_arrays,
             "properties": shape_props,
             "text": shape_text,
-            "shape_type": "polygon",
+            "shape_type": "polygon" if len(shape_arrays) < 1_000 else "path",
             "scale": self.scale,
             "affine": self.transform,
         }
