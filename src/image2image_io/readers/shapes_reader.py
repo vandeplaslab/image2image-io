@@ -63,6 +63,20 @@ def read_shapes(path: PathLike) -> tuple:
     return shapes_geojson, shape_data
 
 
+def napari_to_shapes_data(name: str, data: list[np.ndarray], shapes: list[str]) -> dict:
+    """Convert napari shapes to data."""
+    shape_data = []
+    for array, shape_type in zip(data, shapes):
+        shape_data.append(
+            {
+                "array": array[:, [1, 0]],
+                "shape_type": "polygon",  # shape_type,
+                "shape_name": name,
+            }
+        )
+    return shape_data
+
+
 def read_data(path: Path) -> dict[str, dict[str, np.ndarray]]:
     """Read data."""
     if path.suffix in [".json", ".geojson"]:
@@ -78,15 +92,17 @@ class ShapesReader(BaseReader):
     reader_type = "shapes"
     _channel_names: list[str]
 
-    def __init__(
-        self,
-        path: PathLike,
-        key: str | None = None,
-        auto_pyramid: bool | None = None,
-    ):
+    def __init__(self, path: PathLike, key: str | None = None, auto_pyramid: bool | None = None, init: bool = True):
         super().__init__(path, key=key, auto_pyramid=auto_pyramid)
+        if not init:
+            return
         self.geojson_data, self.shape_data = read_data(self.path)
         self._channel_names = [self.path.stem]
+
+    @classmethod
+    def create(cls, name: str = ""):
+        """Create empty instance."""
+        return cls(name, key=name, init=False)
 
     @property
     def display_name(self) -> str:
@@ -178,6 +194,7 @@ class ShapesReader(BaseReader):
             "shape_type": "polygon" if len(shape_arrays) < 1_000 else "path",
             "scale": self.scale,
             "affine": self.transform,
+            "edge_width": 2,
         }
         kws.update(kwargs)
         return kws

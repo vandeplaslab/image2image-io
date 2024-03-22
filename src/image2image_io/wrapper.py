@@ -26,6 +26,9 @@ class ImageWrapper:
                 resolution.append(_reader_or_array.resolution)
         self.resolution = np.min(resolution)
 
+    def __repr__(self) -> str:
+        return f"ImageWrapper<{len(self.data)}>"
+
     def add(self, reader: BaseReader) -> None:
         """Add data to wrapper."""
         self.data[reader.key] = reader
@@ -56,6 +59,10 @@ class ImageWrapper:
             if reader.path == path:
                 keys.append(reader.key)
         return keys
+
+    def get_reader_for_key(self, key: str) -> BaseReader:
+        """Return reader for specified key."""
+        return self.data[key]
 
     def is_loaded(self, path: PathLike) -> bool:
         """Check if the path is loaded."""
