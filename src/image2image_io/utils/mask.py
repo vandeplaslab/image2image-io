@@ -48,7 +48,7 @@ def transform_mask(mask: np.ndarray, transform: np.ndarray, output_shape: tuple[
     return transformed_mask
 
 
-def write_masks(
+def write_masks_as_hdf5(
     path: PathLike,
     name: str,
     mask: np.ndarray,
@@ -108,6 +108,39 @@ def write_masks(
                     )
                     continue
                 grp.create_dataset(f"{meta_name}", data=meta_data)
+
+
+def write_masks_as_geojson(path: PathLike, shapes_data: dict[str, np.ndarray | str], display_name: str) -> None:
+    """Write masks to GeoJSON."""
+    from koyo.json import write_json_data
+    from shapely import Polygon, to_geojson
+
+    polygons = []
+    for index, array in enumerate(shapes_data["shape_data"]):
+        polygons.append(
+            {
+                "type": "Feature",
+                "id": index,
+                "geometry": to_geojson(Polygon(array)),
+                "properties": {"classification": {"name": display_name}},
+            }
+        )
+    write_json_data(path, polygons)
+
+
+def write_masks_as_image(path: PathLike, mask: np.ndarray) -> None:
+    """Write masks to image."""
+    from PIL import Image
+
+    # need the following attributes to be valid
+    assert mask.max() <= 1, "Expected binary mask."
+    assert mask.ndim == 2, "Expected 2D mask."
+    # turn into a binary mask
+    mask = mask.astype(bool)
+
+    # write to file
+    img = Image.fromarray(mask)
+    img.save(path)
 
 
 def is_polygon_valid(x: np.ndarray, y: np.ndarray | None = None) -> bool:

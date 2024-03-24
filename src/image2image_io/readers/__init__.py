@@ -101,6 +101,7 @@ def sanitize_read_path(path: PathLike, raise_on_error: bool = True) -> Path | No
         + IMSPY_EXTENSIONS
         + GEOJSON_EXTENSIONS
         + POINTS_EXTENSIONS
+        + [".tmp"]
     ):
         if raise_on_error:
             raise ValueError(f"Unsupported file format: {path.suffix} ({path})")
