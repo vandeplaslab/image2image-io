@@ -89,6 +89,7 @@ def read_data(path: Path) -> dict[str, dict[str, np.ndarray]]:
 class ShapesReader(BaseReader):
     """GeoJSON reader for image2image."""
 
+    _is_rgb = False
     reader_type = "shapes"
     _channel_names: list[str]
 
@@ -100,9 +101,12 @@ class ShapesReader(BaseReader):
         self._channel_names = [self.path.stem]
 
     @classmethod
-    def create(cls, name: str = ""):
+    def create(cls, name: str = "", channel_names: list[str] | None = None):
         """Create empty instance."""
-        return cls(name, key=name, init=False)
+        obj = cls(name, key=name, init=False)
+        if channel_names:
+            obj._channel_names = channel_names
+        return obj
 
     @property
     def display_name(self) -> str:

@@ -237,8 +237,9 @@ class ImageWrapper:
                     channel_names = ["RGB"]
                 else:
                     channel_names = [reader.channel_names[index]]
-            except (IndexError, NotImplementedError):
+            except (IndexError, NotImplementedError) as err:
                 channel_names = [f"C{index}"]
+                logger.error(f"Error getting channel names: {err}")
             names.extend([f"{name} | {key}" for name in channel_names])
         return names
 
