@@ -73,7 +73,7 @@ def geojson_to_numpy(gj: dict) -> dict:
     if gj["geometry"].get("type") == "MultiPolygon":
         pts_ = []
         for geo in gj["geometry"].get("coordinates"):
-            pts_.append(np.squeeze(np.array(geo)))
+            pts_.append(np.squeeze(np.asarray(geo)))
         pts = np.vstack(pts_)
     elif gj["geometry"].get("type") == "Polygon":
         pts = np.squeeze(np.asarray(gj["geometry"].get("coordinates")))
