@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 from koyo.typing import PathLike
 
+from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.geojson_utils import get_int_dtype, read_geojson, shape_reader
 
@@ -190,12 +191,17 @@ class ShapesReader(BaseReader):
 
     def to_shapes_kwargs(self, **kwargs: ty.Any) -> dict:
         """Return data so it's compatible with Shapes layer."""
-        *_, shape_arrays, shape_props, shape_text = self.parse_data()
+        n_shapes, _, _, shape_arrays, shape_props, shape_text = self.parse_data()
+        if CONFIG.shape_display == "polygon or path":
+            shape_type = "polygon" if n_shapes < 500 else "path"
+        else:
+            shape_type = CONFIG.shape_display
+
         kws = {
             "data": shape_arrays,
             "properties": shape_props,
             "text": shape_text,
-            "shape_type": "polygon" if len(shape_arrays) < 1_000 else "path",
+            "shape_type": shape_type,
             "scale": self.scale,
             "affine": self.transform,
             "edge_width": 2,

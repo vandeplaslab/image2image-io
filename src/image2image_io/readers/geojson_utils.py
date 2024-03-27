@@ -11,6 +11,7 @@ import cv2
 import geojson
 import numpy as np
 from koyo.typing import PathLike
+from shapely.geometry import Polygon
 
 GJ_SHAPE_TYPE = {
     "polygon": geojson.Polygon,
@@ -53,7 +54,7 @@ def get_int_dtype(value: int) -> np.dtype:
         raise ValueError("Too many shapes")
 
 
-def geojson_to_numpy(gj: dict) -> dict:
+def geojson_to_numpy(gj: dict) -> list[dict]:
     """
     Convert geojson representation to np.ndarray representation of shape.
 
@@ -71,12 +72,17 @@ def geojson_to_numpy(gj: dict) -> dict:
             "shape_name": str - name inherited from QuPath GeoJSON
     """
     if gj["geometry"].get("type") == "MultiPolygon":
-        pts_ = []
+        pts = []
         for geo in gj["geometry"].get("coordinates"):
-            pts_.append(np.squeeze(np.asarray(geo)))
-        pts = np.vstack(pts_)
+            pts.append(np.asarray(np.asarray(Polygon(np.squeeze(geo)).exterior.coords)))
     elif gj["geometry"].get("type") == "Polygon":
-        pts = np.squeeze(np.asarray(gj["geometry"].get("coordinates")))
+        try:
+            pts = np.asarray(np.asarray(Polygon(np.squeeze(gj["geometry"].get("coordinates"))).exterior.coords))
+        except ValueError:
+            pts = []
+            for poly in gj["geometry"].get("coordinates"):
+                pts.append(np.asarray(Polygon(np.asarray(np.squeeze(poly))).exterior.coords))
+        # pts = np.squeeze(np.asarray(gj["geometry"].get("coordinates")))
     elif gj["geometry"].get("type") == "Point":
         pts = np.expand_dims(np.asarray(gj["geometry"].get("coordinates")), 0)
     elif gj["geometry"].get("type") == "MultiPoint":
@@ -91,18 +97,31 @@ def geojson_to_numpy(gj: dict) -> dict:
     else:
         shape_name = gj["properties"].get("classification").get("name")
 
-    if len(pts.shape) == 1:
-        return {
-            "array": np.asarray(pts[0]).astype(np.float32),
-            "shape_type": gj["geometry"].get("type"),
-            "shape_name": shape_name,
-        }
+    if isinstance(pts, list):
+        return [
+            {
+                "array": np.asarray(pt).astype(np.float32),
+                "shape_type": gj["geometry"].get("type"),
+                "shape_name": shape_name,
+            }
+            for pt in pts
+        ]
+    # elif len(pts.shape) == 1:
+    #     return [
+    #         {
+    #             "array": np.asarray(pts[0]).astype(np.float32),
+    #             "shape_type": gj["geometry"].get("type"),
+    #             "shape_name": shape_name,
+    #         }
+    #     ]
     else:
-        return {
-            "array": pts.astype(np.float32),
-            "shape_type": gj["geometry"].get("type"),
-            "shape_name": shape_name,
-        }
+        return [
+            {
+                "array": pts.astype(np.float32),
+                "shape_type": gj["geometry"].get("type"),
+                "shape_name": shape_name,
+            }
+        ]
 
 
 def add_unnamed(gj: dict) -> dict:
@@ -146,7 +165,9 @@ def read_geojson(json_file: PathLike) -> tuple[list, list]:
         else:
             gj_data = [gj_data]
 
-    shapes_np = [geojson_to_numpy(s) for s in gj_data]
+    shapes_np = []
+    for gj in gj_data:
+        shapes_np.extend(geojson_to_numpy(gj))
     gj_data = [add_unnamed(gj) for gj in gj_data]
     return gj_data, shapes_np
 

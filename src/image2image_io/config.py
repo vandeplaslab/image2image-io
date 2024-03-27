@@ -36,6 +36,11 @@ class Config(BaseConfig):
     show_transformed: bool = Field(
         True, title="Show transformed", description="If checked, transformed moving image will be shown.", in_app=False
     )
+    shape_display: ty.Literal["polygon", "path", "polygon or path"] = Field(
+        "path", title="Shape display", description="Shape display type.", in_app=False
+    )
+
+    # extra options
     multicore: bool = Field(True, title="Multicore", description="Use multicore processing.", in_app=False)
 
     @validator("view_type", pre=True, allow_reuse=True)
