@@ -6,14 +6,16 @@ import typing as ty
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from koyo.typing import PathLike
 
 from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.geojson_utils import get_int_dtype, read_geojson, shape_reader
+from image2image_io.readers.utilities import check_df_columns, get_column_name
 
 
-def is_txt_and_has_columns(path: PathLike, columns: list[str]) -> bool:
+def is_txt_and_has_columns(path: PathLike, required: list[str], either: list[tuple[str]]) -> bool:
     """Check if a text file has the required columns."""
     import pandas as pd
 
@@ -28,13 +30,11 @@ def is_txt_and_has_columns(path: PathLike, columns: list[str]) -> bool:
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
-    return all(col in df.columns for col in columns)
+    return check_df_columns(df, required, either)
 
 
 def read_shapes(path: PathLike) -> tuple:
     """Read shapes."""
-    import pandas as pd
-
     path = Path(path)
     if path.suffix == ".csv":
         df = pd.read_csv(path)
@@ -46,16 +46,24 @@ def read_shapes(path: PathLike) -> tuple:
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
-    for col in ["vertex_x", "vertex_y", "cell"]:
-        if col not in df.columns:
-            raise ValueError(f"Missing required columns: {col}. Available columns: {df.columns}")
 
+    get_column_name(df, ["vertex_x", "x"])
+    get_column_name(df, ["vertex_y", "y"])
+    get_column_name(df, ["cell", "cell_id"])
+    return read_shapes_from_df(df)
+
+
+def read_shapes_from_df(df: pd.DataFrame) -> tuple:
+    """Read shapes from DataFrame."""
+    x_key = get_column_name(df, ["vertex_x", "x"])
+    y_key = get_column_name(df, ["vertex_y", "y"])
+    group_by = get_column_name(df, ["cell", "cell_id"])
     shapes_geojson, shape_data = [], []
-    for group, indices in df.groupby("cell").groups.items():
+    for group, indices in df.groupby(group_by).groups.items():
         dff = df.iloc[indices]
         shape_data.append(
             {
-                "array": np.c_[dff["vertex_x"].values, dff["vertex_y"].values].astype(np.float32),
+                "array": np.c_[dff[x_key].values, dff[y_key].values].astype(np.float32),
                 "shape_type": "polygon",
                 "shape_name": group,
             }

@@ -10,9 +10,10 @@ import pandas as pd
 from koyo.typing import PathLike
 
 from image2image_io.readers._base_reader import BaseReader
+from image2image_io.readers.utilities import get_column_name
 
 
-def read_points(path: PathLike) -> pd.DataFrame:
+def read_points(path: PathLike) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Read points from CSV/parquet file."""
     path = Path(path)
     if path.suffix == ".csv":
@@ -25,10 +26,18 @@ def read_points(path: PathLike) -> pd.DataFrame:
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
+    return read_points_from_df(df)
 
-    x = df["x"].values
-    y = df["y"].values
-    return x, y, df.drop(columns=["x", "y"])
+
+def read_points_from_df(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+    """Read points from DataFrame."""
+    x_key = get_column_name(df, ["x", "x_location", "x_centroid"])
+    y_key = get_column_name(df, ["y", "y_location", "y_centroid"])
+    if x_key not in df.columns or y_key not in df.columns:
+        raise ValueError(f"Invalid columns: {df.columns}")
+    x = df[x_key].values
+    y = df[y_key].values
+    return x, y, df.drop(columns=[x_key, y_key])
 
 
 class PointsReader(BaseReader):
@@ -65,12 +74,15 @@ class PointsReader(BaseReader):
     def to_points_kwargs(self, channel_name: str, **kwargs: ty.Any) -> dict:
         """Return data so it's compatible with Shapes layer."""
         x, y, df = self.parse_data()
+        n = len(x)
+
         kws = {
             "data": np.c_[y, x],
             "scale": self.scale,
             "affine": self.transform,
             "features": df,
             "face_color": channel_name,
+            "size": 5 if n < 50_000 else 1,
         }
         kws.update(kwargs)
         return kws

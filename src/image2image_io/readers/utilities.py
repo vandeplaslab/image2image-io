@@ -1,4 +1,5 @@
 """Tiff file utilities."""
+
 from __future__ import annotations
 
 import typing as ty
@@ -6,6 +7,7 @@ from pathlib import Path
 
 import dask.array as da
 import numpy as np
+import pandas as pd
 import SimpleITK as sitk
 import zarr
 from koyo.timer import MeasureTimer
@@ -424,3 +426,20 @@ def prepare_ome_xml_str(
     )
 
     return omexml.tostring().encode("utf8")
+
+
+def check_df_columns(df: pd.DataFrame, required: list[str], either: list[tuple[str]] | None = None) -> bool:
+    """Check if a DataFrame has the required columns."""
+    if not all(col in df.columns for col in required):
+        return False
+    if either is not None:
+        return all(any(col in df.columns for col in cols) for cols in either)
+    return True
+
+
+def get_column_name(df: pd.DataFrame, options: list[str]) -> list[str]:
+    """Get columns from a DataFrame."""
+    for key in options:
+        if key in df.columns:
+            return key
+    raise ValueError(f"None of the options {options} are in the DataFrame. Available columns are {df.columns}")

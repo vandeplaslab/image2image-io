@@ -222,9 +222,11 @@ def get_reader(path: Path, split_czi: bool | None = None, quick: bool = False) -
             # path, readers = _read_centroids_h5_coordinates(path)  # type: ignore
             path, readers = _read_centroids_h5_coordinates_lazy(path)  # type: ignore
     elif suffix in GEOJSON_EXTENSIONS + POINTS_EXTENSIONS:
-        if suffix in GEOJSON_EXTENSIONS or is_txt_and_has_columns(path, ["vertex_x", "vertex_y", "cell"]):
+        if suffix in GEOJSON_EXTENSIONS or is_txt_and_has_columns(
+            path, ["vertex_x", "vertex_y"], [("cell", "cell_id")]
+        ):
             logger.trace(f"Reading GeoJSON file: {path}")
-            path, readers = _read_geojson(path)
+            path, readers = _read_shapes(path)
         else:
             logger.trace(f"Reading points file: {path}")
             path, readers = _read_points(path)  # type: ignore
@@ -255,7 +257,7 @@ def _check_multi_scene_czi(path: PathLike) -> bool:
     return bool(CziSceneFile.get_num_scenes(path) > 1)
 
 
-def _read_geojson(path: PathLike) -> tuple[Path, dict[str, ShapesReader]]:
+def _read_shapes(path: PathLike) -> tuple[Path, dict[str, ShapesReader]]:
     """Read GeoJSON file."""
     from image2image_io.readers.shapes_reader import ShapesReader
 
