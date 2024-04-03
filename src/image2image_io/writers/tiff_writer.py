@@ -188,6 +188,7 @@ class OmeTiffWriter:
         as_uint8: bool = False,
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
+        override: bool = False,
     ) -> Path:
         """Write OME-TIFF image plane-by-plane to disk.
 
@@ -219,6 +220,8 @@ class OmeTiffWriter:
             Channel indices to write to OME-TIFF, if None, all channels are written
         channel_names: list of str
             Channel names.
+        override: bool
+            Whether to override the file if it already exists
 
         Returns
         -------
@@ -231,6 +234,15 @@ class OmeTiffWriter:
         tmp_output_file_name = output_file_name.parent / f"{name}.ome.tiff.tmp"
         logger.info(f"Saving to '{output_file_name}'")
         logger.trace(f"Using transformer: {self.transformer}")
+
+        if output_file_name.exists():
+            if not override:
+                logger.warning(f"File {output_file_name} already exists, skipping...")
+                return output_file_name
+            try:
+                output_file_name.unlink()
+            except (PermissionError, FileNotFoundError, Exception) as e:
+                raise PermissionError(f"Could not remove file {output_file_name} - {e}")
 
         if channel_ids and channel_names:
             if len(channel_ids) != len(channel_names):
@@ -398,6 +410,7 @@ class OmeTiffWriter:
         as_uint8: bool = False,
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
+        override: bool = False,
     ) -> Path:
         """Write image."""
         return self.write_image_by_plane(
@@ -407,4 +420,5 @@ class OmeTiffWriter:
             channel_ids=channel_ids,
             as_uint8=as_uint8,
             channel_names=channel_names,
+            override=override,
         )
