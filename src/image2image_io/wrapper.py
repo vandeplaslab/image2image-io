@@ -40,8 +40,6 @@ class ImageWrapper:
             key_or_reader = key_or_reader.key
         if key_or_reader in self.data:
             reader = self.data.pop(key_or_reader, None)
-            # if reader and hasattr(reader, "close"):
-            #     reader.close()
             del reader
 
     def remove_path(self, path: PathLike) -> list[str]:
@@ -57,6 +55,8 @@ class ImageWrapper:
         keys = []
         for reader in self.reader_iter():
             if reader.path == path:
+                keys.append(reader.key)
+            elif reader.key == path.name:
                 keys.append(reader.key)
         return keys
 
@@ -129,28 +129,40 @@ class ImageWrapper:
         for reader in self.reader_iter():
             yield reader.path, reader
 
-    def reader_channel_iter(
-        self,
-    ) -> ty.Generator[tuple[str, BaseReader, int], None, None]:
+    def reader_channel_iter(self) -> ty.Generator[tuple[str, BaseReader, int], None, None]:
         """Iterator to add channels."""
         for reader_name, reader in self.data.items():
-            if reader.reader_type == "shapes":
-                yield reader_name, reader, 0
-            elif reader.reader_type == "points":
-                yield reader_name, reader, 0
+            yield from self.reader_channel_iter_for_reader(reader_name, reader)
+
+    def reader_channel_iter_for_reader(
+        self, reader_name: str, reader: BaseReader
+    ) -> ty.Generator[tuple[str, BaseReader, int], None, None]:
+        """Iterator to add channels."""
+        if reader.reader_type == "shapes":
+            yield reader_name, reader, 0
+        elif reader.reader_type == "points":
+            yield reader_name, reader, 0
+        else:
+            # spetial case for RGB images
+            if reader.is_rgb and not CONFIG.split_rgb:
+                yield reader_name, reader, None
             else:
-                # spetial case for RGB images
-                if reader.is_rgb and not CONFIG.split_rgb:
-                    yield reader_name, reader, None
+                if reader.channel_names:
+                    for index, _ in enumerate(reader.channel_names):
+                        yield reader_name, reader, index
                 else:
-                    if reader.channel_names:
-                        for index, _ in enumerate(reader.channel_names):
-                            yield reader_name, reader, index
-                    else:
-                        yield from self._reader_channel_iter(reader_name, reader)
-                    # for reader_name_, index in self._reader_channel_iter(reader_name, reader):
-                    #     # for reader_name_, _, _, index in self._reader_image_iter(reader_name, reader):
-                    #     yield reader_name_, reader, index
+                    yield from self._reader_channel_iter(reader_name, reader)
+                # for reader_name_, index in self._reader_channel_iter(reader_name, reader):
+                #     # for reader_name_, _, _, index in self._reader_image_iter(reader_name, reader):
+                #     yield reader_name_, reader, index
+
+    @staticmethod
+    def _reader_channel_iter(
+        reader_name: str, reader: BaseReader
+    ) -> ty.Generator[tuple[str, BaseReader, int], None, None]:
+        """Iterator to add channels."""
+        for channel_index in range(reader.n_channels):
+            yield reader_name, reader, channel_index
 
     def reader_data_iter(
         self,
@@ -170,14 +182,6 @@ class ImageWrapper:
         """Iterator to add channels."""
         for reader_name, reader_or_array in self.data.items():
             yield from self._reader_image_iter(reader_name, reader_or_array)
-
-    @staticmethod
-    def _reader_channel_iter(
-        reader_name: str, reader: BaseReader
-    ) -> ty.Generator[tuple[str, BaseReader, int], None, None]:
-        """Iterator to add channels."""
-        for channel_index in range(reader.n_channels):
-            yield reader_name, reader, channel_index
 
     @staticmethod
     def _reader_image_iter(
@@ -232,16 +236,23 @@ class ImageWrapper:
         """Return list of channel names."""
         names = []
         for key, reader, index in self.reader_channel_iter():
-            try:
-                if reader.is_rgb and not CONFIG.split_rgb:
-                    channel_names = ["RGB"]
-                else:
-                    channel_names = [reader.channel_names[index]]
-            except (IndexError, NotImplementedError) as err:
-                channel_names = [f"C{index}"]
-                logger.error(f"Error getting channel names: {err}")
-            names.extend([f"{name} | {key}" for name in channel_names])
+            channel_names = self.get_channel_names_for_reader(key, reader, index)
+            names.extend(channel_names)
         return names
+
+    @staticmethod
+    def get_channel_names_for_reader(key: str, reader: BaseReader, index: int) -> list[str]:
+        """Retrieve channel names for specified reader."""
+        try:
+            if reader.is_rgb and not CONFIG.split_rgb:
+                channel_names = ["RGB"]
+            else:
+                channel_names = [reader.channel_names[index]]
+        except (IndexError, NotImplementedError) as err:
+            channel_names = [f"C{index}"]
+            logger.error(f"Error getting channel names: {err}")
+        channel_names = [f"{name} | {key}" for name in channel_names]
+        return channel_names
 
     @property
     def min_resolution(self) -> float:
