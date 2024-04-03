@@ -92,10 +92,13 @@ def geojson_to_numpy(gj: dict) -> list[dict]:
     else:
         raise ValueError(f"GeoJSON type {gj['geometry'].get('type')} not supported")
 
-    if gj["properties"].get("classification") is None:
+    if "properties" not in gj:
         shape_name = "unnamed"
     else:
-        shape_name = gj["properties"].get("classification").get("name")
+        if not gj["properties"].get("classification"):
+            shape_name = "unnamed"
+        else:
+            shape_name = gj["properties"].get("classification").get("name")
 
     if isinstance(pts, list):
         return [
@@ -126,8 +129,11 @@ def geojson_to_numpy(gj: dict) -> list[dict]:
 
 def add_unnamed(gj: dict) -> dict:
     """Add unnamed object."""
-    if gj["properties"].get("classification") is None:
-        gj["properties"].update({"classification": {"name": "unnamed"}})
+    if "properties" not in gj:
+        gj["properties"] = {"classification": {"name": "unnamed"}}
+    else:
+        if not gj["properties"].get("classification"):
+            gj["properties"].update({"classification": {"name": "unnamed"}})
     return gj
 
 

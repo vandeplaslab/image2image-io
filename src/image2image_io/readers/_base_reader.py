@@ -258,7 +258,7 @@ class BaseReader:
         self.fh = None
         self._pyramid = None
         # check_if_open(self.path)
-        logger.trace("Closed file handles")
+        logger.trace(f"Closed file handle '{self.path}'")
 
     @property
     def pyramid(self) -> list:
