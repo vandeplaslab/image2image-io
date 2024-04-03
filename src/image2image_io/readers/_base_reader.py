@@ -72,7 +72,7 @@ class BaseReader:
                 return i
         return None
 
-    def print_info(self):
+    def print_info(self) -> None:
         """Print information about the image."""
         print(f"Image: {self.path}")
         print(f"  - Resolution: {self.resolution}")
