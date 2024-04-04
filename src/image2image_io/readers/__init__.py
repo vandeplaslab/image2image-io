@@ -6,6 +6,7 @@ import typing as ty
 from pathlib import Path
 
 import numpy as np
+from koyo.system import IS_MAC
 from koyo.typing import PathLike
 from loguru import logger
 
@@ -208,7 +209,10 @@ def get_reader(path: Path, split_czi: bool | None = None, quick: bool = False) -
         path, readers = _read_npy_coordinates(path)  # type: ignore
     elif suffix in BRUKER_EXTENSIONS:
         logger.trace(f"Reading Bruker file: {path}")
-        path, readers = _read_tsf_tdf_reader(path)  # type: ignore
+        if IS_MAC:
+            path, readers = _read_tsf_tdf_coordinates(path)
+        else:
+            path, readers = _read_tsf_tdf_reader(path)  # type: ignore
     elif suffix in IMZML_EXTENSIONS:
         logger.trace(f"Reading imzML file: {path}")
         path, readers = _read_imzml_reader(path)  # type: ignore

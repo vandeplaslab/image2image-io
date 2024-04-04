@@ -385,10 +385,13 @@ class BaseReader:
         self,
         path: PathLike,
         as_uint8: bool = False,
+        tile_size: int = 512,
         channel_ids: list[int] | None = None,
         channel_names: list[str] | None = None,
     ) -> Path:
         """Write image as OME-TIFF."""
         from image2image_io.writers import write_ome_tiff_alt
 
-        return write_ome_tiff_alt(path, self, as_uint8=as_uint8, channel_names=channel_names, channel_ids=channel_ids)
+        return write_ome_tiff_alt(
+            path, self, as_uint8=as_uint8, channel_names=channel_names, channel_ids=channel_ids, tile_size=tile_size
+        )

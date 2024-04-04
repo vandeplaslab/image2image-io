@@ -252,6 +252,8 @@ def write_ome_tiff_from_array(
     resolution: float | None = None,
     channel_names: list[str] | None = None,
     compression: str | None = "default",
+    tile_size: int = 512,
+    as_uint8: bool = False,
 ) -> Path:
     """Write OME-TIFF by also specifying an array."""
     from image2image_io.readers.array_reader import ArrayImageReader
@@ -270,7 +272,9 @@ def write_ome_tiff_from_array(
     path = Path(path)
     filename = path.name.replace(".ome.tiff", "")
     writer = OmeTiffWriter(array_reader)
-    output_path = writer.write_image_by_plane(filename, path.parent, write_pyramid=True, compression=compression)
+    output_path = writer.write_image_by_plane(
+        filename, path.parent, write_pyramid=True, compression=compression, tile_size=tile_size, as_uint8=as_uint8
+    )
     return output_path
 
 

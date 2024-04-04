@@ -138,6 +138,8 @@ class OmeTiffWriter:
         # protect against too large tile size
         while self.y_size / self.tile_size <= 1 or self.x_size / self.tile_size <= 1:
             self.tile_size = self.tile_size // 2
+        if self.tile_size < 256:
+            self.tile_size = 256
 
         self.pyr_levels, _ = get_pyramid_info(self.y_size, self.x_size, self.reader.n_channels, self.tile_size)
         self.n_pyr_levels = len(self.pyr_levels)
@@ -253,6 +255,9 @@ class OmeTiffWriter:
         if channel_names is None:
             channel_names = self.reader.channel_names
 
+        if np.max(self.reader.image_shape) < 256:
+            write_pyramid = False
+
         self._prepare_image_info(
             name,
             write_pyramid=write_pyramid,
@@ -284,6 +289,9 @@ class OmeTiffWriter:
                 "photometric": "rgb" if self.reader.is_rgb else "minisblack",
                 "metadata": None,
             }
+        if np.max(self.reader.image_shape) < self.tile_size:
+            options.pop("tile")
+
         logger.trace(f"TIFF options: {options}")
 
         # write OME-XML to the ImageDescription tag of the first page
