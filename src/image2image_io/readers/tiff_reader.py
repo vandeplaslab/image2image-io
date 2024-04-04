@@ -157,8 +157,8 @@ class TiffImageReader(BaseReader):
         if ndim == 3:
             if self.is_rgb:
                 return 2, 3
-            elif np.argmin(shape) == 2:
-                return 2, shape[2]
+            # elif np.argmin(shape) == 2:
+            #     return 2, shape[2]
             else:
                 return 0, shape[0]
         return None, 1

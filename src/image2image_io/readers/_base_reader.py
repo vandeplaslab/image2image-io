@@ -323,10 +323,10 @@ class BaseReader:
             if shape[2] in [3, 4]:  # rgb
                 channel_axis = 2
                 n_channels = shape[2]
-            elif np.argmin(shape) == 2:
-                channel_axis = 2
-                n_channels = shape[2]
-            else:
+            # elif np.argmin(shape) == 2:
+            #     channel_axis = 2
+            #     n_channels = shape[2]
+            else:  # channels first
                 channel_axis = 0
                 n_channels = shape[0]
         else:

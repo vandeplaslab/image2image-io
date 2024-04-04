@@ -89,8 +89,14 @@ def get_shape_of_image(array_or_shape: np.ndarray | tuple[int, ...]) -> tuple[in
 
     shape = list(shape)  # type: ignore[assignment]
     if ndim == 3:
-        channel_axis = int(np.argmin(shape))
-        n_channels = int(shape[channel_axis])
+        if shape[2] in [3, 4]:  # rgb or rgba
+            channel_axis = 2
+            n_channels = shape[2]
+        else:
+            channel_axis = 0
+            n_channels = shape[0]
+        # channel_axis = int(np.argmin(shape))
+        # n_channels = int(shape[channel_axis])
         shape.pop(channel_axis)
     else:
         n_channels = 1
