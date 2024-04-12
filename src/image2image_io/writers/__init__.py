@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-def get_total_n_scenes(paths: ty.Iterable[PathLike]) -> ty.Tuple[int, list[Path]]:
+def get_total_n_scenes(paths: ty.Iterable[PathLike]) -> tuple[int, list[Path]]:
     """Get total number of scenes in all files."""
     from image2image_io.readers._czi import CziSceneFile
 

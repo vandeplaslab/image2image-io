@@ -94,7 +94,7 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         self.n_scenes = CziSceneFile.get_num_scenes(self.path)
 
         *_, self.im_dims, self._im_dtype = self._get_image_info()
-        self.im_dims = tuple(self.im_dims)
+        self.im_dims = self._image_shape = tuple(self.im_dims)
         self._is_rgb = guess_rgb(self.im_dims)
         self.resolution = self._get_pixel_size()
         self._channel_names = self._get_channel_names()

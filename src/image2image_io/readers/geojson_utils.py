@@ -77,8 +77,9 @@ def geojson_to_numpy(gj: dict) -> list[dict]:
             pts.append(np.asarray(np.asarray(Polygon(np.squeeze(geo)).exterior.coords)))
     elif gj["geometry"].get("type") == "Polygon":
         try:
-            pts = np.asarray(np.asarray(Polygon(np.squeeze(gj["geometry"].get("coordinates"))).exterior.coords))
-        except ValueError:
+            coordinates = np.squeeze(np.asarray(gj["geometry"].get("coordinates")))
+            pts = np.asarray(Polygon(coordinates).exterior.coords)
+        except (ValueError, TypeError):
             pts = []
             for poly in gj["geometry"].get("coordinates"):
                 pts.append(np.asarray(Polygon(np.asarray(np.squeeze(poly))).exterior.coords))
