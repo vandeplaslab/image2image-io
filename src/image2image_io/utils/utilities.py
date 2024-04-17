@@ -3,12 +3,54 @@ from __future__ import annotations
 
 import typing as ty
 from collections import defaultdict
+from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import numpy as np
+from koyo.typing import PathLike
 
 if ty.TYPE_CHECKING:
     from skimage.transform import ProjectiveTransform
+
+
+def write_thumbnail(path: PathLike, output_dir: PathLike, with_title: bool) -> None:
+    """Write thumbnail."""
+    import matplotlib
+
+    from image2image_io.readers import get_simple_reader
+
+    matplotlib.use("agg")
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    reader = get_simple_reader(path, auto_pyramid=False)
+    if reader.is_rgb:
+        image = reader.pyramid[-1]
+        filename = output_dir / f"{reader.name}_rgb_thumbnail.jpg"
+        make_thumbnail(filename, image, f"{reader.name}", with_title)
+    else:
+        for channel_id, channel_name in enumerate(reader._channel_names):
+            filename = output_dir / f"{reader.name}_index={channel_id}_name={channel_name}_thumbnail.jpg"
+            image = reader.get_channel(channel_id, -1)
+            make_thumbnail(filename, image, f"{reader.name}\n{channel_id} / {channel_name}", with_title)
+    del reader
+
+
+def make_thumbnail(filename: Path, image: np.ndarray, title: str, with_title: bool):
+    """Create thumbnail of an image."""
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(12, 12))
+    if image.ndim == 2:
+        vmax = np.percentile(np.ravel(image), 99.0)
+        ax.imshow(image, cmap="turbo", aspect="equal", vmax=vmax)
+    else:
+        ax.imshow(image, aspect="equal")
+    if with_title:
+        ax.set_title(title, fontsize=14)
+    ax.axis("off")
+    plt.savefig(filename, bbox_inches="tight")
+    plt.close()
 
 
 def xmlstr_to_dict(xmlstr: str) -> dict:

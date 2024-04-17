@@ -7,6 +7,7 @@ import typing as ty
 from pathlib import Path
 
 import numpy as np
+import zarr.storage
 from koyo.typing import PathLike
 from loguru import logger
 
@@ -38,6 +39,7 @@ class BaseReader:
     _im_dtype: np.dtype | None = None
     _im_shape: tuple[int, ...] | None = None
     _image_shape: tuple[int, int] | None = None
+    _zstore: zarr.storage.TempStore | None = None
     auto_pyramid: bool | None = None
     reader: str = "base"
     reader_type: str = "image"
@@ -255,6 +257,11 @@ class BaseReader:
             self.fh.close()
         if self.fh and hasattr(self.fh, "filehandle"):
             self.fh.filehandle.close()
+        if self._zstore is not None and hasattr(self._zstore, "path") and self._zstore.path:
+            zarr_path = Path(self._zstore.path)
+            if zarr_path.exists():
+                zarr.storage.atexit_rmtree(zarr_path)
+                logger.trace(f"Removed temporary zarr store: {zarr_path}")
         self.fh = None
         self._pyramid = None
         # check_if_open(self.path)
