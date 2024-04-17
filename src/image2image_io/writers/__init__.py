@@ -215,7 +215,7 @@ def czi_to_ome_tiff(
         scenes = list(range(n))
     assert min(scenes) >= 0, "Scene index must be greater than or equal to 0."
     assert max(scenes) <= n, "Scene index must be less than the total number of scenes in the file."
-    yield key, 0, len(scenes)
+    # yield key, 0, len(scenes)
 
     # iterate over each scene in the czi file
     for scene_index in scenes:
