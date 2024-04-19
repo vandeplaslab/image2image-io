@@ -213,6 +213,7 @@ class ShapesReader(BaseReader):
             "scale": self.scale,
             "affine": self.transform,
             "edge_width": 2,
+            "edge_color": "cyan",
         }
         kws.update(kwargs)
         return kws
