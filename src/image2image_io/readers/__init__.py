@@ -180,7 +180,9 @@ def is_supported(path: PathLike, raise_on_error: bool = True) -> bool:
     return path is not None
 
 
-def get_reader(path: Path, split_czi: bool | None = None, quick: bool = False) -> tuple[Path, dict[str, BaseReader]]:
+def get_reader(
+    path: Path, split_czi: bool | None = None, split_roi: bool | None = None, quick: bool = False
+) -> tuple[Path, dict[str, BaseReader]]:
     """Get reader for the specified path."""
     path = Path(path)
     path = sanitize_read_path(path)  # type: ignore[assignment]
@@ -188,43 +190,43 @@ def get_reader(path: Path, split_czi: bool | None = None, quick: bool = False) -
         raise UnsupportedFileFormatError("Could not sanitize path - are you sure this file is supported?")
 
     split_czi = split_czi if split_czi is not None else CONFIG.split_czi
+    split_roi = split_roi if split_roi is not None else CONFIG.split_roi
 
     readers: dict[str, BaseReader]
     suffix = path.suffix.lower()
     if suffix in TIFF_EXTENSIONS:
         logger.trace(f"Reading TIFF file: {path}")
-        path, readers = _read_tiff(path)  # type: ignore
+        path, readers = _read_tiff(path)
     elif suffix in CZI_EXTENSIONS:
         if split_czi and _check_multi_scene_czi(path):
             logger.trace(f"Reading multi-scene CZI file: {path}")
-            path, readers = _read_multi_scene_czi(path)  # type: ignore
+            path, readers = _read_multi_scene_czi(path)
         else:
             logger.trace(f"Reading single-scene CZI file: {path}")
-            path, readers = _read_single_scene_czi(path)  # type: ignore
+            path, readers = _read_single_scene_czi(path)
     elif suffix in IMAGE_EXTENSIONS:
         logger.trace(f"Reading image file: {path}")
-        path, readers = _read_image(path)  # type: ignore
+        path, readers = _read_image(path)
     elif suffix in NPY_EXTENSIONS:
         logger.trace(f"Reading NPY file: {path}")
-        path, readers = _read_npy_coordinates(path)  # type: ignore
+        path, readers = _read_npy_coordinates(path)
     elif suffix in BRUKER_EXTENSIONS:
         logger.trace(f"Reading Bruker file: {path}")
-        if IS_MAC:
-            path, readers = _read_tsf_tdf_coordinates(path)
+        if IS_MAC or split_roi:
+            path, readers = _read_tsf_tdf_coordinates(path, split_roi)
         else:
-            path, readers = _read_tsf_tdf_reader(path)  # type: ignore
+            path, readers = _read_tsf_tdf_reader(path)
     elif suffix in IMZML_EXTENSIONS:
         logger.trace(f"Reading imzML file: {path}")
-        path, readers = _read_imzml_reader(path)  # type: ignore
+        path, readers = _read_imzml_reader(path)
     elif suffix in H5_EXTENSIONS + IMSPY_EXTENSIONS:
         logger.trace(f"Reading HDF5 file: {path}")
         if path.suffix == ".data":
             path = path / "dataset.metadata.h5"
         if path.name.startswith("dataset.metadata"):
-            path, readers = _read_metadata_h5_coordinates(path)  # type: ignore
+            path, readers = _read_metadata_h5_coordinates(path)
         else:
-            # path, readers = _read_centroids_h5_coordinates(path)  # type: ignore
-            path, readers = _read_centroids_h5_coordinates_lazy(path)  # type: ignore
+            path, readers = _read_centroids_h5_coordinates_lazy(path)
     elif suffix in GEOJSON_EXTENSIONS + POINTS_EXTENSIONS:
         if suffix in GEOJSON_EXTENSIONS or is_txt_and_has_columns(
             path, ["vertex_x", "vertex_y"], [("cell", "cell_id")]
@@ -516,7 +518,7 @@ def _read_centroids_h5_coordinates_without_metadata_lazy(
     return path, {path.name: reader}
 
 
-def _read_tsf_tdf_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateImageReader]]:
+def _read_tsf_tdf_coordinates(path: PathLike, split_roi: bool = True) -> tuple[Path, dict[str, CoordinateImageReader]]:
     """Read coordinates from TSF file."""
     import sqlite3
 
@@ -544,19 +546,37 @@ def _read_tsf_tdf_coordinates(path: PathLike) -> tuple[Path, dict[str, Coordinat
     cursor = conn.cursor()
     cursor.execute("SELECT Frame, RegionNumber, XIndexPos, YIndexPos FROM MaldiFrameInfo")
     frame_index_position = np.array(cursor.fetchall())
-    x = frame_index_position[:, 2]
-    x = x - np.min(x)  # minimized
-    y = frame_index_position[:, 3]
-    y = y - np.min(y)  # minimized
 
     # get tic
     cursor = conn.execute("SELECT SummedIntensities FROM Frames")
     tic = np.array(cursor.fetchall())
     tic = tic[:, 0]
-    key = get_key(path)
-    return path.parent, {
-        path.name: CoordinateImageReader(path, x, y, resolution=resolution, array_or_reader=reshape(x, y, tic), key=key)
-    }
+
+    # generate reader(s)
+    readers = {}
+    roi = frame_index_position[:, 1]
+    if split_roi:
+        for i in np.unique(roi):
+            mask = roi == i
+            x_ = frame_index_position[mask, 2]
+            x_ = x_ - np.min(x_)
+            y_ = frame_index_position[mask, 3]
+            y_ = y_ - np.min(y_)
+            tic_ = tic[mask]
+            key = get_key(path, i)
+            readers[f"S{i}_{path.name}"] = CoordinateImageReader(
+                path, x_, y_, resolution=resolution, array_or_reader=reshape(x_, y_, tic_), key=key
+            )
+    else:
+        x = frame_index_position[:, 2]
+        x = x - np.min(x)  # minimized
+        y = frame_index_position[:, 3]
+        y = y - np.min(y)  # minimized
+        key = get_key(path)
+        readers[path.name] = CoordinateImageReader(
+            path, x, y, resolution=resolution, array_or_reader=reshape(x, y, tic), key=key
+        )
+    return path.parent, readers
 
 
 def _read_tsf_tdf_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImageReader]]:

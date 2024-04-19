@@ -1,4 +1,5 @@
 """Configuration to override few parameters."""
+
 import typing as ty
 
 from koyo.config import BaseConfig
@@ -29,6 +30,12 @@ class Config(BaseConfig):
         True,
         title="Split RGB image by channel",
         description="When loading RGB image(s), split them by the channel",
+        in_app=True,
+    )
+    split_roi: bool = Field(
+        True,
+        title="Split Bruker .d images by region of interest.",
+        description="When loading Bruker .d image(s), split them by the region of interest.",
         in_app=True,
     )
     only_last_pyramid: bool = Field(False, title="Only last pyramid", description="Only use last pyramid.", in_app=True)
