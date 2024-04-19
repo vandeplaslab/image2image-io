@@ -574,6 +574,16 @@ def _read_tsf_tdf_coordinates(
     readers = {}
     roi = frame_index_position[:, 1]
     unq_roi = np.unique(roi)
+    if len(unq_roi) == 1:
+        split_roi = False
+        scene_index = None
+        include_all = True
+
+    # if we are not on macOS and there is only 1 ROI, we might as well get the proper data reader
+    if not IS_MAC and not split_roi:
+        return _read_tsf_tdf_reader(path)
+
+    # check whether scene index is correct
     if scene_index is not None:
         if scene_index not in unq_roi:
             raise ValueError(f"Scene index {scene_index} not found in the file")
@@ -590,6 +600,7 @@ def _read_tsf_tdf_coordinates(
         readers[path.name] = CoordinateImageReader(
             path, x, y, resolution=resolution, array_or_reader=reshape(x, y, tic), key=key
         )
+
     if split_roi:
         for current_scene_index in unq_roi:
             mask = roi == current_scene_index
