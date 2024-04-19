@@ -31,8 +31,8 @@ def read_points(path: PathLike) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
 
 def read_points_from_df(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Read points from DataFrame."""
-    x_key = get_column_name(df, ["x", "x_location", "x_centroid"])
-    y_key = get_column_name(df, ["y", "y_location", "y_centroid"])
+    x_key = get_column_name(df, ["x", "x_location", "x_centroid", "x:x"])
+    y_key = get_column_name(df, ["y", "y_location", "y_centroid", "y:y"])
     if x_key not in df.columns or y_key not in df.columns:
         raise ValueError(f"Invalid columns: {df.columns}")
     x = df[x_key].values
