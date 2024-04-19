@@ -4,7 +4,7 @@ from __future__ import annotations
 import typing as ty
 
 import numpy as np
-import zarr
+import zarr.storage
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
@@ -116,7 +116,8 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
         auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
-        return self.fh.zarr_pyramidize_czi(zarr.storage.TempStore(), auto_pyramid)
+        self._zstore = zarr.storage.TempStore()
+        return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
 
 
 class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
@@ -159,4 +160,5 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
         auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
-        return self.fh.zarr_pyramidize_czi(zarr.storage.TempStore(), auto_pyramid)
+        self._zstore = zarr.storage.TempStore()
+        return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
