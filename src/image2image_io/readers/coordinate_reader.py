@@ -65,8 +65,9 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):
         array_or_reader: np.ndarray | BaseImzyReader | None = None,
         data: dict[str, np.ndarray] | None = None,
         auto_pyramid: bool | None = None,
+        reader_kws: dict | None = None,
     ):
-        super().__init__(path, key, auto_pyramid=auto_pyramid)
+        super().__init__(path, key, auto_pyramid=auto_pyramid, reader_kws=reader_kws)
         self.x = x
         self.y = y
         self.resolution = resolution

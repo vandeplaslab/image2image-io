@@ -164,7 +164,7 @@ def read_data(
 def get_key(path: Path, scene_index: int | None = None) -> str:
     """Return representative key."""
     name = path.name
-    if name == "dataset.metadata.h5":
+    if name in ["dataset.metadata.h5", "analysis.tsf", "analysis.tdf"]:
         name = path.parent.name
     if scene_index is not None:
         name = f"Scene={scene_index}; {name}"
@@ -181,7 +181,11 @@ def is_supported(path: PathLike, raise_on_error: bool = True) -> bool:
 
 
 def get_reader(
-    path: Path, split_czi: bool | None = None, split_roi: bool | None = None, quick: bool = False
+    path: Path,
+    split_czi: bool | None = None,
+    split_roi: bool | None = None,
+    quick: bool = False,
+    scene_index: int | None = None,
 ) -> tuple[Path, dict[str, BaseReader]]:
     """Get reader for the specified path."""
     path = Path(path)
@@ -192,6 +196,9 @@ def get_reader(
     split_czi = split_czi if split_czi is not None else CONFIG.split_czi
     split_roi = split_roi if split_roi is not None else CONFIG.split_roi
 
+    if scene_index is not None:
+        split_czi = split_roi = True
+
     readers: dict[str, BaseReader]
     suffix = path.suffix.lower()
     if suffix in TIFF_EXTENSIONS:
@@ -200,7 +207,7 @@ def get_reader(
     elif suffix in CZI_EXTENSIONS:
         if split_czi and _check_multi_scene_czi(path):
             logger.trace(f"Reading multi-scene CZI file: {path}")
-            path, readers = _read_multi_scene_czi(path)
+            path, readers = _read_multi_scene_czi(path, scene_index=scene_index)
         else:
             logger.trace(f"Reading single-scene CZI file: {path}")
             path, readers = _read_single_scene_czi(path)
@@ -213,7 +220,7 @@ def get_reader(
     elif suffix in BRUKER_EXTENSIONS:
         logger.trace(f"Reading Bruker file: {path}")
         if IS_MAC or split_roi:
-            path, readers = _read_tsf_tdf_coordinates(path, split_roi)
+            path, readers = _read_tsf_tdf_coordinates(path, split_roi, scene_index=scene_index)
         else:
             path, readers = _read_tsf_tdf_reader(path)
     elif suffix in IMZML_EXTENSIONS:
@@ -293,7 +300,9 @@ def _read_single_scene_czi(path: PathLike, **kwargs: ty.Any) -> tuple[Path, dict
     return path, {path.name: CziImageReader(path, key=key, **kwargs)}
 
 
-def _read_multi_scene_czi(path: PathLike) -> tuple[Path, dict[str, CziSceneImageReader]]:
+def _read_multi_scene_czi(
+    path: PathLike, scene_index: int | None = None
+) -> tuple[Path, dict[str, CziSceneImageReader]]:
     """Read CZI file."""
     from image2image_io.readers._czi import CziSceneFile
     from image2image_io.readers.czi_reader import CziSceneImageReader
@@ -301,11 +310,15 @@ def _read_multi_scene_czi(path: PathLike) -> tuple[Path, dict[str, CziSceneImage
     path = Path(path)
     assert path.exists(), f"File does not exist: {path}"
     n = CziSceneFile.get_num_scenes(path)
+    scenes = list(range(n))
+    if scene_index is not None:
+        if scene_index not in scenes:
+            raise ValueError(f"Scene index {scene_index} not found in the file")
+        scenes = [scene_index]
+
     logger.trace(f"Found {n} scenes in CZI file: {path}")
-    # return path, {f"S{1}_{path.name}": CziSceneImageReader(path, scene_index=1, key=get_key(path, scene_index=1))}
     return path, {
-        f"S{i}_{path.name}": CziSceneImageReader(path, scene_index=i, key=get_key(path, scene_index=i))
-        for i in range(n)
+        f"S{i}_{path.name}": CziSceneImageReader(path, scene_index=i, key=get_key(path, scene_index=i)) for i in scenes
     }
 
 
@@ -518,7 +531,12 @@ def _read_centroids_h5_coordinates_without_metadata_lazy(
     return path, {path.name: reader}
 
 
-def _read_tsf_tdf_coordinates(path: PathLike, split_roi: bool = True) -> tuple[Path, dict[str, CoordinateImageReader]]:
+def _read_tsf_tdf_coordinates(
+    path: PathLike,
+    split_roi: bool = True,
+    include_all: bool = True,
+    scene_index: int | None = None,
+) -> tuple[Path, dict[str, CoordinateImageReader]]:
     """Read coordinates from TSF file."""
     import sqlite3
 
@@ -555,19 +573,15 @@ def _read_tsf_tdf_coordinates(path: PathLike, split_roi: bool = True) -> tuple[P
     # generate reader(s)
     readers = {}
     roi = frame_index_position[:, 1]
-    if split_roi:
-        for i in np.unique(roi):
-            mask = roi == i
-            x_ = frame_index_position[mask, 2]
-            x_ = x_ - np.min(x_)
-            y_ = frame_index_position[mask, 3]
-            y_ = y_ - np.min(y_)
-            tic_ = tic[mask]
-            key = get_key(path, i)
-            readers[f"S{i}_{path.name}"] = CoordinateImageReader(
-                path, x_, y_, resolution=resolution, array_or_reader=reshape(x_, y_, tic_), key=key
-            )
-    else:
+    unq_roi = np.unique(roi)
+    if scene_index is not None:
+        if scene_index not in unq_roi:
+            raise ValueError(f"Scene index {scene_index} not found in the file")
+        include_all = False
+        unq_roi = [scene_index]
+        split_roi = True
+
+    if include_all or not split_roi or len(unq_roi) == 1:
         x = frame_index_position[:, 2]
         x = x - np.min(x)  # minimized
         y = frame_index_position[:, 3]
@@ -576,6 +590,24 @@ def _read_tsf_tdf_coordinates(path: PathLike, split_roi: bool = True) -> tuple[P
         readers[path.name] = CoordinateImageReader(
             path, x, y, resolution=resolution, array_or_reader=reshape(x, y, tic), key=key
         )
+    if split_roi:
+        for current_scene_index in unq_roi:
+            mask = roi == current_scene_index
+            x_ = frame_index_position[mask, 2]
+            x_ = x_ - np.min(x_)
+            y_ = frame_index_position[mask, 3]
+            y_ = y_ - np.min(y_)
+            tic_ = tic[mask]
+            key = get_key(path, current_scene_index)
+            readers[f"S{current_scene_index}_{path.name}"] = CoordinateImageReader(
+                path,
+                x_,
+                y_,
+                resolution=resolution,
+                array_or_reader=reshape(x_, y_, tic_),
+                key=key,
+                reader_kws={"scene_index": current_scene_index},
+            )
     return path.parent, readers
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import cv2
 import numpy as np
 from koyo.typing import PathLike
 from loguru import logger
@@ -15,6 +16,22 @@ from skimage.transform import AffineTransform
 from image2image_io.enums import TIME_FORMAT
 
 logger = logger.bind(src="Mask")
+
+
+def mask_to_polygon(mask: np.ndarray, epsilon: float = 1) -> np.ndarray:
+    """Convert mask to polygon."""
+    mask = np.asarray(mask, dtype=np.uint8)
+    # ensure mask is between 0-255
+    if mask.max() == 1:
+        mask = mask * 255
+
+    # Find contours
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Approximate contours to polygons and get the coordinates
+    polygons = [cv2.approxPolyDP(contour, epsilon=epsilon, closed=True) for contour in contours]
+    polygons = np.asarray(polygons)
+    return polygons
 
 
 def shapes_to_polygons(
