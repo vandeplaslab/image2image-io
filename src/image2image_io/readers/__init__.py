@@ -125,6 +125,7 @@ def read_data(
     transform_data: TransformData | None = None,
     resolution: float | None = None,
     split_czi: bool | None = None,
+    reader_kws: dict[str, ty.Any] = None,
 ) -> tuple[ImageWrapper, list[str], dict[Path, Path]]:
     """Read image data."""
     path = Path(path)
@@ -135,7 +136,8 @@ def read_data(
     readers: dict[str, BaseReader]
     name = path.name
     original_path = path
-    path, readers = get_reader(path, split_czi)
+    scene_index = reader_kws.get("scene_index", None) if reader_kws else None
+    path, readers = get_reader(path, split_czi=split_czi, scene_index=scene_index)
 
     # add transformation information if provided
     if transform_data is not None:
@@ -195,9 +197,11 @@ def get_reader(
 
     split_czi = split_czi if split_czi is not None else CONFIG.split_czi
     split_roi = split_roi if split_roi is not None else CONFIG.split_roi
+    include_all = True
 
     if scene_index is not None:
         split_czi = split_roi = True
+        include_all = False
 
     readers: dict[str, BaseReader]
     suffix = path.suffix.lower()
@@ -220,7 +224,7 @@ def get_reader(
     elif suffix in BRUKER_EXTENSIONS:
         logger.trace(f"Reading Bruker file: {path}")
         if IS_MAC or split_roi:
-            path, readers = _read_tsf_tdf_coordinates(path, split_roi, scene_index=scene_index)
+            path, readers = _read_tsf_tdf_coordinates(path, split_roi, scene_index=scene_index, include_all=include_all)
         else:
             path, readers = _read_tsf_tdf_reader(path)
     elif suffix in IMZML_EXTENSIONS:
@@ -579,10 +583,6 @@ def _read_tsf_tdf_coordinates(
         scene_index = None
         include_all = True
 
-    # if we are not on macOS and there is only 1 ROI, we might as well get the proper data reader
-    if not IS_MAC and not split_roi:
-        return _read_tsf_tdf_reader(path)
-
     # check whether scene index is correct
     if scene_index is not None:
         if scene_index not in unq_roi:
@@ -591,7 +591,11 @@ def _read_tsf_tdf_coordinates(
         unq_roi = [scene_index]
         split_roi = True
 
-    if include_all or not split_roi or len(unq_roi) == 1:
+    # if we are not on macOS and there is only 1 ROI, we might as well get the proper data reader
+    if not IS_MAC and not split_roi:
+        return _read_tsf_tdf_reader(path)
+
+    if include_all or not split_roi:  # or len(unq_roi) == 1):
         x = frame_index_position[:, 2]
         x = x - np.min(x)  # minimized
         y = frame_index_position[:, 3]
