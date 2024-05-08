@@ -295,7 +295,7 @@ def write_ome_tiff_alt(
     output_path = writer.write_image_by_plane(
         filename,
         path.parent,
-        write_pyramid=True,
+        write_pyramid=tile_size > 0,
         as_uint8=as_uint8,
         channel_ids=channel_ids,
         channel_names=channel_names,

@@ -135,11 +135,13 @@ class OmeTiffWriter:
             _, _, self.x_size, self.y_size = self.crop_bbox
 
         self.tile_size = tile_size
-        # protect against too large tile size
-        while self.y_size / self.tile_size <= 1 or self.x_size / self.tile_size <= 1:
-            self.tile_size = self.tile_size // 2
-        if self.tile_size < 256:
-            self.tile_size = 256
+        if tile_size:
+            # protect against too large tile size
+            while self.y_size / self.tile_size <= 1 or self.x_size / self.tile_size <= 1:
+                self.tile_size = self.tile_size // 2
+            if self.tile_size < 256:
+                self.tile_size = 256
+        write_pyramid = self.tile_size > 0
 
         self.pyr_levels, _ = get_pyramid_info(self.y_size, self.x_size, self.reader.n_channels, self.tile_size)
         self.n_pyr_levels = len(self.pyr_levels)
@@ -272,8 +274,8 @@ class OmeTiffWriter:
             logger.trace("Writing image data in 0-255 range as uint8")
 
         # some info about channels
-        logger.info(f"Writing channels ids: {channel_ids}")
-        logger.info(f"Writing channels: {channel_names}")
+        logger.trace(f"Writing channels ids: {channel_ids}")
+        logger.trace(f"Writing channels: {channel_names}")
 
         if self.reader.is_rgb:
             options = {
@@ -289,7 +291,7 @@ class OmeTiffWriter:
                 "photometric": "rgb" if self.reader.is_rgb else "minisblack",
                 "metadata": None,
             }
-        if np.max(self.reader.image_shape) < self.tile_size:
+        if self.tile_size == 0 or np.max(self.reader.image_shape) < self.tile_size:
             options.pop("tile")
 
         logger.trace(f"TIFF options: {options}")
