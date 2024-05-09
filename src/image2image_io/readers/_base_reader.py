@@ -220,6 +220,29 @@ class BaseReader:
         """Return name of the input path."""
         return self.path.stem
 
+    @property
+    def clean_name(self) -> str:
+        """Return name of the input path."""
+        name = self.name
+        for ext in [
+            ".ome",
+            ".tiff",
+            ".tif",
+            ".png",
+            ".jpg",
+            ".svs",
+            ".czi",
+            ".d",
+            ".imzML",
+            ".tsf",
+            ".tdf",
+            ".qptiff",
+            ".raw",
+            ".intermediate",
+        ]:
+            name = name.replace(ext, "")
+        return name
+
     def flat_array(
         self, channel_indices: list[int] | None = None, index: int = 0
     ) -> tuple[np.ndarray, tuple[int, int]]:
@@ -290,7 +313,6 @@ class BaseReader:
         if array.ndim == 2:
             array_ = array[top:bottom, left:right]
         elif array.ndim == 3:
-            shape = array.shape
             channel_axis, _ = self.get_channel_axis_and_n_channels()
             # channel_axis = int(np.argmin(shape))
             if channel_axis == 0:

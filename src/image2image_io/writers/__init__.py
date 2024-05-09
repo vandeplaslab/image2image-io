@@ -18,14 +18,14 @@ from image2image_io.utils.utilities import (
     get_shape_of_image,
     reshape_fortran,
 )
-from image2image_io.writers.merge_tiff_writer import MergeOmeTiffWriter
+from image2image_io.writers.merge_tiff_writer import MergeImages, MergeOmeTiffWriter
 from image2image_io.writers.tiff_writer import OmeTiffWriter
 
 if ty.TYPE_CHECKING:
     from image2image_io.readers._base_reader import BaseReader
 
 
-MetadataReader = dict[int, dict[str, list[ty.Union[int, str]]]]
+MetadataReader = dict[int, dict[str, ty.Union[str, list[ty.Union[int, str]]]]]
 MetadataDict = dict[Path, MetadataReader]
 
 __all__ = [
@@ -62,6 +62,51 @@ def get_total_n_scenes(paths: ty.Iterable[PathLike]) -> tuple[int, list[Path]]:
                 total_n_scenes += 1
             paths_.append(path_)
     return total_n_scenes, paths_
+
+
+def merge_images(
+    name: str,
+    paths: ty.Iterable[PathLike],
+    output_dir: PathLike,
+    as_uint8: bool = False,
+    tile_size: int = 512,
+    metadata: MetadataDict | None = None,
+    overwrite: bool = False,
+) -> None:
+    """Merge multiple images to OME-TIFF."""
+    from image2image_io.readers import get_simple_reader
+
+    name = name.replace(".ome.tiff", "")
+    output_dir = Path(output_dir)
+    filename = output_dir / f"{name}.ome.tiff"
+    if filename.exists() and not overwrite:
+        logger.info(f"Skipping {filename} - already exists")
+        return
+
+    pixel_sizes = []
+    channel_names = []
+    reader_names = []
+    for path_ in paths:
+        reader = get_simple_reader(path_, init_pyramid=False, auto_pyramid=False)
+        reader_metadata: MetadataReader = (
+            metadata.get(0, {"channel_names": reader.channel_names, "name": reader.clean_name})
+            if metadata
+            else {"channel_names": reader.channel_names, "name": reader.clean_name}
+        )
+
+        pixel_sizes.append(reader.resolution)
+        channel_names.append(reader_metadata.get("channel_names", reader.channel_names))
+        reader_names.append(reader_metadata.get("name", reader.clean_name))
+
+    merge_obj = MergeImages(paths, pixel_sizes, channel_names=channel_names)
+    writer = MergeOmeTiffWriter(merge_obj)
+    writer.merge_write_image_by_plane(
+        name,
+        reader_names,
+        output_dir=output_dir,
+        as_uint8=as_uint8,
+        tile_size=tile_size,
+    )
 
 
 def images_to_ome_tiff(
