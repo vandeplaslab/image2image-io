@@ -141,6 +141,8 @@ class OmeTiffWriter:
                 self.tile_size = self.tile_size // 2
             if self.tile_size < 256:
                 self.tile_size = 256
+            if self.x_size < self.tile_size or self.y_size < self.tile_size:
+                self.tile_size = 0
         write_pyramid = self.tile_size > 0
 
         self.pyr_levels, _ = get_pyramid_info(self.y_size, self.x_size, self.reader.n_channels, self.tile_size)
