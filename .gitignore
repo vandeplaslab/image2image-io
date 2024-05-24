@@ -115,3 +115,4 @@ _version.py
 .idea/misc.xml
 .idea/workspace.xml
 .idea/watcherTasks.xml
+.idea/vcs.xml
