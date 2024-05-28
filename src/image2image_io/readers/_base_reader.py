@@ -362,11 +362,26 @@ class BaseReader:
             raise ValueError(f"Array has unsupported shape: {shape}")
         return channel_axis, n_channels
 
+    def get_image_shape_for_shape(self, shape: tuple | None = None) -> tuple[int, int]:
+        """Return shape of an image for a given shape."""
+        if shape is None:
+            shape = self.shape
+        channel_axis, n_channels = self.get_channel_axis_and_n_channels(shape)
+        if channel_axis is None or (self.is_rgb and not CONFIG.split_rgb):
+            return shape[:2]
+        if channel_axis == 0:
+            return shape[1:]
+        elif channel_axis == 1:
+            return shape[0], shape[2]
+        elif channel_axis == 2:
+            return shape[:2]
+        raise ValueError(f"Array has unsupported shape: {shape}")
+
     def get_channel(self, index: int, pyramid: int = 0) -> np.ndarray:
         """Return channel."""
         array: np.ndarray = self.pyramid[pyramid]
         channel_axis, n_channels = self.get_channel_axis_and_n_channels()
-        if channel_axis is None:
+        if channel_axis is None or (self.is_rgb and not CONFIG.split_rgb):
             return array
         if channel_axis == 0:
             return array[index]
@@ -380,9 +395,7 @@ class BaseReader:
         """Return channel pyramid."""
         array = self.pyramid
         channel_axis, n_channels = self.get_channel_axis_and_n_channels()
-        if channel_axis is None:
-            return array
-        if self.is_rgb and not CONFIG.split_rgb:
+        if channel_axis is None or (self.is_rgb and not CONFIG.split_rgb):
             return array
         if channel_axis == 0:
             return [a[index] for a in array]

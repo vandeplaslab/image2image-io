@@ -1,4 +1,5 @@
 """OME-TIFF writer for MergeRegImage class."""
+
 from __future__ import annotations
 
 import typing as ty
@@ -276,7 +277,7 @@ class MergeOmeTiffWriter:
         tile_size: int = 512,
         compression: str = "default",
         as_uint8: bool = False,
-        channel_ids: list[list[int] | None] | None = None,
+        channel_ids: list[list[int | tuple[int, ...]] | None] | None = None,
     ) -> Path:
         """Write merged OME-TIFF image plane-by-plane to disk.
 
@@ -363,7 +364,13 @@ class MergeOmeTiffWriter:
                         continue
 
                     # retrieve channel data
-                    image: np.ndarray = np.squeeze(reader.get_channel(channel_index))
+                    # if channel_index is int, then it's simple, otherwise, let's get maximum intensity projection
+                    if isinstance(channel_index, int):
+                        image: sitk.Image = np.squeeze(reader.get_channel(channel_index))  # type: ignore[assignment]
+                    else:
+                        images: list[sitk.Image] = [np.squeeze(reader.get_channel(i)) for i in channel_index]
+                        images = np.dstack(images)  # type: ignore[assignment]
+                        image = np.max(images, axis=2)  # type: ignore[assignment]
                     image: sitk.Image = sitk.GetImageFromArray(image)  # type: ignore[no-redef]
                     image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[attr-defined]
 

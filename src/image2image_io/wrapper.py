@@ -60,6 +60,13 @@ class ImageWrapper:
                 keys.append(reader.key)
         return keys
 
+    def get_reader_for_path(self, path: PathLike) -> BaseReader:
+        """Return reader for specified path."""
+        keys = self.get_key_for_path(path)
+        if len(keys) == 1:
+            return self.data[keys[0]]
+        raise ValueError(f"Reader for path '{path}' not found.")
+
     def get_reader_for_key(self, key: str) -> BaseReader:
         """Return reader for specified key."""
         return self.data[key]
