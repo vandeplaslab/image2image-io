@@ -19,7 +19,7 @@ from image2image_io.utils.utilities import (
     reshape_fortran,
 )
 from image2image_io.writers.merge_tiff_writer import MergeImages, MergeOmeTiffWriter
-from image2image_io.writers.tiff_writer import OmeTiffWriter
+from image2image_io.writers.tiff_writer import OmeTiffWriter, Transformer
 
 if ty.TYPE_CHECKING:
     from image2image_io.readers._base_reader import BaseReader
@@ -168,6 +168,7 @@ def image_to_ome_tiff(
     as_uint8: bool = False,
     tile_size: int = 512,
     metadata: dict[int, dict[str, list[int | str]]] | None = None,
+    transformer: Transformer | None = None,
     overwrite: bool = False,
 ) -> ty.Generator[tuple[str, int, int, int], None, None]:
     """Convert image of any type to OME-TIFF."""
@@ -178,6 +179,7 @@ def image_to_ome_tiff(
     if output_dir is None:
         output_dir = path.parent
     output_dir = Path(output_dir)
+    output_dir.mkdir(exist_ok=True, parents=True)
 
     key = get_key(path)
     suffix = path.suffix
@@ -202,7 +204,15 @@ def image_to_ome_tiff(
     if not scene_metadata["channel_ids"]:
         yield key, 1, 1, 1
     else:
-        write_ome_tiff_alt(output_path, reader, as_uint8=as_uint8, tile_size=tile_size, **scene_metadata)
+        write_ome_tiff_alt(
+            output_path,
+            reader,
+            as_uint8=as_uint8,
+            tile_size=tile_size,
+            transformer=transformer,
+            **scene_metadata,
+            overwrite=overwrite,
+        )
         yield key, 1, 1, 1
 
 
@@ -330,13 +340,15 @@ def write_ome_tiff_alt(
     tile_size: int = 512,
     channel_ids: list[int] | None = None,
     channel_names: list[str] | None = None,
+    transformer: Transformer | None = None,
+    overwrite: bool = False,
 ) -> Path:
     """Write OME-TIFF."""
     from image2image_io.writers.tiff_writer import OmeTiffWriter
 
     path = Path(path)
     filename = path.name.replace(".ome.tiff", "")
-    writer = OmeTiffWriter(reader)
+    writer = OmeTiffWriter(reader, transformer=transformer)
     output_path = writer.write_image_by_plane(
         filename,
         path.parent,
@@ -345,6 +357,7 @@ def write_ome_tiff_alt(
         channel_ids=channel_ids,
         channel_names=channel_names,
         tile_size=tile_size,
+        overwrite=overwrite,
     )
     return output_path
 

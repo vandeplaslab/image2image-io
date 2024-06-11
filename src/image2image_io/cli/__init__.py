@@ -1,10 +1,12 @@
 """Main CLI"""
+
 import click
 from loguru import logger
 
 from image2image_io import __version__
 from image2image_io.cli.czi2tiff import czi2tiff
 from image2image_io.cli.thumbnail import thumbnail
+from image2image_io.cli.transform import transform
 
 LOG_FMT = "[<level>{level: <8}</level>][{time:YYYY-MM-DD HH:mm:ss:SSS}][{extra[src]}] {message}"
 COLOR_LOG_FMT = (
@@ -80,6 +82,8 @@ def cli(verbosity: int, no_color: bool, dev: bool) -> None:
 # register commands
 cli.add_command(czi2tiff)
 cli.add_command(thumbnail)
+if transform:
+    cli.add_command(transform)
 
 
 def main():

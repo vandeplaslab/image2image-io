@@ -1,4 +1,5 @@
 """Convert images from one format to OME-TIFF format."""
+
 from __future__ import annotations
 
 import click
@@ -37,6 +38,16 @@ from loguru import logger
     required=False,
 )
 @click.option(
+    "-t",
+    "--tile_size",
+    "tile_size",
+    type=click.INT,
+    help="Specify tile size of the pyramid.",
+    default=512,
+    show_default=True,
+    required=True,
+)
+@click.option(
     "-s",
     "--scene",
     "scene_index",
@@ -69,6 +80,7 @@ def czi2tiff(
     input_: str,
     output_dir: str,
     scene_index: int,
+    tile_size: int,
     as_uint8: bool,
     channel_ids: list[int] | None,
     channel_names: list[str | None],
@@ -82,7 +94,7 @@ def czi2tiff(
             raise ValueError("Number of channel IDs and channel names must be equal.")
         metadata = {scene_index: {"channel_ids": channel_ids, "channel_names": channel_names}}
 
-    for key, scene_index, total in czi_to_ome_tiff(
-        input_, output_dir, as_uint8=as_uint8, metadata=metadata, scenes=[scene_index]
+    for key, scene_index, total, _ in czi_to_ome_tiff(
+        input_, output_dir, as_uint8=as_uint8, tile_size=tile_size, metadata=metadata, scenes=[scene_index]
     ):
         logger.info(f"Converted {key} scene {scene_index}/{total}")
