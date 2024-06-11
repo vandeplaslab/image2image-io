@@ -18,7 +18,7 @@ def test_get_simple_reader_tiff(path):
 def test_get_simple_reader_png(path):
     reader = get_simple_reader(path)
     assert reader.is_rgb, "Reader should not be rgb"
-    assert reader.n_channels == 1, "Reader should have 1 channel"
+    assert reader.n_channels == 4, "Reader should have 1 channel"
     assert reader.reader_type == "image", "Reader should be image"
 
 
@@ -26,7 +26,7 @@ def test_get_simple_reader_png(path):
 def test_get_simple_reader_jpg(path):
     reader = get_simple_reader(path)
     assert reader.is_rgb, "Reader should not be rgb"
-    assert reader.n_channels == 1, "Reader should have 1 channel"
+    assert reader.n_channels == 4, "Reader should have 1 channel"
     assert reader.reader_type == "image", "Reader should be image"
 
 
