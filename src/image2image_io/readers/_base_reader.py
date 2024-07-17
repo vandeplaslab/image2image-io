@@ -301,39 +301,83 @@ class BaseReader:
         """Get dask representation of the pyramid."""
         raise NotImplementedError("Must implement method")
 
-    def crop(self, left: int, right: int, top: int, bottom: int, yx: np.ndarray | None = None) -> np.ndarray:
+    def crop(
+        self, left: int, right: int, top: int, bottom: int, array: np.ndarray | None = None, multiply: bool = True
+    ) -> np.ndarray:
         """Crop image."""
-        mask = None
-        if yx is not None:
-            mask = np.zeros(self.image_shape, dtype=bool)
-            mask[yx[:, 0], yx[:, 1]] = True
-        else:
-            top, bottom = sorted([top, bottom])
-            left, right = sorted([left, right])
-            left = math.floor(left * self.inv_resolution)
-            right = math.ceil(right * self.inv_resolution)
-            top = math.floor(top * self.inv_resolution)
-            bottom = math.ceil(bottom * self.inv_resolution)
+        inv_resolution = self.inv_resolution if multiply else 1
+        top, bottom = sorted([top, bottom])
+        left, right = sorted([left, right])
+        left = math.floor(left * inv_resolution)
+        right = math.ceil(right * inv_resolution)
+        top = math.floor(top * inv_resolution)
+        bottom = math.ceil(bottom * inv_resolution)
+
+        # get array
+        if array is None:
             array = self.pyramid[0]
-            if array.ndim == 2:
-                array_ = array[top:bottom, left:right]
-            elif array.ndim == 3:
-                channel_axis, _ = self.get_channel_axis_and_n_channels()
-                # channel_axis = int(np.argmin(shape))
-                if channel_axis == 0:
-                    array_ = array[:, top:bottom, left:right]
-                elif channel_axis == 1:
-                    array_ = array[top:bottom, :, left:right]
-                elif channel_axis == 2:
-                    array_ = array[top:bottom, left:right, :]
-                else:
-                    raise ValueError(f"Array has unsupported shape: {array.shape}")
+        if array.ndim == 2:
+            array_ = array[top:bottom, left:right]
+        elif array.ndim == 3:
+            channel_axis, _ = self.get_channel_axis_and_n_channels()
+            if channel_axis == 0:
+                array_ = array[:, top:bottom, left:right]
+            elif channel_axis == 1:
+                array_ = array[top:bottom, :, left:right]
+            elif channel_axis == 2:
+                array_ = array[top:bottom, left:right, :]
             else:
                 raise ValueError(f"Array has unsupported shape: {array.shape}")
+        else:
+            raise ValueError(f"Array has unsupported shape: {array.shape}")
         # check whether an array is dask array - if so, we need to compute it
         if hasattr(array_, "compute"):
             array_ = array_.compute()
         return array_  # type: ignore[no-any-return]
+
+    def crop_polygon(self, yx: np.ndarray) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+        """Crop image."""
+        import cv2
+
+        # reverse yx to xy
+        xy = yx[:, ::-1] * self.inv_resolution
+        xy = np.round(xy).astype(np.int32)
+        # get left/right/top/bottom from polygon
+        h, w = self.image_shape
+        left, bottom = np.min(xy, axis=0)
+        left = np.max([0, left])
+        bottom = np.max([0, bottom])
+        right, top = np.max(xy, axis=0)
+        right = np.min([w, right])
+        top = np.min([h, top])
+        top, bottom = sorted([top, bottom])
+        left, right = sorted([left, right])
+
+        # get mask
+        mask = np.zeros(self.image_shape, dtype=np.uint8)
+        mask = cv2.fillPoly(mask, pts=[xy], color=np.iinfo(np.uint8).max)
+        mask = mask.astype(bool)
+
+        # get array
+        array = self.pyramid[0]
+        array_ = array.copy()
+        if array.ndim == 2:
+            array_[mask] = 0
+        elif array_.ndim == 3:
+            channel_axis, _ = self.get_channel_axis_and_n_channels()
+            if channel_axis == 0:
+                array_ = array_ * mask
+            elif channel_axis == 1:
+                array_ = array_ * mask[:, :, None]
+            elif channel_axis == 2:
+                array_ = array_ * mask[:, :, None]
+            else:
+                raise ValueError(f"Array has unsupported shape: {array_.shape}")
+        # check whether an array is dask array - if so, we need to compute it
+        if hasattr(array_, "compute"):
+            array_ = array_.compute()
+        array_ = self.crop(left, right, top, bottom, array=array_, multiply=False)
+        return array_, (left, right, top, bottom)
 
     def warp(self, array: np.ndarray) -> np.ndarray:
         """Warp array."""
@@ -382,11 +426,13 @@ class BaseReader:
             return shape[:2]
         raise ValueError(f"Array has unsupported shape: {shape}")
 
-    def get_channel(self, index: int, pyramid: int = 0) -> np.ndarray:
+    def get_channel(self, index: int, pyramid: int = 0, split_rgb: bool | None = None) -> np.ndarray:
         """Return channel."""
+        split_rgb = split_rgb if split_rgb is not None else CONFIG.split_rgb
+
         array: np.ndarray = self.pyramid[pyramid]
         channel_axis, n_channels = self.get_channel_axis_and_n_channels()
-        if channel_axis is None or (self.is_rgb and not CONFIG.split_rgb):
+        if channel_axis is None or (self.is_rgb and (not CONFIG.split_rgb and not split_rgb)):
             return array
         if channel_axis == 0:
             return array[index]

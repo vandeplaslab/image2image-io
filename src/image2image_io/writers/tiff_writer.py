@@ -273,7 +273,7 @@ class OmeTiffWriter:
         )
 
         if as_uint8:
-            logger.trace("Writing image data in 0-255 range as uint8")
+            logger.trace(f"Writing image data in 0-255 range as uint8. Data type: {self.reader.dtype}")
 
         # some info about channels
         logger.trace(f"Writing channels ids: {channel_ids}")
@@ -297,7 +297,6 @@ class OmeTiffWriter:
             options.pop("tile")
 
         logger.trace(f"TIFF options: {options}")
-
         # write OME-XML to the ImageDescription tag of the first page
         description = self.omexml
 
@@ -317,9 +316,13 @@ class OmeTiffWriter:
 
                 # if channel_index is int, then it's simple, otherwise, let's get maximum intensity projection
                 if isinstance(channel_index, int):
-                    image: sitk.Image = np.squeeze(reader.get_channel(channel_index))  # type: ignore[assignment]
+                    image: sitk.Image = np.squeeze(
+                        reader.get_channel(channel_index, split_rgb=True),  # type: ignore[assignment]
+                    )
                 else:
-                    images: list[sitk.Image] = [np.squeeze(reader.get_channel(i)) for i in channel_index]
+                    images: list[sitk.Image] = [
+                        np.squeeze(reader.get_channel(i, split_rgb=True)) for i in channel_index
+                    ]
                     images = np.dstack(images)  # type: ignore[assignment]
                     image = np.max(images, axis=2)  # type: ignore[assignment]
 
