@@ -48,7 +48,9 @@ dependencies = [
     "opencv-python",
     "dicttoxml",
     "appdirs",
-    "geojson"
+    "geojson",
+    "pyarrow",
+    "fastparquet",
 ]
 
 # extras
