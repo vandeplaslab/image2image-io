@@ -20,6 +20,8 @@ def read_points(path: PathLike) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
         df = pd.read_csv(path)
     elif path.suffix == ".txt":
         df = pd.read_csv(path, delimiter="\t")
+        if len(df.columns) == 1:
+            df = pd.read_csv(path, delimiter=" ")
     elif path.suffix == ".tsv":
         df = pd.read_csv(path, delimiter="\t")
     elif path.suffix == ".parquet":

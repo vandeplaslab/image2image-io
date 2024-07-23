@@ -428,7 +428,7 @@ def prepare_ome_xml_str(
     return omexml.tostring().encode("utf8")
 
 
-def check_df_columns(df: pd.DataFrame, required: list[str], either: list[tuple[str]] | None = None) -> bool:
+def check_df_columns(df: pd.DataFrame, required: list[str], either: list[tuple[str, ...]] | None = None) -> bool:
     """Check if a DataFrame has the required columns."""
     if not all(col in df.columns for col in required):
         return False
@@ -437,7 +437,7 @@ def check_df_columns(df: pd.DataFrame, required: list[str], either: list[tuple[s
     return True
 
 
-def get_column_name(df: pd.DataFrame, options: list[str]) -> list[str]:
+def get_column_name(df: pd.DataFrame, options: list[str]) -> str:
     """Get columns from a DataFrame."""
     for key in options:
         if key in df.columns:

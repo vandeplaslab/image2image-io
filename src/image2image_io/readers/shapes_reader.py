@@ -15,7 +15,7 @@ from image2image_io.readers.geojson_utils import get_int_dtype, read_geojson, sh
 from image2image_io.readers.utilities import check_df_columns, get_column_name
 
 
-def is_txt_and_has_columns(path: PathLike, required: list[str], either: list[tuple[str]]) -> bool:
+def is_txt_and_has_columns(path: PathLike, required: list[str], either: list[tuple[str, ...]]) -> bool:
     """Check if a text file has the required columns."""
     import pandas as pd
 
@@ -24,6 +24,8 @@ def is_txt_and_has_columns(path: PathLike, required: list[str], either: list[tup
         df = pd.read_csv(path, nrows=1)
     elif path.suffix == ".txt":
         df = pd.read_csv(path, delimiter="\t", nrows=1)
+        if len(df.columns) == 1:
+            df = pd.read_csv(path, delimiter=" ")
     elif path.suffix == ".tsv":
         df = pd.read_csv(path, delimiter="\t", nrows=1)
     elif path.suffix == ".parquet":

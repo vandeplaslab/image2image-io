@@ -239,8 +239,10 @@ def get_reader(
         else:
             path, readers = _read_centroids_h5_coordinates_lazy(path)
     elif suffix in GEOJSON_EXTENSIONS + POINTS_EXTENSIONS:
-        if suffix in GEOJSON_EXTENSIONS or is_txt_and_has_columns(
-            path, ["vertex_x", "vertex_y"], [("cell", "cell_id")]
+        if (
+            suffix in GEOJSON_EXTENSIONS
+            or is_txt_and_has_columns(path, ["vertex_x", "vertex_y"], [("cell", "cell_id")])
+            or is_txt_and_has_columns(path, ["x", "y"], [("cell", "cell_id")])
         ):
             logger.trace(f"Reading GeoJSON file: {path}")
             path, readers = _read_shapes(path)
