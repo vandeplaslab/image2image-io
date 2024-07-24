@@ -86,7 +86,7 @@ class TransformData(BaseModel):
         if moving_points is None or len(moving_points) == 0 or fixed_points is None or len(fixed_points) == 0:
             if self.affine is None:
                 self.affine = np.eye(3)
-                logger.warning("Transform has not been specified - using identity matrix.")
+                logger.trace("Transform has not been specified - using identity matrix.")
             affine = self.affine
             return AffineTransform(matrix=affine)
 
