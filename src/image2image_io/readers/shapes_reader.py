@@ -117,11 +117,6 @@ class ShapesReader(BaseReader):
             obj._channel_names = channel_names
         return obj
 
-    @property
-    def display_name(self) -> str:
-        """Retrieve display name from the path."""
-        return self.path.stem
-
     def remove_invalid(self) -> None:
         """Remove invalid shapes."""
         from image2image_io.utils.mask import remove_invalid

@@ -216,8 +216,8 @@ class BaseReader:
         return self.path.name
 
     @property
-    def stem(self) -> str:
-        """Return name of the input path."""
+    def display_name(self) -> str:
+        """Retrieve display name from the path."""
         return self.path.stem
 
     @property
