@@ -57,11 +57,6 @@ class PointsReader(BaseReader):
         self.x, self.y, self.df = read_points(self.path)
         self._channel_names = list(self.df.columns)
 
-    @property
-    def display_name(self) -> str:
-        """Retrieve display name from the path."""
-        return self.path.stem
-
     def to_points(self) -> tuple[str, dict[str, np.ndarray | str]]:
         """Convert to shapes that can be exported to Shapes layer."""
         x, y, df = self.parse_data()
