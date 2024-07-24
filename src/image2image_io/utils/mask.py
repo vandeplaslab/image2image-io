@@ -35,14 +35,14 @@ def mask_to_polygon(mask: np.ndarray, epsilon: float = 1) -> np.ndarray:
 
 
 def shapes_to_polygons(
-    shape_data: list[np.ndarray], with_index: bool = False
+    shape_data: list[np.ndarray], with_index: bool = False, inv_pixel_size: float = 1.0
 ) -> list[Polygon] | list[tuple[Polygon, int]]:
     """Convert shapes to polygons."""
     polygons = []
     for index, shape in enumerate(shape_data, start=1):
         if isinstance(shape, dict):
             shape = shape["array"]
-        yx = shape
+        yx = shape * inv_pixel_size
         if with_index:
             polygons.append((Polygon(yx), index))
         else:

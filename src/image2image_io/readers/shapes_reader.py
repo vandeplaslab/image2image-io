@@ -22,12 +22,10 @@ def is_txt_and_has_columns(path: PathLike, required: list[str], either: list[tup
     path = Path(path)
     if path.suffix == ".csv":
         df = pd.read_csv(path, nrows=1)
-    elif path.suffix == ".txt":
-        df = pd.read_csv(path, delimiter="\t", nrows=1)
-        if len(df.columns) == 1:
-            df = pd.read_csv(path, delimiter=" ")
-    elif path.suffix == ".tsv":
-        df = pd.read_csv(path, delimiter="\t", nrows=1)
+    elif path.suffix in [".txt", ".tsv"]:
+        temp = pd.read_csv(path, delimiter="\t", nrows=1)
+        sep = "\t" if len(temp.columns) > 1 else " "
+        df = pd.read_csv(path, delimiter=sep, nrows=1)
     elif path.suffix == ".parquet":
         df = pd.read_parquet(path)
     else:
@@ -40,10 +38,10 @@ def read_shapes(path: PathLike) -> tuple:
     path = Path(path)
     if path.suffix == ".csv":
         df = pd.read_csv(path)
-    elif path.suffix == ".txt":
-        df = pd.read_csv(path, delimiter="\t")
-    elif path.suffix == ".tsv":
-        df = pd.read_csv(path, delimiter="\t")
+    elif path.suffix in [".txt", ".tsv"]:
+        temp = pd.read_csv(path, delimiter="\t", nrows=1)
+        sep = "\t" if len(temp.columns) > 1 else " "
+        df = pd.read_csv(path, delimiter=sep)
     elif path.suffix == ".parquet":
         df = pd.read_parquet(path)
     else:
@@ -131,11 +129,21 @@ class ShapesReader(BaseReader):
         keep, self.shape_data = remove_invalid(self.shape_data)
         self.geojson_data = [self.geojson_data[i] for i in keep]
 
-    def to_mask(self, output_shape: tuple[int, int], with_index: bool = False) -> np.ndarray:
-        """Convert to mask."""
+    def to_mask(
+        self, output_shape: tuple[int, int], with_index: bool = False, inv_pixel_size: float = 1.0
+    ) -> np.ndarray:
+        """Convert to mask.
+
+        It's possible that GeoJSON/shapes data is in the physical units, so we need to convert it to pixels. In order to
+        do so, it's necessary to multiply the coordinates by 1/pixel_size.
+        """
         from image2image_io.utils.mask import polygons_to_mask, shapes_to_polygons
 
-        polygons = shapes_to_polygons(self.shape_data, with_index=with_index)
+        # if native resolution is 1 (not set) and the specified pixel_size is not 1, then we need to multiply the
+        if self.resolution != 1.0 and inv_pixel_size != 1.0:
+            inv_pixel_size = 1.0
+
+        polygons = shapes_to_polygons(self.shape_data, with_index=with_index, inv_pixel_size=inv_pixel_size)
         mask = polygons_to_mask(polygons, output_shape)
         return mask
 
