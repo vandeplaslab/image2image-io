@@ -13,7 +13,7 @@ from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.utilities import get_column_name
 
 
-def read_points(path: PathLike) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+def read_points(path: PathLike, return_df: bool = False) -> tuple[np.ndarray, np.ndarray, pd.DataFrame] | pd.DataFrame:
     """Read points from CSV/parquet file."""
     path = Path(path)
     if path.suffix == ".csv":
@@ -26,6 +26,8 @@ def read_points(path: PathLike) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
+    if return_df:
+        return df
     return read_points_from_df(df)
 
 
