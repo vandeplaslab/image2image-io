@@ -91,3 +91,8 @@ class PointsReader(BaseReader):
     def to_csv(self, path: PathLike) -> str:
         """Export data as CSV file."""
         raise NotImplementedError("Must implement method")
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """Return shape of data."""
+        return (len(self.x),)

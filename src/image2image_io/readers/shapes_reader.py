@@ -14,6 +14,9 @@ from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.geojson_utils import get_int_dtype, read_geojson, shape_reader
 from image2image_io.readers.utilities import check_df_columns, get_column_name
 
+if ty.TYPE_CHECKING:
+    from shapely.geometry import Polygon
+
 
 def is_txt_and_has_columns(path: PathLike, required: list[str], either: list[tuple[str, ...]]) -> bool:
     """Check if a text file has the required columns."""
@@ -49,7 +52,7 @@ def read_shapes(path: PathLike) -> tuple:
 
     get_column_name(df, ["vertex_x", "x"])
     get_column_name(df, ["vertex_y", "y"])
-    get_column_name(df, ["cell", "cell_id"])
+    get_column_name(df, ["cell", "cell_id", "shape", "shape_name"])
     return read_shapes_from_df(df)
 
 
@@ -57,7 +60,7 @@ def read_shapes_from_df(df: pd.DataFrame) -> tuple:
     """Read shapes from DataFrame."""
     x_key = get_column_name(df, ["vertex_x", "x"])
     y_key = get_column_name(df, ["vertex_y", "y"])
-    group_by = get_column_name(df, ["cell", "cell_id"])
+    group_by = get_column_name(df, ["cell", "cell_id", "shape", "shape_name"])
     shapes_geojson, shape_data = [], []
     for group, indices in df.groupby(group_by).groups.items():
         dff = df.iloc[indices]
@@ -86,9 +89,9 @@ def napari_to_shapes_data(name: str, data: list[np.ndarray], shapes: list[str]) 
     return shape_data
 
 
-def read_data(path: Path) -> dict[str, dict[str, np.ndarray]]:
+def read_data(path: Path) -> dict[str, dict[str, np.ndarray | str]]:
     """Read data."""
-    if path.suffix in [".json", ".geojson"]:
+    if path.suffix.lower() in [".json", ".geojson"]:
         geojson_data, shape_data = read_geojson(path)
     else:
         geojson_data, shape_data = read_shapes(path)
@@ -227,6 +230,31 @@ class ShapesReader(BaseReader):
         """Get dask representation of the pyramid."""
         raise NotImplementedError("Must implement method")
 
-    def to_csv(self, path: PathLike) -> str:
+    def to_shapely(self) -> list[Polygon]:
+        """Convert to shapely."""
+        from shapely.geometry import Polygon
+
+        return [Polygon(s["array"]) for s in self.shape_data]
+
+    def to_csv(self, path: PathLike, as_px: bool = False) -> Path:
         """Export data as CSV file."""
-        raise NotImplementedError("Must implement method")
+        data = []
+        # iterate over shapes
+        for i, shape in enumerate(self.shape_data):
+            name = shape["shape_name"] + f"-{i}"
+            # create numpy array with x, y, shape-name columns
+            data.append(np.c_[shape["array"], np.full(shape["array"].shape[0], name)])
+        # concatenate all arrays
+        data = np.concatenate(data)
+        # create DataFrame
+        df = pd.DataFrame(data, columns=["x", "y", "shape"])
+        # if as_px and self.resolution != 1.0:
+        #     df[["x", "y"]] *= self.resolution
+        # save to CSV
+        df.to_csv(path, index=False)
+        return Path(path)
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """Return shape of data."""
+        return (len(self.shape_data),)

@@ -241,10 +241,10 @@ def get_reader(
     elif suffix in GEOJSON_EXTENSIONS + POINTS_EXTENSIONS:
         if (
             suffix in GEOJSON_EXTENSIONS
-            or is_txt_and_has_columns(path, ["vertex_x", "vertex_y"], [("cell", "cell_id")])
-            or is_txt_and_has_columns(path, ["x", "y"], [("cell", "cell_id")])
+            or is_txt_and_has_columns(path, ["vertex_x", "vertex_y"], [("cell", "cell_id", "shape", "shape_name")])
+            or is_txt_and_has_columns(path, ["x", "y"], [("cell", "cell_id", "shape", "shape_name")])
         ):
-            logger.trace(f"Reading GeoJSON file: {path}")
+            logger.trace(f"Reading shape file: {path}")
             path, readers = _read_shapes(path)
         else:
             logger.trace(f"Reading points file: {path}")
