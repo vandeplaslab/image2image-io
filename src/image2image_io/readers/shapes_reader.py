@@ -194,7 +194,7 @@ class ShapesReader(BaseReader):
         n_shapes = len(shapes_geojson)
         shape_types = [sh["geometry"]["type"] for sh in shapes_geojson]
         shape_names = [sh["properties"]["classification"]["name"] for sh in shapes_geojson]
-        shape_arrays = [s["array"][:, [1, 0]] for s in self.shape_data]
+        shape_arrays = [s["array"][:, [1, 0]] for s in self.shape_data]  # expect y, x
         shape_props = {"name": shape_names}
         shape_text = {
             "text": "{name}",
