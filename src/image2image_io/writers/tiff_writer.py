@@ -337,7 +337,7 @@ class OmeTiffWriter:
                         with MeasureTimer() as timer:
                             image = self.transformer(image)
                         logger.trace(
-                            f"Transformed image shape: {image.GetSize()} in {timer()}",  # type: ignore[no-untyped-call]
+                            f"Transformed image shape: {image.GetSize()[::-1]} in {timer()}",  # type: ignore[no-untyped-call]
                         )
 
                     # change dtype

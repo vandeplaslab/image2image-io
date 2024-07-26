@@ -379,7 +379,7 @@ class MergeOmeTiffWriter:
                         with MeasureTimer() as timer:
                             image = self.transformers[reader_index](image)  # type: ignore[assignment,arg-type,misc]
                         logger.trace(
-                            f"Transformed image shape: {image.GetSize()} in {timer()}",  # type: ignore[attr-defined]
+                            f"Transformed image shape: {image.GetSize()[::-1]} in {timer()}",  # type: ignore[attr-defined]
                         )
 
                     # change dtype

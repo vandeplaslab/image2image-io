@@ -98,8 +98,6 @@ else:
         overwrite: bool,
     ) -> None:
         """Transform OME-TIFF using i2r.json or i2reg."""
-        from image2image_reg.models.transform_sequence import TransformSequence
-
         from image2image_io.writers import image_to_ome_tiff
 
         metadata = None
@@ -109,8 +107,12 @@ else:
             metadata = {0: {"channel_ids": channel_ids, "channel_names": channel_names}}
 
         if ".i2r.json" in transform_:
-            transform_seq = TransformSequence.from_i2r(transform_, input_)
+            from image2image_io.utils.warp import ImageWarper
+
+            transform_seq = ImageWarper(transform_)
         else:
+            from image2image_reg.models.transform_sequence import TransformSequence
+
             transform_seq = TransformSequence.from_path(transform_)
         for key, scene_index, total, _ in image_to_ome_tiff(
             input_,
@@ -120,5 +122,6 @@ else:
             metadata=metadata,
             transformer=transform_seq,
             overwrite=overwrite,
+            suffix="_transformed",
         ):
             logger.info(f"Transformed {key} {scene_index}/{total}")

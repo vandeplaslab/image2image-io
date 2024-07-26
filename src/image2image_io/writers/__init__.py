@@ -167,6 +167,7 @@ def image_to_ome_tiff(
     output_dir: PathLike | None = None,
     as_uint8: bool = False,
     tile_size: int = 512,
+    suffix: str = "",
     metadata: dict[int, dict[str, list[int | str]]] | None = None,
     transformer: Transformer | None = None,
     overwrite: bool = False,
@@ -182,9 +183,11 @@ def image_to_ome_tiff(
     output_dir.mkdir(exist_ok=True, parents=True)
 
     key = get_key(path)
-    suffix = path.suffix
-    filename = path.name.replace(".ome.tiff", "").replace(suffix, "")
+    filename = path.name.replace(".ome.tiff", "").replace(path.suffix, "")
+    if suffix:
+        filename += suffix
     output_path = output_dir / filename
+
     # skip if the output file already exists
     if output_path.with_suffix(".ome.tiff").exists() and not overwrite:
         logger.info(f"Skipping {output_path} - already exists")

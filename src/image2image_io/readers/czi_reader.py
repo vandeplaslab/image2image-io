@@ -94,7 +94,7 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         self.n_scenes = CziSceneFile.get_num_scenes(self.path)
 
         *_, self.im_dims, self._im_dtype = self._get_image_info()
-        self.im_dims = self._image_shape = tuple(self.im_dims)
+        self.im_dims = self._image_shape = self._im_shape = tuple(self.im_dims)
         self._is_rgb = guess_rgb(self.im_dims)
         self.resolution = self._get_pixel_size()
         self._channel_names = self._get_channel_names()
@@ -115,6 +115,7 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
+        breakpoint()
         auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
         self._zstore = zarr.storage.TempStore()
         return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
@@ -137,7 +138,7 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         self.fh = CziSceneFile(self.path, scene_index=scene_index)
 
         *_, self.im_dims, self._im_dtype = self._get_image_info()
-        self.im_dims = tuple(self.im_dims)
+        self.im_dims = self._im_shape = self._image_shape = tuple(self.im_dims)
         self._is_rgb = self.fh.is_rgb
         self.resolution = self._get_pixel_size()
         self._channel_names = self._get_channel_names()
