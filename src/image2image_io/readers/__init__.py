@@ -255,14 +255,18 @@ def get_reader(
 
 
 def get_simple_reader(
-    path: PathLike, init_pyramid: bool = True, auto_pyramid: bool = True, quick: bool = False
+    path: PathLike,
+    init_pyramid: bool = True,
+    auto_pyramid: bool = True,
+    quick: bool = False,
+    scene_index: int | None = None,
 ) -> BaseReader:
     """Get simple reader."""
     init_pyramid_ = CONFIG.init_pyramid
     CONFIG.init_pyramid = init_pyramid
     auto_pyramid_ = CONFIG.auto_pyramid
     CONFIG.auto_pyramid = auto_pyramid
-    path, readers = get_reader(path, split_czi=False, quick=quick)
+    path, readers = get_reader(path, split_czi=False, quick=quick, scene_index=scene_index)
     CONFIG.init_pyramid = init_pyramid_
     CONFIG.auto_pyramid = auto_pyramid_
     return next(iter(readers.values()))

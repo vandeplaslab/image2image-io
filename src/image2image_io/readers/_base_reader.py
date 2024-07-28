@@ -379,12 +379,19 @@ class BaseReader:
         array_ = self.crop(left, right, top, bottom, array=array_, multiply=False)
         return array_, (left, right, top, bottom)
 
-    def warp(self, array: np.ndarray) -> np.ndarray:
-        """Warp array."""
+    def warp(self, array: np.ndarray, affine: np.ndarray | None = None) -> np.ndarray:
+        """Warp array.
+
+        Parameters
+        ----------
+        array : np.ndarray
+            Array to warp.
+        """
         from image2image_io.utils.mask import transform_mask
 
-        transform = self.transform_data.compute(yx=True, px=True).params
-        transformed_mask = transform_mask(array, transform, self.image_shape)
+        if affine is None:
+            affine = self.transform_data.compute(yx=True, px=True).params
+        transformed_mask = transform_mask(array, affine, self.image_shape)
         return transformed_mask
 
     def get_channel_axis_and_n_channels(self, shape: tuple | None = None) -> tuple[int | None, int]:

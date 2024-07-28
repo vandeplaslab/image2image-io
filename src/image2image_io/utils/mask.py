@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import cv2
 import numpy as np
+from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
 from rasterio.features import rasterize
 from scipy.ndimage import affine_transform
 from shapely import Polygon
 from skimage.transform import AffineTransform
+from tqdm import tqdm
 
-from image2image_io.enums import TIME_FORMAT
+from image2image_io.enums import TIME_FORMAT, MaskOutputFmt
 
 logger = logger.bind(src="Mask")
 
@@ -35,11 +38,13 @@ def mask_to_polygon(mask: np.ndarray, epsilon: float = 1) -> np.ndarray:
 
 
 def shapes_to_polygons(
-    shape_data: list[np.ndarray], with_index: bool = False, inv_pixel_size: float = 1.0
+    shapes: list[np.ndarray], with_index: bool = False, inv_pixel_size: float = 1.0, silent: bool = True
 ) -> list[Polygon] | list[tuple[Polygon, int]]:
     """Convert shapes to polygons."""
     polygons = []
-    for index, shape in enumerate(shape_data, start=1):
+    for index, shape in enumerate(
+        tqdm(shapes, desc="Drawing shapes", leave=False, miniters=1000, disable=silent), start=1
+    ):
         if isinstance(shape, dict):
             shape = shape["array"]
         yx = shape * inv_pixel_size
@@ -177,3 +182,82 @@ def remove_invalid(
             keep.append(index)
     logger.warning(f"Removed {len(shape_data) - len(valid_shapes)} invalid polygons.")
     return keep, valid_shapes
+
+
+def transform_masks(
+    transform_to: PathLike,
+    masks: list[PathLike],
+    output_dir: PathLike,
+    fmt: str | MaskOutputFmt | list[str] | list[MaskOutputFmt],
+    config_path: PathLike,
+    scene_index: int | None = None,
+    overwrite: bool = False,
+) -> None:
+    """Transform and export masks."""
+    from image2image_io.readers import ShapesReader, get_simple_reader
+    from image2image_io.utils.warp import get_affine_from_config
+
+    if isinstance(fmt, str):
+        fmt = [fmt]
+    if not fmt:
+        raise ValueError("No output format specified.")
+
+    affine, mask_shape, pixel_size = get_affine_from_config(config_path, yx=True, px=True, inv=False)
+    mask_inv_pixel_size = 1 / pixel_size
+    affine = np.asarray(affine, dtype=float)
+    if affine.shape != (3, 3):
+        raise ValueError("Expected 3x3 affine matrix.")
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # image that masks are transformed to
+    image_reader = get_simple_reader(transform_to, init_pyramid=False, auto_pyramid=False, scene_index=scene_index)
+    # mask_shape = image_reader.image_shape
+    # mask_inv_pixel_size = image_reader.inv_resolution
+    logger.trace(f"Initial mask shape {mask_shape} with {1/mask_inv_pixel_size:.4f} resolution.")
+
+    with_index = any(f in ["hdf5"] for f in fmt)
+    with_shapes = any(f in ["hdf5", "geojson"] for f in fmt)
+    for mask in tqdm(masks, desc="Exporting masks..."):
+        with MeasureTimer() as timer:
+            mask_reader = ShapesReader(mask)
+            display_name = mask_reader.display_name or mask_reader.path.stem
+            logger.trace(f"Reading mask {display_name} in {timer()}")
+
+            mask_indexed = None
+            mask = mask_reader.to_mask(mask_shape, inv_pixel_size=mask_inv_pixel_size, silent=False)
+            if with_index:
+                mask_indexed = mask_reader.to_mask(
+                    mask_shape, inv_pixel_size=mask_inv_pixel_size, with_index=True, silent=False
+                )
+            shapes = None
+            if with_shapes:
+                _, shapes = mask_reader.to_shapes()
+            # masks must be transformed to the image shape - sometimes that might involve warping if affine matrix
+            # is specified
+            transformed_mask = image_reader.warp(mask, affine=affine)
+            transformed_mask_indexed = None
+            if mask_indexed is not None:
+                transformed_mask_indexed = image_reader.warp(mask_indexed, affine=affine)
+            logger.trace(f"Transformed mask {display_name} in {timer(since_last=True)}")
+
+            for fmt_ in fmt:
+                extension = {"hdf5": "h5", "binary": "png", "geojson": "geojson"}[fmt_]
+                output_path = output_dir / f"{display_name}_ds={image_reader.path.stem}.{extension}"
+                if fmt_ == "hdf5":
+                    write_masks_as_hdf5(
+                        output_path,
+                        display_name,
+                        transformed_mask,
+                        shapes,
+                        display_name,
+                        metadata={"polygon_index": transformed_mask_indexed},
+                    )
+                elif fmt_ == "binary":
+                    write_masks_as_image(output_path, transformed_mask)
+                elif fmt_ == "geojson":
+                    write_masks_as_geojson(output_path, shapes, display_name)
+                else:
+                    raise ValueError(f"Unsupported format '{fmt_}'")
+                logger.info(f"Exported {output_path} in {timer(since_last=True)}")

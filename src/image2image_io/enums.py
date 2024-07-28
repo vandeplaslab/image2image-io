@@ -1,4 +1,5 @@
 """Enums."""
+import typing as ty
 from enum import Enum
 
 import numpy as np
@@ -6,6 +7,8 @@ import numpy as np
 DEFAULT_TRANSFORM_NAME: str = "Identity matrix"
 
 TIME_FORMAT = "%d/%m/%Y-%H:%M:%S:%f"
+
+MaskOutputFmt = ty.Literal["hdf5", "binary", "geojson"]
 
 
 class ViewType(str, Enum):

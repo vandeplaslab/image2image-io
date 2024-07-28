@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from koyo.typing import PathLike
+from tqdm import tqdm
 
 from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
@@ -128,7 +129,7 @@ class ShapesReader(BaseReader):
         self.geojson_data = [self.geojson_data[i] for i in keep]
 
     def to_mask(
-        self, output_shape: tuple[int, int], with_index: bool = False, inv_pixel_size: float = 1.0
+        self, output_shape: tuple[int, int], with_index: bool = False, inv_pixel_size: float = 1.0, silent: bool = True
     ) -> np.ndarray:
         """Convert to mask.
 
@@ -141,11 +142,15 @@ class ShapesReader(BaseReader):
         if self.resolution != 1.0 and inv_pixel_size != 1.0:
             inv_pixel_size = 1.0
 
-        polygons = shapes_to_polygons(self.shape_data, with_index=with_index, inv_pixel_size=inv_pixel_size)
+        polygons = shapes_to_polygons(
+            self.shape_data, with_index=with_index, inv_pixel_size=inv_pixel_size, silent=silent
+        )
         mask = polygons_to_mask(polygons, output_shape)
         return mask
 
-    def to_mask_alt(self, output_size: tuple[int, int], with_index: bool = False) -> np.ndarray:
+    def to_mask_alt(
+        self, output_size: tuple[int, int], with_index: bool = False, inv_pixel_size: float = 1.0, silent: bool = True
+    ) -> np.ndarray:
         """
         Draw a binary or label mask using shape data.
 
@@ -155,6 +160,10 @@ class ShapesReader(BaseReader):
             Size of the mask in tuple(x,y)
         with_index: bool
             Whether to write each mask instance as a label (1-n_shapes) or to write all as binary (255)
+        inv_pixel_size: float
+            Inverse pixel size for the mask
+        silent: bool
+            Whether to display progress bar
 
         Returns
         -------
@@ -169,10 +178,12 @@ class ShapesReader(BaseReader):
             dtype = get_int_dtype(len(self.shape_data))  # type: ignore[assignment]
         mask = np.zeros(output_size[::-1], dtype=dtype)
         shapes = self.shape_data
-        for idx, sh in enumerate(shapes):
+        for idx, sh in enumerate(tqdm(shapes, desc="Drawing shapes", leave=False, miniters=1000, disable=silent)):
+            shape = sh["array"]
+            yx = shape * inv_pixel_size
             mask = cv2.fillPoly(
                 mask,
-                pts=[sh["array"].astype(np.int32)],
+                pts=[yx.astype(np.int32)],
                 color=idx + 1 if with_index else np.iinfo(dtype).max,
             )
         return mask

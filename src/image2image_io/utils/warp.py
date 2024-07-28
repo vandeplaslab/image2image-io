@@ -10,7 +10,9 @@ from koyo.typing import PathLike
 from tqdm import trange
 
 
-def get_affine_from_config(path: PathLike) -> tuple[np.ndarray, tuple[int, int], float]:
+def get_affine_from_config(
+    path: PathLike, yx: bool = True, px: bool = True, inv: bool = False
+) -> tuple[np.ndarray, tuple[int, int], float]:
     """Get affine transformation matrix from config."""
     from koyo.json import read_json_data
     from koyo.toml import read_toml_data
@@ -24,8 +26,15 @@ def get_affine_from_config(path: PathLike) -> tuple[np.ndarray, tuple[int, int],
         config = read_toml_data(path)
     else:
         config = read_json_data(path)
+
+    # create matrix query
+    key = "matrix"
+    key += "_yx" if yx else "_xy"
+    key += "_px" if px else "_um"
+    key += "_inv" if inv else ""
+
     # get affine transformation
-    affine_inv = config["matrix_yx_px_inv"]
+    affine_inv = config[key]
     affine_inv = np.asarray(affine_inv)
     # get output image shape
     fixed_paths = config["fixed_paths"]
@@ -34,10 +43,12 @@ def get_affine_from_config(path: PathLike) -> tuple[np.ndarray, tuple[int, int],
     image_shapes = [tuple(t["image_shape"]) for t in fixed_paths]
     if len(set(image_shapes)) != 1:
         raise ValueError("Different image shapes found in config.")
-    pixel_size_um = [t["pixel_size_um"] for t in fixed_paths]
-    if len(set(pixel_size_um)) != 1:
+    image_shape: tuple[int, int] = tuple(image_shapes[0])
+    pixel_sizes_um = [float(t["pixel_size_um"]) for t in fixed_paths]
+    if len(set(pixel_sizes_um)) != 1:
         raise ValueError("Different pixel sizes found in config.")
-    return affine_inv, tuple(image_shapes[0]), pixel_size_um[0]
+    pixel_size_um: float = pixel_sizes_um[0]
+    return affine_inv, image_shape, pixel_size_um
 
 
 def warp_path(config_path: PathLike, from_transform: PathLike) -> np.ndarray:
@@ -48,7 +59,7 @@ def warp_path(config_path: PathLike, from_transform: PathLike) -> np.ndarray:
     from image2image_io.readers import get_simple_reader
 
     # load affine matrix
-    affine_inv, output_shape = get_affine_from_config(config_path)
+    affine_inv, output_shape, pixel_size = get_affine_from_config(config_path)
 
     if not Path(from_transform).exists():
         raise FileNotFoundError(f"File not found: {from_transform}")
@@ -98,7 +109,7 @@ class ImageWarper:
     def __init__(self, config_path: PathLike):
         """Initialize."""
         self.config_path = Path(config_path)
-        self.affine_inv, self.output_size_yx, pixel_size = get_affine_from_config(self.config_path)
+        self.affine_inv, self.output_size_yx, pixel_size = get_affine_from_config(self.config_path, yx=True)
         self.output_size = self.output_size_yx[::-1]  # x, y
         self.output_spacing = (pixel_size, pixel_size)
 
