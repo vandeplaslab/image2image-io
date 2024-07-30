@@ -13,7 +13,7 @@ if ty.TYPE_CHECKING:
     from skimage.transform import ProjectiveTransform
 
 
-def write_thumbnail(path: PathLike, output_dir: PathLike, with_title: bool) -> None:
+def write_thumbnail(path: PathLike, output_dir: PathLike, with_title: bool, first_only: bool = False) -> None:
     """Write thumbnail."""
     import matplotlib
 
@@ -33,6 +33,8 @@ def write_thumbnail(path: PathLike, output_dir: PathLike, with_title: bool) -> N
             filename = output_dir / f"{reader.name}_index={channel_id}_name={channel_name}_thumbnail.jpg"
             image = reader.get_channel(channel_id, -1)
             make_thumbnail(filename, image, f"{reader.name}\n{channel_id} / {channel_name}", with_title)
+            if first_only:
+                break
     del reader
 
 
