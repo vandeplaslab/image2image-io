@@ -156,6 +156,8 @@ class OmeTiffWriter:
         dtype: np.dtype[ty.Any] = np.uint8 if as_uint8 else self.reader.dtype  # type: ignore[assignment]
         if channel_names is None:
             channel_names = self.reader.channel_names
+        if channel_names and len(channel_names) > self.reader.n_channels:
+            channel_names = self.reader.channel_names
         if channel_ids is not None:
             if len(channel_ids) != len(channel_names):
                 channel_names = [channel_names[i] for i in channel_ids]
