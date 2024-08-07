@@ -115,7 +115,6 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
-        breakpoint()
         auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
         self._zstore = zarr.storage.TempStore()
         return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
