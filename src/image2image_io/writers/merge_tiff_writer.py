@@ -276,7 +276,7 @@ class MergeOmeTiffWriter:
         write_pyramid: bool = True,
         tile_size: int = 512,
         compression: str = "default",
-        as_uint8: bool = False,
+        as_uint8: bool | None = False,
         channel_ids: list[list[int | tuple[int, ...]] | None] | None = None,
     ) -> Path:
         """Write merged OME-TIFF image plane-by-plane to disk.

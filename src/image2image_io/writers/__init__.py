@@ -266,7 +266,7 @@ def czi_to_ome_tiff(
     output_dir: PathLike | None = None,
     as_uint8: bool = False,
     tile_size: int = 512,
-    metadata: dict[int, dict[str, list[int | str]]] | None = None,
+    metadata: MetadataScene | None = None,
     scenes: list[int] | None = None,
     overwrite: bool = False,
 ) -> ty.Generator[tuple[str, int, int, int], None, None]:
@@ -290,6 +290,9 @@ def czi_to_ome_tiff(
     assert min(scenes) >= 0, "Scene index must be greater than or equal to 0."
     assert max(scenes) <= n, "Scene index must be less than the total number of scenes in the file."
     yield key, 0, len(scenes), 0
+
+    if metadata is None:
+        metadata = {}
 
     # iterate over each scene in the czi file
     for scene_index in scenes:
