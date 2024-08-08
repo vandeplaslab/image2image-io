@@ -125,7 +125,7 @@ def read_data(
     transform_data: TransformData | None = None,
     resolution: float | None = None,
     split_czi: bool | None = None,
-    reader_kws: dict[str, ty.Any] = None,
+    reader_kws: dict[str, ty.Any] | None = None,
 ) -> tuple[ImageWrapper, list[str], dict[Path, Path]]:
     """Read image data."""
     path = Path(path)

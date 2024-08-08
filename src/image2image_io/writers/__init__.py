@@ -24,8 +24,8 @@ from image2image_io.writers.tiff_writer import OmeTiffWriter, Transformer
 if ty.TYPE_CHECKING:
     from image2image_io.readers._base_reader import BaseReader
 
-
-MetadataReader = dict[int, dict[str, ty.Union[str, list[ty.Union[int, str]]]]]
+MetadataScene = dict[str, ty.Union[str, list[ty.Union[int, str]]]]
+MetadataReader = dict[int, MetadataScene]
 MetadataDict = dict[Path, MetadataReader]
 
 __all__ = [
@@ -85,20 +85,36 @@ def merge_images(
 
     pixel_sizes = []
     channel_names = []
+    channel_ids = []
     reader_names = []
     for path_ in paths:
         reader = get_simple_reader(path_, init_pyramid=False, auto_pyramid=False)
         reader_metadata: MetadataReader = (
-            metadata.get(0, {"channel_names": reader.channel_names, "name": reader.clean_name})
+            metadata.get(
+                Path(path_),
+                {
+                    0: {
+                        "name": reader.clean_name,
+                        "channel_names": reader.channel_names,
+                        "channel_ids": reader.channel_ids,
+                    }
+                },
+            )
             if metadata
-            else {"channel_names": reader.channel_names, "name": reader.clean_name}
+            else {
+                0: {"name": reader.clean_name, "channel_names": reader.channel_names, "channel_ids": reader.channel_ids}
+            }
+        )
+        scene_metadata = reader_metadata.get(
+            0, {"name": reader.clean_name, "channel_names": reader.channel_names, "channel_ids": reader.channel_ids}
         )
 
         pixel_sizes.append(reader.resolution)
-        channel_names.append(reader_metadata.get("channel_names", reader.channel_names))
-        reader_names.append(reader_metadata.get("name", reader.clean_name))
+        channel_names.append(scene_metadata.get("channel_names", reader.channel_names))
+        channel_ids.append(scene_metadata.get("channel_ids", reader.channel_ids))
+        reader_names.append(scene_metadata.get("name", reader.clean_name))
 
-    merge_obj = MergeImages(paths, pixel_sizes, channel_names=channel_names)
+    merge_obj = MergeImages(paths, pixel_sizes, channel_names=channel_names, channel_ids=channel_ids)
     writer = MergeOmeTiffWriter(merge_obj)
     writer.merge_write_image_by_plane(
         name,
@@ -124,7 +140,7 @@ def images_to_ome_tiff(
     # get total number of scenes
     total_n_scenes, paths = get_total_n_scenes(paths)
     current_total_scene = 0
-    for current, path_ in enumerate(tqdm(paths, desc="Converting to OME-TIFF...", total=len(paths))):
+    for _current, path_ in enumerate(tqdm(paths, desc="Converting to OME-TIFF...", total=len(paths))):
         path_ = Path(path_)
         if path_.suffix == ".czi":
             reader_metadata = metadata.get(path_, None) if metadata else None

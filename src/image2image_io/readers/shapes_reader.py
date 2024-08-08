@@ -79,7 +79,7 @@ def read_shapes_from_df(df: pd.DataFrame) -> tuple:
 def napari_to_shapes_data(name: str, data: list[np.ndarray], shapes: list[str]) -> dict:
     """Convert napari shapes to data."""
     shape_data = []
-    for array, shape_type in zip(data, shapes):
+    for array, _shape_type in zip(data, shapes):
         shape_data.append(
             {
                 "array": array[:, [1, 0]],

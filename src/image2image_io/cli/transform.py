@@ -13,7 +13,7 @@ from image2image_io.enums import MaskOutputFmt
 
 @click.group()
 def transform():
-    """Transform command"""
+    """Transform command."""
 
 
 @click.option(

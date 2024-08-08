@@ -169,7 +169,7 @@ class MergeOmeTiffWriter:
     def _check_channel_ids(self, channel_ids: list[list[int] | None] | None) -> list[list[int]]:
         """Check channel ids."""
         if channel_ids is None or not channel_ids:
-            channel_ids = [list(range(0, reader.n_channels)) for reader in self.merge.readers]
+            channel_ids = [reader.channel_ids for reader in self.merge.readers]
         if len(channel_ids) != len(self.merge.readers):
             raise ValueError(
                 f"The number of channel_ids does not match number of images. Expected {len(self.merge.readers)} but"

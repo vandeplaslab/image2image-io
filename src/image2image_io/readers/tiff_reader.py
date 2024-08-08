@@ -9,7 +9,6 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
-import numpy as np
 from loguru import logger
 from ome_types import from_xml
 from tifffile import TiffFile
