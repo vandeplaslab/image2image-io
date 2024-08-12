@@ -29,6 +29,11 @@ class ImageWrapper:
     def __repr__(self) -> str:
         return f"ImageWrapper<{len(self.data)}>"
 
+    def __getitem__(self, item: int | PathLike) -> BaseReader:
+        if isinstance(item, int):
+            return list(self.data.values())[item]
+        return self.data[item]
+
     def add(self, reader: BaseReader) -> None:
         """Add data to wrapper."""
         self.data[reader.key] = reader

@@ -37,7 +37,7 @@ class BaseReader:
     _pyramid = None
     _is_rgb: bool | None = None
     _im_dtype: np.dtype | None = None
-    _im_shape: tuple[int, ...] | None = None
+    _im_dims: tuple[int, ...] | None = None
     _image_shape: tuple[int, int] | None = None
     _zstore: zarr.storage.TempStore | None = None
     auto_pyramid: bool | None = None
@@ -110,9 +110,9 @@ class BaseReader:
     @property
     def shape(self) -> tuple[int, ...]:
         """Return shape of the image, including channels, etc."""
-        if self._im_shape is None:
-            self._im_shape = self.pyramid[0].shape
-        return self._im_shape
+        if self._im_dims is None:
+            self._im_dims = self.pyramid[0].shape  # TODO: this is wrong!
+        return self._im_dims
 
     @property
     def image_shape(self) -> tuple[int, int]:
