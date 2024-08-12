@@ -119,7 +119,7 @@ class OmeTiffWriter:
         write_pyramid: bool = True,
         tile_size: int = 512,
         compression: str | None = "default",
-        as_uint8: bool = False,
+        as_uint8: bool | None = None,
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
     ) -> None:
@@ -153,6 +153,8 @@ class OmeTiffWriter:
         else:
             self.PhysicalSizeX = self.PhysicalSizeY = self.reader.resolution
 
+        if as_uint8 is None:
+            as_uint8 = self.reader.dtype == np.uint8
         dtype: np.dtype[ty.Any] = np.uint8 if as_uint8 else self.reader.dtype  # type: ignore[assignment]
         if channel_names is None:
             channel_names = self.reader.channel_names
@@ -193,7 +195,7 @@ class OmeTiffWriter:
         write_pyramid: bool = True,
         tile_size: int = 512,
         compression: str | None = "default",
-        as_uint8: bool = False,
+        as_uint8: bool | None = None,
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
         overwrite: bool = False,
@@ -273,7 +275,8 @@ class OmeTiffWriter:
             channel_ids=channel_ids,
             channel_names=channel_names,
         )
-
+        if as_uint8 is None:
+            as_uint8 = self.reader.dtype == np.uint8
         if as_uint8:
             logger.trace(f"Writing image data in 0-255 range as uint8. Data type: {self.reader.dtype}")
 
@@ -423,7 +426,7 @@ class OmeTiffWriter:
         name: str,
         output_dir: Path,
         tile_size: int = 512,
-        as_uint8: bool = False,
+        as_uint8: bool | None = None,
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
         overwrite: bool = False,
