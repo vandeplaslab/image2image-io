@@ -216,7 +216,10 @@ class MergeOmeTiffWriter:
         while self.y_size / self.tile_size <= 1 or self.x_size / self.tile_size <= 1:
             self.tile_size = self.tile_size // 2
 
-        self.pyr_levels, _ = get_pyramid_info(self.y_size, self.x_size, reader.n_channels, self.tile_size)
+        if self.tile_size:
+            self.pyr_levels, _ = get_pyramid_info(self.y_size, self.x_size, reader.n_channels, self.tile_size)
+        else:
+            self.pyr_levels = [(self.y_size, self.x_size)]
         self.n_pyr_levels = len(self.pyr_levels)
 
         if transformer:
@@ -347,7 +350,7 @@ class MergeOmeTiffWriter:
             "metadata": None,
         }
         logger.trace(f"TIFF options: {options}")
-        logger.trace(f"Writing to {output_file_name}")
+        logger.trace(f"Pyramid levels: {self.pyr_levels} ({self.n_pyr_levels})")
         ome_set = False
         description = None
         with TiffWriter(tmp_output_file_name, bigtiff=True) as tif, MeasureTimer() as main_timer:

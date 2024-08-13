@@ -145,7 +145,10 @@ class OmeTiffWriter:
                 self.tile_size = 0
         write_pyramid = self.tile_size > 0
 
-        self.pyr_levels, _ = get_pyramid_info(self.y_size, self.x_size, self.reader.n_channels, self.tile_size)
+        if self.tile_size:
+            self.pyr_levels, _ = get_pyramid_info(self.y_size, self.x_size, self.reader.n_channels, self.tile_size)
+        else:
+            self.pyr_levels = [(self.y_size, self.x_size)]
         self.n_pyr_levels = len(self.pyr_levels)
 
         if self.transformer:
@@ -299,6 +302,7 @@ class OmeTiffWriter:
             options.pop("tile")
 
         logger.trace(f"TIFF options: {options}")
+        logger.trace(f"Pyramid levels: {self.pyr_levels} ({self.n_pyr_levels})")
         # write OME-XML to the ImageDescription tag of the first page
         description = self.omexml
 
