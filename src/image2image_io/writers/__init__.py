@@ -330,7 +330,7 @@ def write_ome_tiff_from_array(
     channel_names: list[str] | None = None,
     compression: str | None = "default",
     tile_size: int = 512,
-    as_uint8: bool = False,
+    as_uint8: bool | None = None,
 ) -> Path:
     """Write OME-TIFF by also specifying an array."""
     from image2image_io.readers.array_reader import ArrayImageReader
@@ -358,7 +358,7 @@ def write_ome_tiff_from_array(
 def write_ome_tiff_alt(
     path: PathLike,
     reader: BaseReader,
-    as_uint8: bool = False,
+    as_uint8: bool | None = None,
     tile_size: int = 512,
     channel_ids: list[int] | None = None,
     channel_names: list[str] | None = None,
