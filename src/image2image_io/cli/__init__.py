@@ -50,7 +50,7 @@ COLOR_LOG_FMT = (
     " information.",
 )
 @click.option("--quiet", "-q", "verbosity", flag_value=0, help="Minimal output")
-@click.option("--debug", "verbosity", flag_value=5, help="Maximum output")
+@click.option("--debug", "verbosity", flag_value=0.5, help="Maximum output")
 def cli(verbosity: int, no_color: bool, dev: bool) -> None:
     """image2image-io CLI."""
     from koyo.hooks import install_debugger_hook, uninstall_debugger_hook
