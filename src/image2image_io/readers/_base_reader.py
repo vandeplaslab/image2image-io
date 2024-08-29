@@ -16,6 +16,9 @@ from image2image_io.enums import DEFAULT_TRANSFORM_NAME
 from image2image_io.models.transform import TransformData
 from image2image_io.readers.utilities import guess_rgb
 
+if ty.TYPE_CHECKING:
+    from image2image_io.writers.tiff_writer import Transformer
+
 logger = logger.bind(src="Reader")
 
 
@@ -488,6 +491,7 @@ class BaseReader:
         tile_size: int = 512,
         channel_ids: list[int] | None = None,
         channel_names: list[str] | None = None,
+        transformer: Transformer | None = None,
         overwrite: bool = False,
     ) -> Path:
         """Write image as OME-TIFF."""
@@ -501,4 +505,5 @@ class BaseReader:
             channel_ids=channel_ids,
             tile_size=tile_size,
             overwrite=overwrite,
+            transformer=transformer,
         )

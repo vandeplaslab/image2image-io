@@ -11,21 +11,22 @@ from tqdm import trange
 
 
 def get_affine_from_config(
-    path: PathLike, yx: bool = True, px: bool = True, inv: bool = False
+    config_or_path: PathLike | dict, yx: bool = True, px: bool = True, inv: bool = False
 ) -> tuple[np.ndarray, tuple[int, int], float]:
     """Get affine transformation matrix from config."""
     from koyo.json import read_json_data
     from koyo.toml import read_toml_data
 
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"Config file not found: {path}")
-
-    # Read config
-    if path.suffix == ".toml":
-        config = read_toml_data(path)
+    if not isinstance(config_or_path, dict):
+        config_or_path = Path(config_or_path)
+        if not config_or_path.exists():
+            raise FileNotFoundError(f"Config file not found: {config_or_path}")
+        if config_or_path.suffix == ".toml":
+            config = read_toml_data(config_or_path)
+        else:
+            config = read_json_data(config_or_path)
     else:
-        config = read_json_data(path)
+        config = config_or_path
 
     # create matrix query
     key = "matrix"
@@ -106,10 +107,10 @@ def warp(affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarra
 class ImageWarper:
     """Image warper class."""
 
-    def __init__(self, config_path: PathLike):
+    def __init__(self, config_or_path: PathLike | dict, yx: bool = True, inv: bool = False):
         """Initialize."""
-        self.config_path = Path(config_path)
-        self.affine_inv, self.output_size_yx, pixel_size = get_affine_from_config(self.config_path, yx=True)
+        self.config_or_path = Path(config_or_path) if not isinstance(config_or_path, dict) else config_or_path
+        self.affine_inv, self.output_size_yx, pixel_size = get_affine_from_config(self.config_or_path, yx=yx, inv=inv)
         self.output_size = self.output_size_yx[::-1]  # x, y
         self.output_spacing = (pixel_size, pixel_size)
 

@@ -40,12 +40,11 @@ from loguru import logger
 @click.option(
     "-t",
     "--tile_size",
-    "tile_size",
-    type=click.INT,
-    help="Specify tile size of the pyramid.",
-    default=512,
+    help="Tile size.",
+    type=click.Choice(["256", "512", "1024", "2048"], case_sensitive=False),
+    default="512",
     show_default=True,
-    required=True,
+    required=False,
 )
 @click.option(
     "-s",
@@ -80,7 +79,7 @@ def czi2tiff(
     input_: str,
     output_dir: str,
     scene_index: int,
-    tile_size: int,
+    tile_size: str,
     as_uint8: bool,
     channel_ids: list[int] | None,
     channel_names: list[str | None],
@@ -95,6 +94,6 @@ def czi2tiff(
         metadata = {scene_index: {"channel_ids": channel_ids, "channel_names": channel_names}}
 
     for key, scene_index, total, _ in czi_to_ome_tiff(
-        input_, output_dir, as_uint8=as_uint8, tile_size=tile_size, metadata=metadata, scenes=[scene_index]
+        input_, output_dir, as_uint8=as_uint8, tile_size=int(tile_size), metadata=metadata, scenes=[scene_index]
     ):
         logger.info(f"Converted {key} scene {scene_index}/{total}")

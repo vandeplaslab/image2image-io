@@ -99,6 +99,23 @@ def mask(
     show_default=True,
 )
 @click.option(
+    "--inverse",
+    is_flag=True,
+    help="Transform the image using the inverse transformation matrix (from moving to fixed).",
+    show_default=True,
+    required=False,
+    default=False,
+)
+@click.option(
+    "-s",
+    "--suffix",
+    type=click.STRING,
+    help="Specify the suffix that goes at the end of the filename.",
+    default="_transformed",
+    show_default=True,
+    required=True,
+)
+@click.option(
     "-N",
     "--channel_names",
     type=click.STRING,
@@ -131,12 +148,11 @@ def mask(
 @click.option(
     "-t",
     "--tile_size",
-    "tile_size",
-    type=click.INT,
-    help="Specify tile size of the pyramid.",
-    default=512,
+    help="Tile size.",
+    type=click.Choice(["256", "512", "1024", "2048"], case_sensitive=False),
+    default="512",
     show_default=True,
-    required=True,
+    required=False,
 )
 @click.option(
     "-o",
@@ -159,6 +175,7 @@ def mask(
 @click.option(
     "-i",
     "--image",
+    "image_",
     help="Path to the OME-TIFF file that should be converted.",
     type=click.Path(exists=False, resolve_path=False, file_okay=True, dir_okay=False),
     show_default=True,
@@ -173,7 +190,9 @@ def image(
     as_uint8: bool,
     channel_ids: list[int] | None,
     channel_names: list[str | None],
-    overwrite: bool,
+    suffix: str = "_transformed",
+    inverse: bool = True,
+    overwrite: bool = False,
 ) -> None:
     """Transform OME-TIFF using image2image transformation matrix (i2r.json) or elastix (i2reg) transformation."""
     from image2image_io.writers import image_to_ome_tiff
@@ -187,7 +206,7 @@ def image(
     if any(ext in transform_ for ext in (".i2r.json", ".i2r.toml")):
         from image2image_io.utils.warp import ImageWarper
 
-        transform_seq = ImageWarper(transform_)
+        transform_seq = ImageWarper(transform_, inv=inverse)
     else:
         try:
             from image2image_reg.models.transform_sequence import TransformSequence
@@ -200,10 +219,10 @@ def image(
         image_,
         output_dir,
         as_uint8=as_uint8,
-        tile_size=tile_size,
+        tile_size=int(tile_size),
         metadata=metadata,
         transformer=transform_seq,
         overwrite=overwrite,
-        suffix="_transformed",
+        suffix=suffix,
     ):
         logger.info(f"Transformed {key} {scene_index}/{total}")
