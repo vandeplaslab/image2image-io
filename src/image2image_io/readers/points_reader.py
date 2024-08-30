@@ -42,6 +42,14 @@ def read_points_from_df(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, pd.Da
     return x, y, df.drop(columns=[x_key, y_key])
 
 
+def get_channel_names_from_df(df: pd.DataFrame) -> tuple[str, list[str]]:
+    """Return list of column names. This is very specific and might break under certain circumstances."""
+    filter_col = get_column_name(df, ["feature_name", "name"])
+    if not filter_col:
+        return "", list(df.columns)
+    return filter_col, list(df[filter_col].unique())
+
+
 class PointsReader(BaseReader):
     """GeoJSON reader for image2image."""
 
@@ -56,7 +64,8 @@ class PointsReader(BaseReader):
     ):
         super().__init__(path, key=key, auto_pyramid=auto_pyramid)
 
-        self.x, self.y, self.df = read_points(self.path)
+        self.x, self.y, self.df = read_points(self.path)  # type: ignore[var-annotated]
+        # self.filter_column, self._channel_names = get_channel_names_from_df(self.df)
         self._channel_names = list(self.df.columns)
 
     def to_points(self) -> tuple[str, dict[str, np.ndarray | str]]:
@@ -68,7 +77,7 @@ class PointsReader(BaseReader):
         """Parse data."""
         return self.x, self.y, self.df
 
-    def to_points_kwargs(self, channel_name: str, **kwargs: ty.Any) -> dict:
+    def to_points_kwargs(self, face_color: str, **kwargs: ty.Any) -> dict:
         """Return data so it's compatible with Shapes layer."""
         x, y, df = self.parse_data()
         n = len(x)
@@ -78,7 +87,7 @@ class PointsReader(BaseReader):
             "scale": self.scale,
             "affine": self.transform,
             "features": df,
-            "face_color": channel_name,
+            "face_color": face_color,
             "size": 5 if n < 50_000 else 1,
         }
         kws.update(kwargs)

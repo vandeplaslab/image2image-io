@@ -216,7 +216,7 @@ class ShapesReader(BaseReader):
         }
         return n_shapes, shape_types, shape_names, shape_arrays, shape_props, shape_text
 
-    def to_shapes_kwargs(self, **kwargs: ty.Any) -> dict:
+    def to_shapes_kwargs(self, edge_color: str = "cyan", **kwargs: ty.Any) -> dict:
         """Return data so it's compatible with Shapes layer."""
         n_shapes, _, _, shape_arrays, shape_props, shape_text = self.parse_data()
         if CONFIG.shape_display == "polygon or path":
@@ -232,7 +232,7 @@ class ShapesReader(BaseReader):
             "scale": self.scale,
             "affine": self.transform,
             "edge_width": 10,
-            "edge_color": "cyan",
+            "edge_color": edge_color,
         }
         kws.update(kwargs)
         return kws
