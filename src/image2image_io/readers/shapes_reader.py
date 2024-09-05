@@ -7,7 +7,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from koyo.rand import temporary_seed
 from koyo.typing import PathLike
+from loguru import logger
 from tqdm import tqdm
 
 from image2image_io.config import CONFIG
@@ -188,24 +190,23 @@ class ShapesReader(BaseReader):
             )
         return mask
 
-    def to_shapes(self) -> tuple[str, dict[str, np.ndarray | str]]:
-        """Convert to shapes that can be exported to Shapes layer."""
-        _, shape_types, shape_names, shape_arrays, *_ = self.parse_data()
-        if len(shape_types) > 1_000:
-            shape_types = ["path"] * len(shape_types)
-        else:
-            shape_types = [s.lower() for s in shape_types]  # expected polygon not Polygon
-        return shape_names[0], {"shape_types": shape_types, "shape_data": shape_arrays}
-
     def parse_data(self) -> tuple:
         """Parse data."""
         shape_data = self.shape_data
-        shapes_geojson, shapes = shape_reader(shape_data)
+        shapes_geojson, _ = shape_reader(shape_data)
+        n_shapes = len(shapes_geojson)
+        if n_shapes > 10_000 and CONFIG.subsample and CONFIG.subsample_ratio < 1.0:
+            n_subsample = int(CONFIG.subsample_ratio * n_shapes)
+            logger.trace(f"Subsampling to {n_subsample:,} shapes.")
+            with temporary_seed(CONFIG.subsample_random_seed, skip_if_negative_one=True):
+                indices = np.random.choice(n_shapes, n_subsample, replace=False)
+            shapes_geojson = [shapes_geojson[i] for i in indices]
+            shape_data = [shape_data[i] for i in indices]
 
         n_shapes = len(shapes_geojson)
         shape_types = [sh["geometry"]["type"] for sh in shapes_geojson]
         shape_names = [sh["properties"]["classification"]["name"] for sh in shapes_geojson]
-        shape_arrays = [s["array"][:, [1, 0]] for s in self.shape_data]  # expect y, x
+        shape_arrays = [s["array"][:, [1, 0]] for s in shape_data]  # expect y, x
         shape_props = {"name": shape_names}
         shape_text = {
             "text": "{name}",
@@ -215,6 +216,15 @@ class ShapesReader(BaseReader):
             "visible": False,
         }
         return n_shapes, shape_types, shape_names, shape_arrays, shape_props, shape_text
+
+    def to_shapes(self) -> tuple[str, dict[str, np.ndarray | str]]:
+        """Convert to shapes that can be exported to Shapes layer."""
+        _, shape_types, shape_names, shape_arrays, *_ = self.parse_data()
+        if len(shape_types) > 1_000:
+            shape_types = ["path"] * len(shape_types)
+        else:
+            shape_types = [s.lower() for s in shape_types]  # expected polygon not Polygon
+        return shape_names[0], {"shape_types": shape_types, "shape_data": shape_arrays}
 
     def to_shapes_kwargs(self, edge_color: str = "cyan", **kwargs: ty.Any) -> dict:
         """Return data so it's compatible with Shapes layer."""

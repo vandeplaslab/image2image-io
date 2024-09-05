@@ -46,6 +46,11 @@ class Config(BaseConfig):
     shape_display: ty.Literal["polygon", "path", "polygon or path"] = Field(
         "path", title="Shape display", description="Shape display type.", in_app=False
     )
+    subsample: bool = Field(True, title="Subsample", description="Subsample shapes for display.", in_app=False)
+    subsample_ratio: float = Field(0.01, title="Subsample ratio", description="Shapes subsample ratio.", in_app=False)
+    subsample_random_seed: float = Field(
+        -1, title="Subsample random seed", description="Shapes subsample ratio.", in_app=False, save=False
+    )
 
     # extra options
     multicore: bool = Field(True, title="Multicore", description="Use multicore processing.", in_app=False)

@@ -7,8 +7,11 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from koyo.rand import temporary_seed
 from koyo.typing import PathLike
+from loguru import logger
 
+from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.utilities import get_column_name
 
@@ -75,7 +78,17 @@ class PointsReader(BaseReader):
 
     def parse_data(self) -> tuple:
         """Parse data."""
-        return self.x, self.y, self.df
+        x, y, df = self.x, self.y, self.df
+        n_points = len(x)
+        if n_points > 1_000_000 and CONFIG.subsample and CONFIG.subsample_ratio < 1.0:
+            n_subsample = int(CONFIG.subsample_ratio * n_points)
+            logger.trace(f"Subsampling to {n_subsample:,} points.")
+            with temporary_seed(CONFIG.subsample_random_seed, skip_if_negative_one=True):
+                indices = np.random.choice(n_points, n_subsample, replace=False)
+            x = x[indices]
+            y = y[indices]
+            df = df.iloc[indices]
+        return x, y, df
 
     def to_points_kwargs(self, face_color: str, **kwargs: ty.Any) -> dict:
         """Return data so it's compatible with Shapes layer."""
