@@ -428,11 +428,18 @@ def prepare_ome_xml_str(
     return omexml.tostring().encode("utf8")
 
 
-def check_df_columns(df: pd.DataFrame, required: list[str], either: list[tuple[str, ...]] | None = None) -> bool:
+def check_df_columns(
+    df: pd.DataFrame,
+    required: list[str],
+    either: list[tuple[str, ...]] | None = None,
+    either_dtype: tuple[np.dtype, ...] | None = None,
+) -> bool:
     """Check if a DataFrame has the required columns."""
     if not all(col in df.columns for col in required):
         return False
     if either is not None:
+        if either_dtype is not None:
+            return all(any((col in df.columns) and (df[col].dtype in either_dtype) for col in cols) for cols in either)
         return all(any(col in df.columns for col in cols) for cols in either)
     return True
 

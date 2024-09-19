@@ -242,7 +242,9 @@ def get_reader(
         if (
             suffix in GEOJSON_EXTENSIONS
             or is_txt_and_has_columns(path, ["vertex_x", "vertex_y"], [("cell", "cell_id", "shape", "shape_name")])
-            or is_txt_and_has_columns(path, ["x", "y"], [("cell", "cell_id", "shape", "shape_name")])
+            or is_txt_and_has_columns(
+                path, ["x", "y"], [("cell", "cell_id", "shape", "shape_name")], (np.dtype("O"), np.dtype("S"))
+            )
         ):
             logger.trace(f"Reading shape file: {path}")
             path, readers = _read_shapes(path)

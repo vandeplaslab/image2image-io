@@ -21,7 +21,9 @@ if ty.TYPE_CHECKING:
     from shapely.geometry import Polygon
 
 
-def is_txt_and_has_columns(path: PathLike, required: list[str], either: list[tuple[str, ...]]) -> bool:
+def is_txt_and_has_columns(
+    path: PathLike, required: list[str], either: list[tuple[str, ...]], either_dtype: tuple[np.dtype, ...] | None = None
+) -> bool:
     """Check if a text file has the required columns."""
     import pandas as pd
 
@@ -36,7 +38,7 @@ def is_txt_and_has_columns(path: PathLike, required: list[str], either: list[tup
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
-    return check_df_columns(df, required, either)
+    return check_df_columns(df, required, either, either_dtype)
 
 
 def read_shapes(path: PathLike) -> tuple:
