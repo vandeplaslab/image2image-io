@@ -1,4 +1,5 @@
 """Coordinate wrapper."""
+
 from __future__ import annotations
 
 import typing as ty
@@ -84,6 +85,10 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):
         set_dimensions(self)
 
     @property
+    def _channel_names(self) -> list[str]:
+        return list(self.data.keys())
+
+    @property
     def channel_names(self) -> list[str]:
         """List of channel names."""
         return list(self.data.keys())
@@ -130,7 +135,7 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):
             return self.data[key]
         return np.dstack([self.data[key] for key in self.data])
 
-    def get_channel(self, index: int, pyramid: int = 0) -> np.ndarray:
+    def get_channel(self, index: int, pyramid: int = 0, split_rgb: bool | None = None) -> np.ndarray:
         """Return channel."""
         image = self.get_channel_pyramid(index)[pyramid]
         return image

@@ -1,4 +1,5 @@
 """Numpy array wrapper."""
+
 from __future__ import annotations
 
 import numpy as np

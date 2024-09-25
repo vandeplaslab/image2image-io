@@ -1,4 +1,5 @@
 """Utilities."""
+
 from __future__ import annotations
 
 import typing as ty
@@ -122,6 +123,29 @@ def format_mz(mz: float) -> str:
     return f"m/z {mz:.3f}"
 
 
+def guess_rgb(shape: tuple[int, ...]) -> bool:
+    """Guess if the passed shape comes from rgb data.
+
+    If last dim is 3 or 4 assume the data is rgb, including rgba.
+
+    Parameters
+    ----------
+    shape : list of int
+        Shape of the data that should be checked.
+
+    Returns
+    -------
+    bool
+        If data is rgb or not.
+    """
+    ndim = len(shape)
+    last_dim = shape[-1]
+    rgb = False
+    if ndim > 2 and last_dim < 5:
+        rgb = True
+    return rgb
+
+
 def get_shape_of_image(array_or_shape: np.ndarray | tuple[int, ...]) -> tuple[int, int | None, tuple[int, int]]:
     """Return shape of an image."""
     if isinstance(array_or_shape, tuple):
@@ -132,7 +156,10 @@ def get_shape_of_image(array_or_shape: np.ndarray | tuple[int, ...]) -> tuple[in
         shape = array_or_shape.shape
 
     shape = list(shape)  # type: ignore[assignment]
-    if ndim == 3:
+    if ndim == 2:
+        n_channels = 1
+        channel_axis = None
+    elif ndim == 3:
         if shape[2] in [3, 4]:  # rgb or rgba
             channel_axis = 2
             n_channels = shape[2]

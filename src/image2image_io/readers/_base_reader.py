@@ -14,7 +14,7 @@ from loguru import logger
 from image2image_io.config import CONFIG
 from image2image_io.enums import DEFAULT_TRANSFORM_NAME
 from image2image_io.models.transform import TransformData
-from image2image_io.readers.utilities import guess_rgb
+from image2image_io.utils.utilities import guess_rgb
 
 if ty.TYPE_CHECKING:
     from image2image_io.writers.tiff_writer import Transformer

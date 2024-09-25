@@ -14,6 +14,8 @@ from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import TiffFile, imread, xml2dict
 
+from image2image_io.utils.utilities import guess_rgb
+
 logger = logger.bind(src="Tiff")
 
 
@@ -115,29 +117,6 @@ def centered_transform(
     rot_mat[:2, 2] = translation[:2]
 
     return rot_mat
-
-
-def guess_rgb(shape: tuple[int, ...]) -> bool:
-    """Guess if the passed shape comes from rgb data.
-
-    If last dim is 3 or 4 assume the data is rgb, including rgba.
-
-    Parameters
-    ----------
-    shape : list of int
-        Shape of the data that should be checked.
-
-    Returns
-    -------
-    bool
-        If data is rgb or not.
-    """
-    ndim = len(shape)
-    last_dim = shape[-1]
-    rgb = False
-    if ndim > 2 and last_dim < 5:
-        rgb = True
-    return rgb
 
 
 def tf_get_largest_series(image_filepath):

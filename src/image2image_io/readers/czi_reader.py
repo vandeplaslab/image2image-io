@@ -12,7 +12,7 @@ from loguru import logger
 from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers._czi import CziFile, CziSceneFile
-from image2image_io.readers.utilities import guess_rgb
+from image2image_io.utils.utilities import guess_rgb
 
 logger = logger.bind(src="CZI")
 
