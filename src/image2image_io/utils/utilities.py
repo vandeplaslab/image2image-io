@@ -14,6 +14,18 @@ if ty.TYPE_CHECKING:
     from skimage.transform import ProjectiveTransform
 
 
+def resize(array: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    """Resize image which could be grayscale, RGB or multi-channel."""
+    import cv2
+
+    _, channel_axis, _ = get_shape_of_image(array)
+    if channel_axis is None:
+        array = cv2.resize(array, shape[::-1], interpolation=cv2.INTER_LINEAR)
+    else:
+        array = cv2.resize(array, shape[::-1], interpolation=cv2.INTER_LINEAR)
+    return array
+
+
 def write_thumbnail(path: PathLike, output_dir: PathLike, with_title: bool, first_only: bool = False) -> None:
     """Write thumbnail."""
     import matplotlib
