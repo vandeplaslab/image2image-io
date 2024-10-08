@@ -6,6 +6,7 @@ import typing as ty
 from pathlib import Path
 
 import numpy as np
+from koyo.secret import hash_obj
 from koyo.system import IS_MAC
 from koyo.typing import PathLike
 from loguru import logger
@@ -166,11 +167,12 @@ def read_data(
 def get_key(path: Path, scene_index: int | None = None) -> str:
     """Return representative key."""
     name = path.name
+    hash_of_path = hash_obj(path, n_in_hash=3)
     if name in ["dataset.metadata.h5", "analysis.tsf", "analysis.tdf"]:
         name = path.parent.name
     if scene_index is not None:
         name = f"Scene={scene_index}; {name}"
-    return name
+    return f"{name}-{hash_of_path}"
 
 
 def is_supported(path: PathLike, raise_on_error: bool = True) -> bool:
