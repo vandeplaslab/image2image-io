@@ -43,7 +43,7 @@ class Config(BaseConfig):
     show_transformed: bool = Field(
         True, title="Show transformed", description="If checked, transformed moving image will be shown.", in_app=False
     )
-    shape_display: ty.Literal["polygon", "path", "polygon or path"] = Field(
+    shape_display: ty.Literal["polygon", "path", "polygon or path", "points"] = Field(
         "path", title="Shape display", description="Shape display type.", in_app=False
     )
     subsample: bool = Field(True, title="Subsample", description="Subsample shapes for display.", in_app=False)

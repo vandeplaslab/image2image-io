@@ -249,6 +249,23 @@ class ShapesReader(BaseReader):
         kws.update(kwargs)
         return kws
 
+    def to_points_kwargs(self, face_color: str, **kwargs: ty.Any) -> dict:
+        """Return data so it's compatible with Shapes layer."""
+        df = _convert_geojson_to_df(self.shape_data)
+        x = df["x"].values
+        y = df["y"].values
+        n = len(x)
+
+        kws = {
+            "data": np.c_[y, x],
+            "scale": self.scale,
+            "affine": self.transform,
+            "face_color": face_color,
+            "size": 5 if n < 50_000 else 1,
+        }
+        kws.update(kwargs)
+        return kws
+
     def get_dask_pyr(self) -> list[ty.Any]:
         """Get dask representation of the pyramid."""
         raise NotImplementedError("Must implement method")
@@ -281,3 +298,15 @@ class ShapesReader(BaseReader):
     def shape(self) -> tuple[int, ...]:
         """Return shape of data."""
         return (len(self.shape_data),)
+
+
+def _convert_geojson_to_df(shape_data: list[dict]) -> pd.DataFrame:
+    """Convert GeoJSON data so that it can be transformed back to GeoJSON."""
+    # types: pt = Point; pg = Polygon; mp = MultiPolygon
+    data = []  # columns: x, y, unique_index, inner, outer, type
+    n = 1
+    for feature in shape_data:
+        data.append(feature["array"])
+    data = np.concatenate(data)
+    df = pd.DataFrame(data, columns=["x", "y"])
+    return df
