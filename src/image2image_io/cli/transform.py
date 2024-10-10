@@ -5,7 +5,7 @@ from __future__ import annotations
 import typing as ty
 
 import click
-from koyo.click import arg_split_int, arg_split_str, cli_parse_paths_sort
+from koyo.click import Parameter, arg_split_int, arg_split_str, cli_parse_paths_sort, print_parameters, warning_msg
 from loguru import logger
 
 from image2image_io.enums import MaskOutputFmt
@@ -180,10 +180,12 @@ def mask(
     type=click.Path(exists=False, resolve_path=False, file_okay=True, dir_okay=False),
     show_default=True,
     required=True,
+    multiple=True,
+    callback=cli_parse_paths_sort,
 )
 @transform.command(name="image")
 def image(
-    image_: str,
+    image_: list[str],
     output_dir: str,
     transform_: str,
     tile_size: int,
@@ -202,6 +204,10 @@ def image(
         if len(channel_ids) != len(channel_names):
             raise ValueError("Number of channel IDs and channel names must be equal.")
         metadata = {0: {"channel_ids": channel_ids, "channel_names": channel_names}}
+    if len(image_) > 1 and metadata:
+        warning_msg(
+            "Multiple image files were specified wih a single set of metadata - it will be repeated for each image."
+        )
 
     if any(ext in transform_ for ext in (".i2r.json", ".i2r.toml")):
         from image2image_io.utils.warp import ImageWarper
@@ -215,14 +221,23 @@ def image(
         except ImportError:
             raise ImportError("Please install image2image-reg to use i2reg transformations.")
 
-    for key, scene_index, total, _ in image_to_ome_tiff(
-        image_,
-        output_dir,
-        as_uint8=as_uint8,
-        tile_size=int(tile_size),
-        metadata=metadata,
-        transformer=transform_seq,
-        overwrite=overwrite,
-        suffix=suffix,
-    ):
-        logger.info(f"Transformed {key} {scene_index}/{total}")
+    print_parameters(
+        Parameter("Name", "-i/--image", image_),
+        Parameter("Output directory", "-o/--output_dir", output_dir),
+        Parameter("Channel ids", "-C/--channel_ids", channel_ids),
+        Parameter("Write images as uint8", "--as_uint8/--no_as_uint8", as_uint8),
+        Parameter("Overwrite", "-W/--overwrite", overwrite),
+    )
+
+    for image_path in image_:
+        for key, scene_index, total, _ in image_to_ome_tiff(
+            image_path,
+            output_dir,
+            as_uint8=as_uint8,
+            tile_size=int(tile_size),
+            metadata=metadata,
+            transformer=transform_seq,
+            overwrite=overwrite,
+            suffix=suffix,
+        ):
+            logger.info(f"Transformed {key} {scene_index}/{total}")
