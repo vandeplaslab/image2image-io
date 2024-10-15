@@ -308,13 +308,15 @@ def czi_to_ome_tiff(
         # read the scene
         reader = CziSceneImageReader(path, scene_index=scene_index, auto_pyramid=False, init_pyramid=False)
         scene_metadata: dict[str, list[int | str]] = (
-            metadata.get(scene_index, None)
+            metadata.get(scene_index, {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names})
             if metadata
             else {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
         )
         if scene_metadata:
             assert "channel_ids" in scene_metadata, "Channel IDs must be specified in metadata."
             assert "channel_names" in scene_metadata, "Channel names must be specified in metadata."
+
+        # skip if there are no channel IDs
         if not scene_metadata["channel_ids"]:
             yield key, scene_index + 1, n, 1
         else:
