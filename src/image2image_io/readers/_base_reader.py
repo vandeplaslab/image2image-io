@@ -135,7 +135,8 @@ class BaseReader:
     def channel_ids(self) -> list[int]:
         """Return channel indices."""
         if self._channel_ids is None:
-            self._channel_ids = list(range(len(self._channel_names)))
+            channel_names = self._channel_names or self.channel_names
+            self._channel_ids = list(range(len(channel_names)))
         return self._channel_ids
 
     @channel_ids.setter
