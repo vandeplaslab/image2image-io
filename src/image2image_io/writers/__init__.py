@@ -186,6 +186,7 @@ def image_to_ome_tiff(
     suffix: str = "",
     metadata: dict[int, dict[str, list[int | str]]] | None = None,
     transformer: Transformer | None = None,
+    resolution: float | None = None,
     overwrite: bool = False,
 ) -> ty.Generator[tuple[str, int, int, int], None, None]:
     """Convert image of any type to OME-TIFF."""
@@ -212,6 +213,8 @@ def image_to_ome_tiff(
 
     # read the scene
     reader = get_simple_reader(path, auto_pyramid=False, init_pyramid=False)
+    if resolution:
+        reader.resolution = resolution
     scene_metadata: dict[str, list[int | str]] = (
         metadata.get(0, None)
         if metadata

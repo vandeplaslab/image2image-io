@@ -261,3 +261,24 @@ def transform_masks(
                 else:
                     raise ValueError(f"Unsupported format '{fmt_}'")
                 logger.info(f"Exported {output_path} in {timer(since_last=True)}")
+
+
+def transform_shapes_or_points(
+        files: list[PathLike],
+        output_dir: PathLike,
+        config_path: PathLike,
+        overwrite: bool = False,
+                     ):
+    """Transform and export shapes or points."""
+    from image2image_io.readers import get_simple_reader
+    from image2image_io.utils.warp import ImageWarper
+
+    transform_seq = ImageWarper(config_path, inv=False)
+    for file in tqdm(files, desc="Exporting masks..."):
+        with MeasureTimer() as timer:
+            reader = get_simple_reader(file)
+            display_name = reader.display_name
+            logger.trace(f"Reading shape/point {display_name} in {timer()}")
+            if reader.reader_type == "points":
+                x, y = reader.x, reader.y
+                transform_seq.transform_points(x, y)
