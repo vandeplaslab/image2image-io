@@ -89,6 +89,7 @@ def mask(
 
     transform_masks(image_, mask_, output_dir, fmt, transform_, scene_index=scene_index, overwrite=overwrite)
 
+
 @click.option(
     "-W",
     "--overwrite",
@@ -149,7 +150,14 @@ def attachment(
     default=None,
     show_default=True,
 )
-@click.option("-R", "--resolution", help="Image resolution - override in case it's not specified in the file.", type=click.FLOAT, default=None, show_default=True)
+@click.option(
+    "-R",
+    "--resolution",
+    help="Image resolution - override in case it's not specified in the file.",
+    type=click.FLOAT,
+    default=None,
+    show_default=True,
+)
 @click.option(
     "--inverse",
     is_flag=True,
@@ -246,7 +254,7 @@ def image(
     channel_names: list[str | None],
     suffix: str = "_transformed",
     inverse: bool = True,
-    resolution: float  | None = None,
+    resolution: float | None = None,
     overwrite: bool = False,
 ) -> None:
     """Transform OME-TIFF using image2image transformation matrix (i2r.json) or elastix (i2reg) transformation."""

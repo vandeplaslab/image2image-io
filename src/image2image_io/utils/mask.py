@@ -264,11 +264,11 @@ def transform_masks(
 
 
 def transform_shapes_or_points(
-        files: list[PathLike],
-        output_dir: PathLike,
-        config_path: PathLike,
-        overwrite: bool = False,
-                     ):
+    files: list[PathLike],
+    output_dir: PathLike,
+    config_path: PathLike,
+    overwrite: bool = False,
+):
     """Transform and export shapes or points."""
     from image2image_io.readers import get_simple_reader
     from image2image_io.utils.warp import ImageWarper
