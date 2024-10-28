@@ -348,9 +348,13 @@ def _read_tiff(path: PathLike) -> tuple[Path, dict[str, TiffImageReader]]:
 
 def _read_image(path: PathLike) -> tuple[Path, dict[str, ArrayImageReader]]:
     """Read image."""
+    from PIL import Image
     from skimage.io import imread
 
     from image2image_io.readers.array_reader import ArrayImageReader
+
+    # disable decompression bomb protection
+    Image.MAX_IMAGE_PIXELS = int(30_000 * 30_000)  # 30k x 30k pixels
 
     path = Path(path)
     assert path.exists(), f"File does not exist: {path}"

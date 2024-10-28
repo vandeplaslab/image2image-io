@@ -1,6 +1,7 @@
 """Configuration to override few parameters."""
 
 import typing as ty
+from contextlib import contextmanager
 
 from koyo.config import BaseConfig
 from pydantic import Field, validator
@@ -59,6 +60,16 @@ class Config(BaseConfig):
     def _validate_view_type(value: ty.Union[str, ViewType]) -> ViewType:  # type: ignore[misc]
         """Validate view_type."""
         return ViewType(value)
+
+    @contextmanager
+    def temporary_override(self, **kwargs: ty.Any) -> ty.ContextManager:
+        """Temporary override configuration."""
+        old_values = {key: getattr(self, key) for key in kwargs}
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        yield
+        for key, value in old_values.items():
+            setattr(self, key, value)
 
 
 CONFIG = Config()  # type: ignore[call-arg]

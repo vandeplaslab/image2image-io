@@ -6,7 +6,9 @@ from pathlib import Path
 import dask.array
 import numpy as np
 import SimpleITK as sitk
+from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
+from loguru import logger
 from tqdm import trange
 
 
@@ -96,6 +98,7 @@ def warp(affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarra
 
     use_cv2 = max(max(image.shape), max(output_shape)) < 32767
     if use_cv2:
+        logger.debug("Using cv2 for warping.")
         if isinstance(image, dask.array.Array):
             image = image.compute()
         warped = cv2.warpAffine(image.T, np.linalg.inv(affine_inv)[:2, :], output_shape).T
@@ -119,11 +122,13 @@ class ImageWarper:
 
     def __call__(self, image: np.ndarray | sitk.Image) -> np.ndarray | sitk.Image:
         """Warp image."""
-        is_sitk = isinstance(image, sitk.Image)
-        if is_sitk:
-            image = sitk.GetArrayFromImage(image)
-        image = warp(self.affine_inv, self.output_size_yx, image)
-        assert image.shape == self.output_size_yx, f"Image shape mismatch: {image.shape} != {self.output_size_yx}"
-        if is_sitk:
-            image = sitk.GetImageFromArray(image)
+        with MeasureTimer() as timer:
+            is_sitk = isinstance(image, sitk.Image)
+            if is_sitk:
+                image = sitk.GetArrayFromImage(image)
+            image = warp(self.affine_inv, self.output_size_yx, image)
+            assert image.shape == self.output_size_yx, f"Image shape mismatch: {image.shape} != {self.output_size_yx}"
+            if is_sitk:
+                image = sitk.GetImageFromArray(image)
+            logger.trace(f"Warped image in {timer()}.")
         return image
