@@ -102,14 +102,15 @@ class TransformData(BaseModel):
         if not px:
             moving_points = moving_points * moving_resolution
             fixed_points = fixed_points * self.fixed_resolution
+        if self.is_inverse:
+            moving_points, fixed_points = fixed_points, moving_points
+
         # compute transform
         transform = compute_transform(
             moving_points,  # source
             fixed_points,  # destination
             self.transformation_type,
         )
-        if self.is_inverse:
-            transform = transform.inverse
         self.moving_resolution = moving_resolution
         return transform
 
@@ -164,7 +165,7 @@ class TransformModel(BaseModel):
             transform_data = deepcopy(transform_data)
             transform_data.is_inverse = True
             self.transforms[path] = transform_data
-        logger.info(f"Added '{path.name}' to list of transformations")
+            logger.info(f"Added '{path.name}' to list of transformations")
 
     def remove_transform(self, name_or_path: PathLike) -> None:
         """Remove transformation matrix."""

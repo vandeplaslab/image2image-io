@@ -91,7 +91,7 @@ def warp_path(config_path: PathLike, from_transform: PathLike) -> np.ndarray:
     return warped
 
 
-def warp(affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarray) -> np.ndarray:
+def warp(affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarray, order: int = 1) -> np.ndarray:
     """Warp image."""
     import cv2
     from scipy.ndimage import affine_transform
@@ -101,9 +101,14 @@ def warp(affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarra
         logger.debug("Using cv2 for warping.")
         if isinstance(image, dask.array.Array):
             image = image.compute()
-        warped = cv2.warpAffine(image.T, np.linalg.inv(affine_inv)[:2, :], output_shape).T
+        warped = cv2.warpAffine(
+            image.T,
+            np.linalg.inv(affine_inv)[:2, :],
+            output_shape,
+            flags=cv2.INTER_NEAREST if order == 0 else cv2.INTER_LINEAR,
+        ).T
     else:
-        warped = affine_transform(image, affine_inv, order=1, output_shape=output_shape)
+        warped = affine_transform(image, affine_inv, order=order, output_shape=output_shape)
     return warped
 
 
