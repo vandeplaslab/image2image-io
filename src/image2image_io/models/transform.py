@@ -1,5 +1,7 @@
 """Transform."""
+
 import typing as ty
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +31,8 @@ class TransformData(BaseModel):
     affine: ty.Optional[np.ndarray] = None
     # Type of transformation
     transformation_type: str = "affine"
+    # Inverse
+    is_inverse: bool = False
 
     def to_dict(self) -> ty.Dict:
         """Serialize data."""
@@ -104,6 +108,8 @@ class TransformData(BaseModel):
             fixed_points,  # destination
             self.transformation_type,
         )
+        if self.is_inverse:
+            transform = transform.inverse
         self.moving_resolution = moving_resolution
         return transform
 
@@ -145,7 +151,7 @@ class TransformModel(BaseModel):
         """Return list of transform names."""
         return [Path(t).name for t in self.transforms] if self.transforms else []
 
-    def add_transform(self, name_or_path: PathLike, transform_data: TransformData) -> None:
+    def add_transform(self, name_or_path: PathLike, transform_data: TransformData, with_inverse: bool = True) -> None:
         """Add transformation matrix."""
         if self.transforms is None:
             self.transforms = {}
@@ -153,22 +159,33 @@ class TransformModel(BaseModel):
         path = Path(name_or_path)
         self.transforms[path] = transform_data
         logger.info(f"Added '{path.name}' to list of transformations")
+        if with_inverse:
+            path = Path(name_or_path).parent / (path.name + " (inverse)")
+            transform_data = deepcopy(transform_data)
+            transform_data.is_inverse = True
+            self.transforms[path] = transform_data
+        logger.info(f"Added '{path.name}' to list of transformations")
 
     def remove_transform(self, name_or_path: PathLike) -> None:
         """Remove transformation matrix."""
         if self.transforms is None:
             return
 
+        def _remove_transform(path_of_transform: Path) -> None:
+            if path_of_transform in self.transforms:
+                del self.transforms[path_of_transform]
+                logger.info(f"Removed '{path_of_transform.name}' from list of transformations")
+            else:
+                for path in self.transforms:
+                    if path.name == path_of_transform.name:
+                        del self.transforms[path]
+                        logger.info(f"Removed '{path.name}' from list of transformations")
+                        break
+
         name_or_path = Path(name_or_path)
-        if name_or_path in self.transforms:
-            del self.transforms[name_or_path]
-            logger.info(f"Removed '{name_or_path.name}' from list of transformations")
-        else:
-            for path in self.transforms:
-                if path.name == name_or_path.name:
-                    del self.transforms[path]
-                    logger.info(f"Removed '{path.name}' from list of transformations")
-                    break
+        _remove_transform(name_or_path)
+        inv_name_or_path = name_or_path.parent / (name_or_path.name + " (inverse)")
+        _remove_transform(inv_name_or_path)
 
     def get_matrix(self, name_or_path: PathLike) -> ty.Optional[TransformData]:
         """Get transformation matrix."""
