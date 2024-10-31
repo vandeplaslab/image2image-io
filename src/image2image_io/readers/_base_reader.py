@@ -37,32 +37,34 @@ def check_if_open(path: Path) -> None:
 class BaseReader:
     """Base class for some of the other image readers."""
 
+    _closed = False
     _pyramid = None
     _is_rgb: bool | None = None
     _im_dtype: np.dtype | None = None
     _im_dims: tuple[int, ...] | None = None
     _image_shape: tuple[int, int] | None = None
     _zstore: zarr.storage.TempStore | None = None
-    auto_pyramid: bool | None = None
-    reader: str = "base"
-    reader_type: str = "image"
-    n_scenes: int = 1
     _scene_ids: list[int] | None = None
-    lazy: bool = False
-    fh: ty.Any | None = None
-    allow_extraction: bool = False
     _resolution: float = 1.0
     _channel_names: list[str] | None = None
     _channel_colors: list[str] | None = None
     _channel_ids: list[int] | None = None
 
+    auto_pyramid: bool | None = None
+    reader: str = "base"
+    reader_type: str = "image"
+    n_scenes: int = 1
+    lazy: bool = False
+    fh: ty.Any | None = None
+    allow_extraction: bool = False
+
     def __init__(
         self, path: PathLike, key: str | None = None, reader_kws: dict | None = None, auto_pyramid: bool | None = None
     ):
+        self.auto_pyramid = auto_pyramid
         # This is the direct path to the image
         self.path = Path(path)
         # This is the attribute we will use to identify the image
-        self.auto_pyramid = auto_pyramid
         self.key = key or self.path.name
         self.reader_kws = reader_kws or {}
         self.transform_data: TransformData = TransformData()
@@ -169,7 +171,7 @@ class BaseReader:
         self._scene_ids = value
 
     @property
-    def channel_colors(self) -> list[str]:
+    def channel_colors(self) -> list[str] | None:
         """Return channel names."""
         return self._channel_colors
 
@@ -292,7 +294,9 @@ class BaseReader:
         self.fh = None
         self._pyramid = None
         # check_if_open(self.path)
-        logger.trace(f"Closed file handle '{self.path}'")
+        if not self._closed:
+            logger.trace(f"Closed file handle '{self.path}'")
+            self._closed = True
 
     @property
     def pyramid(self) -> list:
@@ -304,6 +308,10 @@ class BaseReader:
     def get_dask_pyr(self) -> list[ty.Any]:
         """Get dask representation of the pyramid."""
         raise NotImplementedError("Must implement method")
+
+    def get_thumbnail(self) -> tuple[np.ndarray, tuple[float, float]]:
+        """Return thumbnail."""
+        return self.pyramid[-1], self.scale_for_pyramid(-1)
 
     def crop(
         self, left: int, right: int, top: int, bottom: int, array: np.ndarray | None = None, multiply: bool = True

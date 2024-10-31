@@ -1,4 +1,5 @@
 """CZI reader."""
+
 from __future__ import annotations
 
 import typing as ty
@@ -11,7 +12,7 @@ from loguru import logger
 
 from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
-from image2image_io.readers._czi import CziFile, CziSceneFile
+from image2image_io.readers._czi import CziFile, CziSceneFile, get_czi_thumbnail
 from image2image_io.utils.utilities import guess_rgb
 
 logger = logger.bind(src="CZI")
@@ -59,7 +60,6 @@ class CziMixin:
         from image2image_io.utils.utilities import xmlstr_to_dict
 
         # from tifffile import xml2dict
-
         return xmlstr_to_dict(self.fh.metadata())
 
     def _get_image_info(self) -> tuple:
@@ -111,7 +111,7 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
             logger.trace(f"{path}: pyramid={len(self._pyramid)} in {timer()}")
 
     @property
-    def n_channels(self):
+    def n_channels(self) -> int:
         """Return number of channels."""
         return self.im_dims[2] if self.is_rgb else self.im_dims[0]
 
@@ -120,6 +120,13 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
         self._zstore = zarr.storage.TempStore()
         return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
+
+    def get_thumbnail(self) -> tuple[np.ndarray, tuple[float, float]]:
+        """Get thumbnail."""
+        thumbnail, scale = get_czi_thumbnail(self.fh, self.scale)
+        if thumbnail is None:
+            return self.pyramid[-1], self.scale_for_pyramid(-1)
+        return thumbnail, scale
 
 
 class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
