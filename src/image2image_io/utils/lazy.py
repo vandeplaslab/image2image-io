@@ -1,4 +1,5 @@
 """Lazy HDF5 wrapper around image data."""
+
 from __future__ import annotations
 
 import typing as ty
@@ -49,10 +50,10 @@ class LazyImageWrapper:
             return array.shape  # type: ignore[return-value]
 
     @property
-    def dtype(self):
+    def dtype(self) -> np.dtype:
         """Return dtype of the array."""
         with self.lazy_array() as peaks:
-            return peaks.dtype
+            return peaks.dtype  # type: ignore[no-any-return]
 
     def get_image(self) -> np.ndarray:
         """Return 3d version of the data."""

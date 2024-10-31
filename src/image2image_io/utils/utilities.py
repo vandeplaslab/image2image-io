@@ -120,7 +120,7 @@ def format_merge_channel_names(
         if len(channel_ids) != len(channel_names):
             raise ValueError("The number of channel ids does not match the number of channel names.")
         for index, channel_ids_ in enumerate(channel_ids):
-            channel_names_.extend([channel_names[index][idx] for idx in channel_ids_])
+            channel_names_.extend([channel_names[index][idx_] for idx_ in channel_ids_])
         channel_names = channel_names_
     else:
         if isinstance(channel_names, list) and isinstance(channel_names[0], list):
