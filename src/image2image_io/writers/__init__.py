@@ -27,6 +27,8 @@ if ty.TYPE_CHECKING:
 MetadataScene = dict[str, ty.Union[str, list[ty.Union[int, str]]]]
 MetadataReader = dict[int, MetadataScene]
 MetadataDict = dict[Path, MetadataReader]
+ExportProgress = tuple[str, int, int, int, bool]
+
 
 __all__ = [
     "OmeTiffWriter",
@@ -114,8 +116,14 @@ def merge_images(
         channel_ids.append(scene_metadata.get("channel_ids", reader.channel_ids))
         reader_names.append(scene_metadata.get("name", reader.clean_name))
 
-    merge_obj = MergeImages(paths, pixel_sizes, channel_names=channel_names, channel_ids=channel_ids)
-    writer = MergeOmeTiffWriter(merge_obj)
+    writer = MergeOmeTiffWriter(
+        MergeImages(
+            paths,
+            pixel_sizes,
+            channel_names=channel_names,
+            channel_ids=channel_ids,
+        )
+    )
     writer.merge_write_image_by_plane(
         name,
         reader_names,
@@ -131,9 +139,10 @@ def images_to_ome_tiff(
     as_uint8: bool = False,
     tile_size: int = 512,
     metadata: MetadataDict | None = None,
+    path_to_scene: dict[Path, list[int]] | None = None,
     extras: dict[Path, dict[str, int | float | None]] | None = None,
     overwrite: bool = False,
-) -> ty.Generator[tuple[str, int, int, int, int], None, None]:
+) -> ty.Generator[ExportProgress, None, None]:
     """Convert multiple images to OME-TIFF."""
     output_dir = Path(output_dir) if output_dir else None
 
@@ -142,27 +151,28 @@ def images_to_ome_tiff(
     current_total_scene = 0
     for _current, path_ in enumerate(tqdm(paths, desc="Converting to OME-TIFF...", total=len(paths))):
         path_ = Path(path_)
+        reader_metadata = metadata.get(path_, None) if metadata else None
+        reader_scenes = path_to_scene.get(path_, None) if path_to_scene else None
         if path_.suffix == ".czi":
-            reader_metadata = metadata.get(path_, None) if metadata else None
             try:
-                for key, current_file_scene, total_file_scenes, increment_by in czi_to_ome_tiff(
+                for key, current_file_scene, total_file_scenes, increment_by, is_exported in czi_to_ome_tiff(
                     path_,
                     output_dir=output_dir,
                     as_uint8=as_uint8,
                     tile_size=tile_size,
                     metadata=reader_metadata,
+                    reader_scenes=reader_scenes,
                     overwrite=overwrite,
                 ):
-                    yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes
+                    yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes, is_exported
                     current_total_scene += increment_by
             except (ValueError, TypeError, OSError) as err:
                 logger.error(f"Could not read Czi file {path_} ({err})")
                 logger.exception(err)
                 continue
         else:
-            reader_metadata = metadata.get(path_, None) if metadata else None
             try:
-                for key, current_file_scene, total_file_scenes, increment_by in image_to_ome_tiff(
+                for key, current_file_scene, total_file_scenes, increment_by, is_exported in image_to_ome_tiff(
                     path_,
                     output_dir=output_dir,
                     as_uint8=as_uint8,
@@ -170,7 +180,7 @@ def images_to_ome_tiff(
                     metadata=reader_metadata,
                     overwrite=overwrite,
                 ):
-                    yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes
+                    yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes, is_exported
                     current_total_scene += increment_by
             except (ValueError, TypeError, OSError) as err:
                 logger.error(f"Could not read {path_.suffix} file {path_} ({err})")
@@ -184,11 +194,11 @@ def image_to_ome_tiff(
     as_uint8: bool = False,
     tile_size: int = 512,
     suffix: str = "",
-    metadata: dict[int, dict[str, list[int | str]]] | None = None,
+    metadata: MetadataReader | None = None,
     transformer: Transformer | None = None,
     resolution: float | None = None,
     overwrite: bool = False,
-) -> ty.Generator[tuple[str, int, int, int], None, None]:
+) -> ty.Generator[ExportProgress, None, None]:
     """Convert image of any type to OME-TIFF."""
     from image2image_io.readers import get_key, get_simple_reader
 
@@ -204,11 +214,12 @@ def image_to_ome_tiff(
     if suffix:
         filename += suffix
     output_path = output_dir / filename
+    yield key, 1, 1, 1, False
 
     # skip if the output file already exists
     if output_path.with_suffix(".ome.tiff").exists() and not overwrite:
         logger.info(f"Skipping {output_path} - already exists")
-        yield key, 1, 1, 1
+        yield key, 1, 1, 1, True
         return
 
     # read the scene
@@ -216,7 +227,7 @@ def image_to_ome_tiff(
     if resolution:
         reader.resolution = resolution
     scene_metadata: dict[str, list[int | str]] = (
-        metadata.get(0, None)
+        metadata.get(0, {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names})
         if metadata
         else {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
     )
@@ -224,7 +235,7 @@ def image_to_ome_tiff(
         assert "channel_ids" in scene_metadata, "Channel IDs must be specified in metadata."
         assert "channel_names" in scene_metadata, "Channel names must be specified in metadata."
     if not scene_metadata["channel_ids"]:
-        yield key, 1, 1, 1
+        yield key, 1, 1, 1, True
     else:
         write_ome_tiff_alt(
             output_path,
@@ -235,7 +246,7 @@ def image_to_ome_tiff(
             **scene_metadata,
             overwrite=overwrite,
         )
-        yield key, 1, 1, 1
+        yield key, 1, 1, 1, True
 
 
 def czis_to_ome_tiff(
@@ -244,7 +255,7 @@ def czis_to_ome_tiff(
     as_uint8: bool = False,
     tile_size: int = 512,
     metadata: MetadataDict | None = None,
-) -> ty.Generator[tuple[str, int, int, int, int], None, None]:
+) -> ty.Generator[ExportProgress, None, None]:
     """Convert multiple CZI images to OME-TIFF."""
     # calculate true total number of scenes
     total_n_scenes, paths_ = get_total_n_scenes(paths)
@@ -254,10 +265,10 @@ def czis_to_ome_tiff(
         path_ = Path(path_)
         reader_metadata = metadata.get(path_, None) if metadata else None
         try:
-            for key, current_file_scene, total_file_scenes, increment_by in czi_to_ome_tiff(
+            for key, current_file_scene, total_file_scenes, increment_by, is_exported in czi_to_ome_tiff(
                 path_, output_dir, as_uint8, tile_size, reader_metadata
             ):
-                yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes
+                yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes, is_exported
                 current_total_scene += increment_by
         except (ValueError, TypeError, OSError):
             logger.error(f"Could not read Czi file {path_}")
@@ -269,43 +280,49 @@ def czi_to_ome_tiff(
     output_dir: PathLike | None = None,
     as_uint8: bool = False,
     tile_size: int = 512,
-    metadata: MetadataScene | None = None,
+    metadata: MetadataReader | None = None,
+    reader_scenes: list[int] | None = None,
     scenes: list[int] | None = None,
     overwrite: bool = False,
-) -> ty.Generator[tuple[str, int, int, int], None, None]:
+) -> ty.Generator[ExportProgress, None, None]:
     """Convert Czi image to OME-TIFF."""
     from image2image_io.readers import get_key
     from image2image_io.readers._czi import CziSceneFile
     from image2image_io.readers.czi_reader import CziSceneImageReader
 
     path = Path(path)
-    key = get_key(path)
     if output_dir is None:
         output_dir = path.parent
     output_dir = Path(output_dir)
     try:
         n = CziSceneFile.get_num_scenes(path)
+        has_scenes = n != 1
     except Exception as e:
         logger.error(f"Could not read Czi file {path} - {e}")
         return
     if scenes is None:
         scenes = list(range(n))
+    if reader_scenes is not None:
+        scenes = [scene for scene in scenes if scene in reader_scenes]
+
     assert min(scenes) >= 0, "Scene index must be greater than or equal to 0."
     assert max(scenes) <= n, "Scene index must be less than the total number of scenes in the file."
-    yield key, 0, len(scenes), 0
+    scene_key = get_key(path, scenes[0] if has_scenes else None)
+    yield scene_key, 0, len(scenes), 0, False
 
     if metadata is None:
         metadata = {}
 
     # iterate over each scene in the czi file
     for scene_index in scenes:
+        scene_key = get_key(path, scene_index if has_scenes else None)
         logger.debug(f"Converting scene {scene_index + 1}/{n} from {path}...")
         filename = path.name.replace(".czi", "") + (f"_scene={scene_index:02d}" if n > 1 else "")
         output_path = output_dir / filename
         # skip if the output file already exists
         if output_path.with_suffix(".ome.tiff").exists() and not overwrite:
             logger.info(f"Skipping {output_path} - already exists")
-            yield key, scene_index + 1, n, 1
+            yield scene_key, scene_index + 1, n, 1, True
             continue
 
         # read the scene
@@ -321,10 +338,10 @@ def czi_to_ome_tiff(
 
         # skip if there are no channel IDs
         if not scene_metadata["channel_ids"]:
-            yield key, scene_index + 1, n, 1
+            yield scene_key, scene_index + 1, n, 1, True
         else:
             write_ome_tiff_alt(output_path, reader, as_uint8=as_uint8, tile_size=tile_size, **scene_metadata)
-            yield key, scene_index + 1, n, 1
+            yield scene_key, scene_index + 1, n, 1, True
 
 
 def write_ome_tiff_from_array(

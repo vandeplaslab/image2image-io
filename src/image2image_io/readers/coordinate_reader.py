@@ -53,7 +53,7 @@ class CoordinateImagerMixin:
         return array
 
 
-class CoordinateImageReader(BaseReader, CoordinateImagerMixin):
+class CoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ignore[misc]
     """Reader for data that has defined coordinates."""
 
     def __init__(
@@ -121,8 +121,10 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):
         """Get dask representation of the pyramid."""
         return [self.get_image()]
 
-    def get_channel_axis_and_n_channels(self) -> tuple[int | None, int]:
+    def get_channel_axis_and_n_channels(self, shape: tuple[int, ...] | None = None) -> tuple[int | None, int]:
         """Return channel axis and number of channels."""
+        if shape is not None:
+            return super().get_channel_axis_and_n_channels(shape)
         if len(self.data) == 1:
             return None, 1
         return 2, len(self.data)
@@ -143,7 +145,7 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
         """Return channel pyramid."""
         name = self.channel_names[index]
-        return [self.data[name]]
+        return [self.preprocessor(self.data[name])]
 
 
 class LazyCoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ignore[misc]
@@ -182,10 +184,12 @@ class LazyCoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ign
         """Return image as a stack."""
         return self.lazy_wrapper.get_image()
 
-    def get_channel_axis_and_n_channels(self) -> tuple[int | None, int]:
+    def get_channel_axis_and_n_channels(self, shape: tuple[int, ...] | None = None) -> tuple[int | None, int]:
         """Return channel axis and number of channels."""
+        if shape:
+            return super().get_channel_axis_and_n_channels(shape)
         return 2, len(self.channel_names)
 
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
         """Return channel pyramid."""
-        return [self.lazy_wrapper[index]]
+        return [self.preprocessor(self.lazy_wrapper[index])]

@@ -156,14 +156,22 @@ class OmeTiffWriter:
         else:
             self.PhysicalSizeX = self.PhysicalSizeY = self.reader.resolution
 
+        is_merging = False
+        if channel_ids:
+            for channel_id in channel_ids:
+                if not isinstance(channel_id, int):
+                    is_merging = True
+
         if as_uint8 is None:
             as_uint8 = self.reader.dtype == np.uint8
         dtype: np.dtype[ty.Any] = np.uint8 if as_uint8 else self.reader.dtype  # type: ignore[assignment]
         if channel_names is None:
             channel_names = self.reader.channel_names
-        if channel_names and len(channel_names) > self.reader.n_channels:
+            logger.trace(f"Channel names were undefined - using {channel_names}")
+        if channel_names and len(channel_names) > self.reader.n_channels and not is_merging:
             channel_names = self.reader.channel_names
-        if channel_ids is not None:
+            logger.warning(f"Channel names were too long - using {channel_names}")
+        if channel_ids is not None and not is_merging:
             if len(channel_ids) != len(channel_names):
                 channel_names = [channel_names[i] for i in channel_ids]
         if len(channel_names) != len(channel_ids):  # type: ignore[arg-type]
@@ -334,6 +342,7 @@ class OmeTiffWriter:
                     ]
                     images = np.dstack(images)  # type: ignore[assignment]
                     image = np.max(images, axis=2)  # type: ignore[assignment]
+                    logger.trace(f"Max intensity projection for channel {channel_name} ({channel_index})")
 
                 # check whether we actually need to do any pre-processing
                 if self.transformer or as_uint8:

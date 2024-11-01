@@ -13,6 +13,7 @@ from loguru import logger
 
 from image2image_io.config import CONFIG
 from image2image_io.enums import DEFAULT_TRANSFORM_NAME
+from image2image_io.models.preprocess import NoopProcessor, PreProcessor
 from image2image_io.models.transform import TransformData
 from image2image_io.utils.utilities import guess_rgb
 
@@ -69,6 +70,7 @@ class BaseReader:
         self.reader_kws = reader_kws or {}
         self.transform_data: TransformData = TransformData()
         self.transform_name = DEFAULT_TRANSFORM_NAME
+        self.preprocessor = NoopProcessor()
 
     def find_channel_name(self, name: str) -> int | None:
         """Find cycle by name or part of the name."""
@@ -89,6 +91,13 @@ class BaseReader:
         for i, channel in enumerate(self.channel_names):
             print(f"  - Channel {i}: {channel}")
         print(f"  - Transform: {self.transform}")
+
+    @property
+    def scene_index(self) -> int:
+        """Return scene index."""
+        if self.reader_kws and "scene_index" in self.reader_kws:
+            return self.reader_kws["scene_index"]
+        return 0
 
     @property
     def transform(self) -> np.ndarray:
@@ -406,7 +415,7 @@ class BaseReader:
         transformed_mask = transform_mask(array, affine, self.image_shape)
         return transformed_mask
 
-    def get_channel_axis_and_n_channels(self, shape: tuple | None = None) -> tuple[int | None, int]:
+    def get_channel_axis_and_n_channels(self, shape: tuple[int, ...] | None = None) -> tuple[int | None, int]:
         """Return channel axis and number of channels."""
         if shape is None:
             shape = self.shape
@@ -452,13 +461,13 @@ class BaseReader:
         array: np.ndarray = self.pyramid[pyramid]
         channel_axis, n_channels = self.get_channel_axis_and_n_channels()
         if channel_axis is None or (self.is_rgb and (not CONFIG.split_rgb and not split_rgb)):
-            return array
+            return self.preprocessor("rgb", array)
         if channel_axis == 0:
-            return array[index]
+            return self.preprocessor(self.channel_names[index], array[index])
         elif channel_axis == 1:
-            return array[:, index]
+            return self.preprocessor(self.channel_names[index], array[:, index])
         elif channel_axis == 2:
-            return array[:, :, index]
+            return self.preprocessor(self.channel_names[index], array[:, :, index])
         raise ValueError(f"Array has unsupported shape: {array.shape}")
 
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
