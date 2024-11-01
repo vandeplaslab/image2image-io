@@ -168,6 +168,7 @@ class LazyCoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ign
         self.resolution = resolution
         self._is_rgb = False
         self._im_dtype = lazy_wrapper.dtype
+        self._im_dims = (y.max(), x.max(), lazy_wrapper.shape[-1])
         self.lazy_wrapper = lazy_wrapper
         if channel_names:
             self._channel_names = channel_names

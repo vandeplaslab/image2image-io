@@ -297,9 +297,9 @@ class ShapesReader(BaseReader):
     @property
     def shape(self) -> tuple[int, ...]:
         """Return shape of data."""
-        if hasattr(self.shape_data):
+        if hasattr(self, "shape_data"):
             return (len(self.shape_data),)
-        return 0
+        return (0,)
 
 
 def _convert_geojson_to_df(shape_data: list[dict]) -> pd.DataFrame:
