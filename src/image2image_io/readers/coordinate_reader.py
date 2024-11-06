@@ -192,4 +192,4 @@ class LazyCoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ign
 
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
         """Return channel pyramid."""
-        return [self.preprocessor(self.lazy_wrapper[index])]
+        return [self.preprocessor("", self.lazy_wrapper[index])]
