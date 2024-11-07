@@ -145,7 +145,7 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ignore[
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
         """Return channel pyramid."""
         name = self.channel_names[index]
-        return [self.preprocessor(self.data[name])]
+        return [self.preprocessor("", self.data[name])]
 
 
 class LazyCoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ignore[misc]
