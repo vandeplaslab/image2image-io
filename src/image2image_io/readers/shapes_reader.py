@@ -113,6 +113,7 @@ class ShapesReader(BaseReader):
     def __init__(self, path: PathLike, key: str | None = None, auto_pyramid: bool | None = None, init: bool = True):
         super().__init__(path, key=key, auto_pyramid=auto_pyramid)
         if not init:
+            self.geojson_data, self.shape_data = [], []
             return
         self.geojson_data, self.shape_data = read_data(self.path)
         self._channel_names = [self.path.stem]
