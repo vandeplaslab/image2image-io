@@ -63,12 +63,12 @@ class TiffImageReader(BaseReader):
             self._pyramid = self.pyramid
 
     @property
-    def n_channels(self):
+    def n_channels(self) -> int:
         """Return number of channels."""
         _, n_channels = self.get_channel_axis_and_n_channels()
         return self.im_dims[2] if self.is_rgb else n_channels
 
-    def get_dask_pyr(self):
+    def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
         d_pyr = tifffile_to_dask(self.path, self.largest_series)
         channel_axis, _ = self.get_channel_axis_and_n_channels(shape=d_pyr[0].shape)
