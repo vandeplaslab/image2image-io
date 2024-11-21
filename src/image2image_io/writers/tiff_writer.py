@@ -370,17 +370,17 @@ class OmeTiffWriter:
                 # ensure that the image is a numpy array and not e.g. dask/zarr array
                 image = np.asarray(image)  # type: ignore[assignment]
 
-                # if the image is RGB, let's accumulate the image data and write it at the end
-                if reader.is_rgb:
-                    rgb_im_data.append(image)  # type: ignore[arg-type]
-                    continue
-
                 # apply crop mask
                 if self.crop_mask is not None:
                     image = self.crop_mask * image
                 elif self.crop_bbox is not None:
                     x, y, width, height = self.crop_bbox
                     image = image[y : y + height, x : x + width]
+
+                # if the image is RGB, let's accumulate the image data and write it at the end
+                if reader.is_rgb:
+                    rgb_im_data.append(image)  # type: ignore[arg-type]
+                    continue
 
                 msg = f"Writing image for channel={channel_name} ({channel_index})"
                 past_msg = msg.replace("Writing", "Wrote")
@@ -403,11 +403,11 @@ class OmeTiffWriter:
                 image: np.ndarray = np.dstack(rgb_im_data)  # type: ignore[no-redef]
                 del rgb_im_data
 
-                if self.crop_mask is not None:
-                    image = np.atleast_3d(self.crop_mask) * image
-                elif self.crop_bbox is not None:
-                    x, y, width, height = self.crop_bbox
-                    image = image[y : y + height, x : x + width, :]
+                # if self.crop_mask is not None:
+                #     image = np.atleast_3d(self.crop_mask) * image
+                # elif self.crop_bbox is not None:
+                #     x, y, width, height = self.crop_bbox
+                #     image = image[y : y + height, x : x + width, :]
 
                 # write channel data
                 msg = "Writing RGB image"

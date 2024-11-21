@@ -113,6 +113,7 @@ class ShapesReader(BaseReader):
     def __init__(self, path: PathLike, key: str | None = None, auto_pyramid: bool | None = None, init: bool = True):
         super().__init__(path, key=key, auto_pyramid=auto_pyramid)
         if not init:
+            self.geojson_data, self.shape_data = [], []
             return
         self.geojson_data, self.shape_data = read_data(self.path)
         self._channel_names = [self.path.stem]
@@ -297,7 +298,9 @@ class ShapesReader(BaseReader):
     @property
     def shape(self) -> tuple[int, ...]:
         """Return shape of data."""
-        return (len(self.shape_data),)
+        if hasattr(self, "shape_data"):
+            return (len(self.shape_data),)
+        return (0,)
 
 
 def _convert_geojson_to_df(shape_data: list[dict]) -> pd.DataFrame:

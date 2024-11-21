@@ -145,7 +145,7 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ignore[
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
         """Return channel pyramid."""
         name = self.channel_names[index]
-        return [self.preprocessor(self.data[name])]
+        return [self.preprocessor("", self.data[name])]
 
 
 class LazyCoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ignore[misc]
@@ -170,6 +170,7 @@ class LazyCoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ign
         self.resolution = resolution
         self._is_rgb = False
         self._im_dtype = lazy_wrapper.dtype
+        self._im_dims = (y.max(), x.max(), lazy_wrapper.shape[-1])
         self.lazy_wrapper = lazy_wrapper
         if channel_names:
             self._channel_names = channel_names
@@ -191,4 +192,4 @@ class LazyCoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ign
 
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
         """Return channel pyramid."""
-        return [self.preprocessor(self.lazy_wrapper[index])]
+        return [self.preprocessor("", self.lazy_wrapper[index])]

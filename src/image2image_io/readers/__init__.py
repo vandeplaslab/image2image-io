@@ -238,6 +238,8 @@ def get_reader(
             path = path / "dataset.metadata.h5"
         if path.name.startswith("dataset.metadata"):
             path, readers = _read_metadata_h5_coordinates(path)
+        elif _is_h5_mask(path):
+            path, readers = _read_mask_h5(path)
         else:
             path, readers = _read_centroids_h5_coordinates_lazy(path)
     elif suffix in GEOJSON_EXTENSIONS + POINTS_EXTENSIONS:
@@ -351,8 +353,6 @@ def _read_image(path: PathLike) -> tuple[Path, dict[str, ArrayImageReader]]:
     from PIL import Image
     from skimage.io import imread
 
-    from image2image_io.readers.array_reader import ArrayImageReader
-
     # disable decompression bomb protection
     Image.MAX_IMAGE_PIXELS = int(30_000 * 30_000)  # 30k x 30k pixels
 
@@ -375,10 +375,26 @@ def _read_npy_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateIma
     return path, {path.name: CoordinateImageReader(path, x, y, array_or_reader=image, key=key)}
 
 
+def _get_resolution_from_metadata(path: PathLike) -> float:
+    """Get resolution from metadata."""
+    from koyo.json import read_json_data
+
+    resolution = 1.0
+    path = Path(path)
+    if path.name != "metadata.json":
+        path_ = path / "metadata.json"
+        if not path_.exists():
+            path_ = path.parent / "metadata.json"
+        path = path_
+    if path.exists():
+        metadata = read_json_data(path)
+        resolution = metadata["metadata.experimental"]["pixel_size"]
+    return resolution
+
+
 def _read_metadata_h5_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateImageReader]]:
     """Read coordinates from HDF5 file."""
     import h5py
-    from koyo.json import read_json_data
 
     from image2image_io.readers.coordinate_reader import CoordinateImageReader
 
@@ -388,18 +404,15 @@ def _read_metadata_h5_coordinates(path: PathLike) -> tuple[Path, dict[str, Coord
     # read coordinates
     with h5py.File(path, "r") as f:
         try:
-            yx = f["Dataset/Spectral/Coordinates/yx"][:]
-            tic = f["Dataset/Spectral/Sum/y"][:]
-        except KeyError:
             yx = f["Dataset/Spatial/Coordinates/yx"][:]
             tic = f["Dataset/Spatial/Sum/y"][:]
+        except KeyError:
+            yx = f["Dataset/Spectral/Coordinates/yx"][:]
+            tic = f["Dataset/Spectral/Sum/y"][:]
+
     y = yx[:, 0]
     x = yx[:, 1]
-    # read pixel size (resolution)
-    resolution = 1.0
-    if (path.parent / "metadata.json").exists():
-        metadata = read_json_data(path.parent / "metadata.json")
-        resolution = metadata["metadata.experimental"]["pixel_size"]
+    resolution = _get_resolution_from_metadata(path)
     key = get_key(path)
     return path, {
         path.name: CoordinateImageReader(path, x, y, resolution=resolution, array_or_reader=reshape(x, y, tic), key=key)
@@ -418,6 +431,32 @@ def _read_centroids_h5_coordinates(path: PathLike) -> tuple[Path, dict[str, Coor
     if metadata_file.exists():
         return _read_centroids_h5_coordinates_with_metadata(path, metadata_file)
     return _read_centroids_h5_coordinates_without_metadata(path)
+
+
+def _is_h5_mask(path: PathLike) -> bool:
+    """Check whether this is a mask file."""
+    import h5py
+
+    path = Path(path)
+    with h5py.File(path, "r") as f:
+        return "Mask" in f
+
+
+def _read_mask_h5(path: PathLike) -> tuple[Path, dict[str, ArrayImageReader]]:
+    """Read centroids data from HDF5 file."""
+    import h5py
+
+    path = Path(path)
+    assert path.suffix in H5_EXTENSIONS, "Only .h5 files are supported"
+
+    # read coordinates
+    with h5py.File(path, "r") as f:
+        mask = f["Mask/mask"][:]
+    resolution = 1.0
+    if path.parent.name == "Masks":
+        resolution = _get_resolution_from_metadata(path.parent.parent.with_suffix(".data"))
+    key = get_key(path)
+    return path, {path.name: ArrayImageReader(path, mask, resolution=resolution, key=key)}
 
 
 def _read_centroids_h5_coordinates_lazy(path: PathLike) -> tuple[Path, dict[str, LazyCoordinateImageReader]]:
