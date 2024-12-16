@@ -118,11 +118,8 @@ class MergeOmeTiffWriter:
             height = image_shape[0] - y
         return x, y, width, height
 
-    def _check_transforms_and_readers(self, reader_names: list[str]) -> None:
+    def _check_transforms_and_readers(self) -> None:
         """Make sure incoming data is kosher in dimensions."""
-        if not isinstance(reader_names, list):
-            raise ValueError("Require a list of image names for each image to merge")
-
         transformations = self.transformers
         if transformations is None:
             transformations = [None for _ in range(len(self.merge.readers))]
@@ -139,12 +136,11 @@ class MergeOmeTiffWriter:
         for channel_names in self.merge.channel_names:
             all_channel_names.extend(channel_names)
 
-        if len(set(all_channel_names)) != self.merge.n_channels:
-            self.merge.channel_names = [
-                _prepare_channel_names(name, channel_names)
-                for name, channel_names in zip(reader_names, self.merge.channel_names)
-            ]
-        # self.merge.channel_names = [item for sublist in self.merge.channel_names for item in sublist]
+        # if len(set(all_channel_names)) != self.merge.n_channels:
+        self.merge.channel_names = [
+            _prepare_channel_names(name, channel_names)
+            for name, channel_names in zip(reader_names, self.merge.channel_names)
+        ]
 
     def _check_transforms_sizes_and_resolutions(self) -> None:
         """Check that all transforms as currently loaded output to the same size/resolution."""
@@ -316,7 +312,7 @@ class MergeOmeTiffWriter:
         merge_dtype_sitk, merge_dtype_np = self._get_merge_dtype(as_uint8=as_uint8)
 
         channel_ids_fixed: list[list[int]] = self._check_channel_ids(channel_ids)
-        self._check_transforms_and_readers(reader_names)
+        self._check_transforms_and_readers()
         self._create_channel_names(reader_names)
         self._check_transforms_sizes_and_resolutions()
         assert isinstance(channel_ids_fixed, list), "channel_ids must be a list of lists"
@@ -351,6 +347,7 @@ class MergeOmeTiffWriter:
         }
         logger.trace(f"TIFF options: {options}")
         logger.trace(f"Pyramid levels: {self.pyr_levels} ({self.n_pyr_levels})")
+
         ome_set = False
         description = None
         with TiffWriter(tmp_output_file_name, bigtiff=True) as tif, MeasureTimer() as main_timer:

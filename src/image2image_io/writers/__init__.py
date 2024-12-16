@@ -91,30 +91,42 @@ def merge_images(
     reader_names = []
     for path_ in paths:
         reader = get_simple_reader(path_, init_pyramid=False, auto_pyramid=False)
-        reader_metadata: MetadataReader = (
-            metadata.get(
-                Path(path_),
-                {
+        reader_metadata: MetadataReader
+        if metadata:
+            reader_metadata = metadata.get(path_, None)
+            if not reader_metadata:
+                reader_metadata = {
                     0: {
                         "name": reader.clean_name,
                         "channel_names": reader.channel_names,
                         "channel_ids": reader.channel_ids,
                     }
-                },
-            )
-            if metadata
-            else {
+                }
+                logger.warning(f"Metadata not found for {path_}. Using default metadata.")
+        else:
+            reader_metadata = {
                 0: {"name": reader.clean_name, "channel_names": reader.channel_names, "channel_ids": reader.channel_ids}
             }
-        )
-        scene_metadata = reader_metadata.get(
-            0, {"name": reader.clean_name, "channel_names": reader.channel_names, "channel_ids": reader.channel_ids}
-        )
+            logger.trace(f"Metadata not specified for {path_}. Using default metadata.")
+
+        scene_metadata: dict[str, list[int | str]]
+        if reader_metadata:
+            scene_metadata = reader_metadata.get(0, None)
+            if not scene_metadata:
+                scene_metadata = {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
+                logger.warning("Metadata not found for 0. Using default metadata.")
+        else:
+            scene_metadata = {
+                "name": reader.clean_name,
+                "channel_ids": reader.channel_ids,
+                "channel_names": reader.channel_names,
+            }
+            logger.trace("Metadata not specified for 0. Using default metadata.")
 
         pixel_sizes.append(reader.resolution)
+        reader_names.append(scene_metadata.get("name", reader.clean_name))
         channel_names.append(scene_metadata.get("channel_names", reader.channel_names))
         channel_ids.append(scene_metadata.get("channel_ids", reader.channel_ids))
-        reader_names.append(scene_metadata.get("name", reader.clean_name))
 
     writer = MergeOmeTiffWriter(
         MergeImages(
@@ -226,11 +238,22 @@ def image_to_ome_tiff(
     reader = get_simple_reader(path, auto_pyramid=False, init_pyramid=False)
     if resolution:
         reader.resolution = resolution
-    scene_metadata: dict[str, list[int | str]] = (
-        metadata.get(0, {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names})
-        if metadata
-        else {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
-    )
+
+    scene_metadata: dict[str, list[int | str]]
+    if metadata:
+        scene_metadata = metadata.get(path, None)
+        if not scene_metadata:
+            scene_metadata = {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
+            logger.warning(f"Metadata not found for {path}. Using default metadata.")
+    else:
+        scene_metadata = {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
+        logger.trace(f"Metadata not specified for {path}. Using default metadata.")
+
+    # scene_metadata: dict[str, list[int | str]] = (
+    #     metadata.get(0, {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names})
+    #     if metadata
+    #     else {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
+    # )
     if scene_metadata:
         assert "channel_ids" in scene_metadata, "Channel IDs must be specified in metadata."
         assert "channel_names" in scene_metadata, "Channel names must be specified in metadata."
@@ -312,6 +335,7 @@ def czi_to_ome_tiff(
 
     if metadata is None:
         metadata = {}
+        logger.trace("Metadata not specified. Setting to empty.")
 
     # iterate over each scene in the czi file
     for scene_index in scenes:
@@ -327,11 +351,21 @@ def czi_to_ome_tiff(
 
         # read the scene
         reader = CziSceneImageReader(path, scene_index=scene_index, auto_pyramid=False, init_pyramid=False)
-        scene_metadata: dict[str, list[int | str]] = (
-            metadata.get(scene_index, {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names})
-            if metadata
-            else {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
-        )
+        path = reader.path
+
+        scene_metadata: dict[str, list[int | str]]
+        if metadata:
+            scene_metadata = metadata.get(scene_index, None)
+            if not scene_metadata:
+                scene_metadata = {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
+                logger.warning(
+                    f"Metadata not found for {path} {scene_index}. Using default metadata. "
+                    f"Available keys: {metadata.keys()}"
+                )
+        else:
+            scene_metadata = {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
+            logger.trace(f"Metadata not specified for {path} {scene_index}. Using default metadata.")
+
         if scene_metadata:
             assert "channel_ids" in scene_metadata, "Channel IDs must be specified in metadata."
             assert "channel_names" in scene_metadata, "Channel names must be specified in metadata."
