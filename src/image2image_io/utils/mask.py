@@ -215,7 +215,7 @@ def transform_masks(
     image_reader = get_simple_reader(transform_to, init_pyramid=False, auto_pyramid=False, scene_index=scene_index)
     # mask_shape = image_reader.image_shape
     # mask_inv_pixel_size = image_reader.inv_resolution
-    logger.trace(f"Initial mask shape {mask_shape} with {1/mask_inv_pixel_size:.4f} resolution.")
+    logger.trace(f"Initial mask shape {mask_shape} with {1 / mask_inv_pixel_size:.4f} resolution.")
 
     with_index = any(f in ["hdf5"] for f in fmt)
     with_shapes = any(f in ["hdf5", "geojson"] for f in fmt)
