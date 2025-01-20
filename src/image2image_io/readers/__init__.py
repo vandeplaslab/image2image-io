@@ -58,6 +58,7 @@ IMZML_EXTENSIONS = [".imzml", ".ibd"]
 H5_EXTENSIONS = [".h5", ".hdf5"]
 IMSPY_EXTENSIONS = [".data"]
 NPY_EXTENSIONS = [".npy"]
+NPZ_EXTENSIONS = [".npz"]
 GEOJSON_EXTENSIONS = [".geojson", ".json"]
 POINTS_EXTENSIONS = [".csv", ".txt", ".parquet"]
 SUPPORTED_IMAGE_FORMATS = [
@@ -97,6 +98,7 @@ def sanitize_read_path(path: PathLike, raise_on_error: bool = True) -> Path | No
         + IMAGE_EXTENSIONS
         + CZI_EXTENSIONS
         + NPY_EXTENSIONS
+        + NPZ_EXTENSIONS
         + BRUKER_EXTENSIONS
         + IMZML_EXTENSIONS
         + H5_EXTENSIONS
@@ -223,6 +225,9 @@ def get_reader(
     elif suffix in NPY_EXTENSIONS:
         logger.trace(f"Reading NPY file: {path}")
         path, readers = _read_npy_coordinates(path)
+    elif suffix in NPZ_EXTENSIONS:
+        logger.trace(f"Reading NPY file: {path}")
+        path, readers = _read_npz_coordinates(path)
     elif suffix in BRUKER_EXTENSIONS:
         logger.trace(f"Reading Bruker file: {path}")
         if IS_MAC or split_roi:
@@ -363,7 +368,7 @@ def _read_image(path: PathLike) -> tuple[Path, dict[str, ArrayImageReader]]:
 
 
 def _read_npy_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateImageReader]]:
-    """Read data from npz or npy file."""
+    """Read data from npy file."""
     from image2image_io.readers.coordinate_reader import CoordinateImageReader
 
     path = Path(path)
@@ -373,6 +378,29 @@ def _read_npy_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateIma
     y, x = get_yx_coordinates_from_shape(image.shape)
     key = get_key(path)
     return path, {path.name: CoordinateImageReader(path, x, y, array_or_reader=image, key=key)}
+
+def _read_npz_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateImageReader]]:
+    """Read data from npy file."""
+    from image2image_io.readers.array_reader import ArrayImageReader
+
+    path = Path(path)
+    with np.load(path) as f:
+        if "labels" in f:
+            labels = f["labels"]
+        elif "ppm_labels" in f:
+            labels = f["ppm_labels"]
+        else:
+            raise ValueError("Labels not found in the file")
+        labels = labels.tolist()
+        if "array" in f:
+            image = f["array"]
+        elif "image" in f:
+            image = f["image"]
+        else:
+            raise ValueError("Image not found in the file")
+    assert image.ndim == 3, "Only 3D images are supported"
+    key = get_key(path)
+    return path, {path.name: ArrayImageReader(path, array=image, key=key, channel_names=labels)}
 
 
 def _get_resolution_from_metadata(path: PathLike) -> float:
