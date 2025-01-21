@@ -24,19 +24,19 @@ from image2image_io.utils.utilities import get_yx_coordinates_from_shape, reshap
 from image2image_io.wrapper import ImageWrapper
 
 __all__ = [
-    "BaseReader",
     "ArrayImageReader",
+    "BaseReader",
+    "CoordinateImageReader",
     "CziImageReader",
     "CziSceneImageReader",
-    "CoordinateImageReader",
-    "ShapesReader",
     "LazyCoordinateImageReader",
+    "ShapesReader",
     "TiffImageReader",
+    "get_key",
+    "is_supported",
+    "read_data",
     "sanitize_path",
     "sanitize_read_path",
-    "read_data",
-    "is_supported",
-    "get_key",
 ]
 
 
@@ -378,6 +378,7 @@ def _read_npy_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateIma
     y, x = get_yx_coordinates_from_shape(image.shape)
     key = get_key(path)
     return path, {path.name: CoordinateImageReader(path, x, y, array_or_reader=image, key=key)}
+
 
 def _read_npz_coordinates(path: PathLike) -> tuple[Path, dict[str, CoordinateImageReader]]:
     """Read data from npy file."""
