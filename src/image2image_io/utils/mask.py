@@ -62,8 +62,8 @@ def polygons_to_mask(polygons: list[Polygon], output_shape: tuple[int, int]) -> 
 
 def transform_mask(mask: np.ndarray, transform: np.ndarray, output_shape: tuple[int, int]) -> np.ndarray:
     """Transform mask."""
-    from skimage.transform import AffineTransform
     from scipy.ndimage import affine_transform
+    from skimage.transform import AffineTransform
 
     tform = AffineTransform(matrix=transform)
     transformed_mask: np.ndarray = affine_transform(
