@@ -10,10 +10,7 @@ import numpy as np
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
-from rasterio.features import rasterize
-from scipy.ndimage import affine_transform
 from shapely import Polygon
-from skimage.transform import AffineTransform
 from tqdm import tqdm
 
 from image2image_io.enums import TIME_FORMAT, MaskOutputFmt
@@ -57,12 +54,17 @@ def shapes_to_polygons(
 
 def polygons_to_mask(polygons: list[Polygon], output_shape: tuple[int, int]) -> np.ndarray:
     """Convert polygons to mask."""
+    from rasterio.features import rasterize
+
     mask: np.ndarray = rasterize(polygons, out_shape=output_shape)
     return mask
 
 
 def transform_mask(mask: np.ndarray, transform: np.ndarray, output_shape: tuple[int, int]) -> np.ndarray:
     """Transform mask."""
+    from skimage.transform import AffineTransform
+    from scipy.ndimage import affine_transform
+
     tform = AffineTransform(matrix=transform)
     transformed_mask: np.ndarray = affine_transform(
         mask, tform.params, output_shape=output_shape, mode="constant", order=0
