@@ -2,7 +2,7 @@
 
 import click
 from loguru import logger
-
+import koyo.compat  # noqa
 from image2image_io import __version__
 from image2image_io.cli.czi2tiff import czi2tiff
 from image2image_io.cli.thumbnail import thumbnail
