@@ -307,9 +307,9 @@ def _convert_geojson_to_df(shape_data: list[dict]) -> pd.DataFrame:
     """Convert GeoJSON data so that it can be transformed back to GeoJSON."""
     # types: pt = Point; pg = Polygon; mp = MultiPolygon
     data = []  # columns: x, y, unique_index, inner, outer, type
-    n = 1
     for feature in shape_data:
         data.append(feature["array"])
-    data = np.concatenate(data)
+    if data:
+        data = np.concatenate(data)
     df = pd.DataFrame(data, columns=["x", "y"])
     return df
