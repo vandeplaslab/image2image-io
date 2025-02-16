@@ -277,8 +277,8 @@ class ShapesReader(BaseReader):
 
         return [Polygon(s["array"]) for s in self.shape_data]
 
-    def to_csv(self, path: PathLike, as_px: bool = False) -> Path:
-        """Export data as CSV file."""
+    def to_table(self):
+        """Convert to table."""
         data = []
         # iterate over shapes
         for i, shape in enumerate(self.shape_data):
@@ -289,9 +289,12 @@ class ShapesReader(BaseReader):
         data = np.concatenate(data)
         # create DataFrame
         df = pd.DataFrame(data, columns=["x", "y", "shape"])
-        # if as_px and self.resolution != 1.0:
-        #     df[["x", "y"]] *= self.resolution
-        # save to CSV
+        df = df.astype({"x": np.float32, "y": np.float32})
+        return df
+
+    def to_csv(self, path: PathLike, as_px: bool = False) -> Path:
+        """Export data as CSV file."""
+        df = self.to_table()
         df.to_csv(path, index=False)
         return Path(path)
 
