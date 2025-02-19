@@ -73,3 +73,13 @@ class Config(BaseConfig):
 
 
 CONFIG = Config()  # type: ignore[call-arg]
+
+
+def get_reader_config() -> Config:
+    """Get reader configuration."""
+    global CONFIG
+
+    if CONFIG is None:
+        CONFIG = Config()
+        CONFIG.load()
+    return CONFIG
