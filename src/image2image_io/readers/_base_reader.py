@@ -381,20 +381,17 @@ class BaseReader:
         top = np.min([h, top])
         top, bottom = sorted([top, bottom])
         left, right = sorted([left, right])
-        print(left, right, top, bottom)
 
         cropped_array = self.crop_bbox(left, right, top, bottom, multiply=False, apply=True)
 
         # Adjust polygon coordinates for the cropped region
         xy_cropped = xy - np.array([left, top])
-        print(xy)
 
         # Create mask only for the cropped region
         cropped_shape = self.get_image_shape_for_shape(cropped_array.shape)
         mask = np.zeros(cropped_shape, dtype=np.uint8)
         cv2.fillPoly(mask, pts=[xy_cropped], color=np.iinfo(np.uint8).max)
         mask = mask.astype(bool)
-        print(mask.max())
 
         # Apply mask
         if cropped_array.ndim == 2:
@@ -411,8 +408,48 @@ class BaseReader:
         # If the array is a dask array, compute it
         if hasattr(cropped_array, "compute"):
             cropped_array = cropped_array.compute()
-
         return cropped_array, (left, right, top, bottom)
+
+    def crop_polygon_iter(self, yx: np.ndarray) -> ty.Generator[np.ndarray, tuple[int, int, int, int]]:
+        """Polygon iterator."""
+        import cv2
+
+        # reverse yx to xy
+        xy = yx[:, ::-1] * self.inv_resolution
+        xy = np.round(xy).astype(np.int32)
+
+        # get left/right/top/bottom from polygon
+        h, w = self.image_shape
+        left, bottom = np.min(xy, axis=0)
+        left = np.max([0, left])
+        bottom = np.max([0, bottom])
+        right, top = np.max(xy, axis=0)
+        right = np.min([w, right])
+        top = np.min([h, top])
+        top, bottom = sorted([top, bottom])
+        left, right = sorted([left, right])
+
+        # Adjust polygon coordinates for the cropped region
+        xy_cropped = xy - np.array([left, top])
+
+        mask = None
+        for channel_id in range(self.n_channels):
+            array = self.get_channel(channel_id)
+            cropped_array = self.crop_bbox(left, right, top, bottom, array=array, multiply=False, apply=True)
+
+            # create mask only once
+            if mask is None:
+                # Create mask only for the cropped region
+                cropped_shape = self.get_image_shape_for_shape(cropped_array.shape)
+                mask = np.zeros(cropped_shape, dtype=np.uint8)
+                cv2.fillPoly(mask, pts=[xy_cropped], color=np.iinfo(np.uint8).max)
+                mask = mask.astype(bool)
+
+            # apply mask
+            cropped_array *= mask
+            if hasattr(cropped_array, "compute"):
+                cropped_array = cropped_array.compute()
+            yield cropped_array, (left, right, top, bottom)
 
     def crop_polygon_mask(self, yx: np.ndarray) -> tuple[np.ndarray, tuple[int, int, int, int]]:
         """Crop image."""
