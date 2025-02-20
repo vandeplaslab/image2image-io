@@ -150,6 +150,8 @@ def guess_rgb(shape: tuple[int, ...]) -> bool:
     bool
         If data is rgb or not.
     """
+    if hasattr(shape, "shape"):
+        shape = shape.shape
     ndim = len(shape)
     last_dim = shape[-1]
     rgb = False
