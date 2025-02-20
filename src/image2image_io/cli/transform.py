@@ -291,7 +291,7 @@ def image(
     )
 
     for image_path in image_:
-        for key, scene_index, total, _ in image_to_ome_tiff(
+        for key, scene_index, total, _, _ in image_to_ome_tiff(
             image_path,
             output_dir,
             as_uint8=as_uint8,

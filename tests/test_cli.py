@@ -31,5 +31,5 @@ def test_thumbnail(tmp_path, with_title):
 def test_transform(tmp_path, transform):
     tmp = tmp_path
     tiff = get_test_file("transform/test-1.ome.tiff")
-    exit_status = os.system(f"i2io transform -i {tiff!s} -o {tmp!s} -T {transform}")
+    exit_status = os.system(f"i2io transform image -i {tiff!s} -o {tmp!s} -T {transform}")
     assert exit_status == 0, "Exit status was not 0"

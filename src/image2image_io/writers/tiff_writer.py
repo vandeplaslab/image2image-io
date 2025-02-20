@@ -8,6 +8,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import SimpleITK as sitk
+import zarr
 from koyo.decorators import retry
 from koyo.timer import MeasureTimer
 from loguru import logger
@@ -133,16 +134,18 @@ class OmeTiffWriter:
 
         if self.crop_bbox is not None:
             _, _, self.x_size, self.y_size = self.crop_bbox
+        if not write_pyramid:
+            tile_size = 0
 
-        self.tile_size = tile_size
         if tile_size:
             # protect against too large tile size
-            while self.y_size / self.tile_size <= 1 or self.x_size / self.tile_size <= 1:
-                self.tile_size = self.tile_size // 2
-            if self.tile_size < 256:
-                self.tile_size = 256
-            if self.x_size < self.tile_size or self.y_size < self.tile_size:
-                self.tile_size = 0
+            while self.y_size / tile_size <= 1 or self.x_size / tile_size <= 1:
+                tile_size = tile_size // 2
+            if tile_size < 256:
+                tile_size = 256
+            if self.x_size < tile_size or self.y_size < tile_size:
+                tile_size = 0
+        self.tile_size = tile_size
         write_pyramid = self.tile_size > 0
 
         if self.tile_size:
@@ -199,7 +202,28 @@ class OmeTiffWriter:
             self.compression = compression
         logger.info(f"Saving using {self.compression} compression")
 
-    def write_image_by_plane(
+    def write(
+        self,
+        name: str,
+        output_dir: Path,
+        tile_size: int = 512,
+        as_uint8: bool | None = None,
+        channel_ids: list[int | tuple[int, ...]] | None = None,
+        channel_names: list[str] | None = None,
+        overwrite: bool = False,
+    ) -> Path:
+        """Write image."""
+        return self.write_image_by_plane(
+            name,
+            output_dir,
+            tile_size=tile_size,
+            channel_ids=channel_ids,
+            as_uint8=as_uint8,
+            channel_names=channel_names,
+            overwrite=overwrite,
+        )
+
+    def _prepare_tiff(
         self,
         name: str,
         output_dir: Path | str = "",
@@ -210,46 +234,8 @@ class OmeTiffWriter:
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
         overwrite: bool = False,
-    ) -> Path:
-        """Write OME-TIFF image plane-by-plane to disk.
-
-        WsiReg compatible RegImages all have methods to read an image channel-by-channel, thus each channel is read,
-        transformed, and written to reduce memory during file writing.
-
-        RGB images may run large memory footprints as they are interleaved before write, for RGB images,
-        using the `OmeTiledTiffWriter` is recommended.
-
-        Parameters
-        ----------
-        name: str
-            Name to be written WITHOUT extension
-            for example if image_name = "cool_image" the file
-            would be "cool_image.ome.tiff"
-        output_dir: Path or str
-            Directory where the image will be saved
-        write_pyramid: bool
-            Whether to write the OME-TIFF with sub-resolutions or not
-        tile_size: int
-            What size to write OME-TIFF tiles to disk
-        compression: str
-            tifffile string to pass to compression argument, defaults to "deflate" for minisblack
-            and "jpeg" for RGB type images
-        as_uint8: bool
-            Whether to save the image in the 0-255 intensity range, substantially reducing file size at the cost of some
-            intensity information.
-        channel_ids: list of int
-            Channel indices to write to OME-TIFF, if None, all channels are written
-        channel_names: list of str
-            Channel names.
-        overwrite: bool
-            Whether to overwrite the file if it already exists
-
-        Returns
-        -------
-        output_file_name: str
-            File path to the written OME-TIFF
-        """
-        # make sure user did not provide filename with OME-TIFF
+    ) -> tuple[Path | None, Path, dict[str, ty.Any] | None, list[int] | None, list[str] | None]:
+        """Prepare all the necessary information to write a TIFF file."""
         name = name.replace(".ome", "").replace(".tiff", "").replace(".tif", "")
         output_file_name = Path(output_dir) / f"{name}.ome.tiff"
         tmp_output_file_name = output_file_name.parent / f"{name}.ome.tiff.tmp"
@@ -259,7 +245,7 @@ class OmeTiffWriter:
         if output_file_name.exists():
             if not overwrite:
                 logger.warning(f"File {output_file_name} already exists, skipping...")
-                return output_file_name
+                return None, output_file_name, None, None, None
             try:
                 output_file_name.unlink()
             except (PermissionError, FileNotFoundError, Exception) as e:
@@ -314,143 +300,268 @@ class OmeTiffWriter:
 
         logger.trace(f"TIFF options: {options}")
         logger.trace(f"Pyramid levels: {self.pyr_levels} ({self.n_pyr_levels})")
+        return tmp_output_file_name, output_file_name, options, channel_ids, channel_names
+
+    def _processed_image_yield(
+        self, channel_ids: list[int | tuple[int, ...]], channel_names: list[str], as_uint8: bool | None = None
+    ) -> ty.Generator[tuple[str, int, np.ndarray], None, None]:
+        reader = self.reader
+        for index, channel_index in enumerate(
+            tqdm(
+                channel_ids,
+                desc="Writing channels..." if not reader.is_rgb else "Collecting channels...",
+            )
+        ):
+            channel_name = channel_names[index]
+            if channel_index not in channel_ids:
+                logger.trace(f"Skipping channel {channel_index}")
+                continue
+
+            # if channel_index is int, then it's simple, otherwise, let's get maximum intensity projection
+            if isinstance(channel_index, int):
+                image: sitk.Image = np.squeeze(
+                    reader.get_channel(channel_index, split_rgb=True),  # type: ignore[assignment]
+                )
+            else:
+                images: list[sitk.Image] = [np.squeeze(reader.get_channel(i, split_rgb=True)) for i in channel_index]
+                images = np.dstack(images)  # type: ignore[assignment]
+                image = np.max(images, axis=2)  # type: ignore[assignment]
+                logger.trace(f"Max intensity projection for channel {channel_name} ({channel_index})")
+
+            # check whether we actually need to do any pre-processing
+            if self.transformer or as_uint8:
+                # load data
+                image = sitk.GetImageFromArray(image)  # type: ignore[arg-type]
+                image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[no-untyped-call]
+
+                # transform
+                if self.transformer and callable(self.transformer):
+                    with MeasureTimer() as timer:
+                        image = self.transformer(image)
+                    logger.trace(
+                        f"Transformed image shape: {image.GetSize()[::-1]} in {timer()}",  # type: ignore[no-untyped-call]
+                    )
+
+                # change dtype
+                if as_uint8:
+                    image = sitk.RescaleIntensity(image, 0, 255)  # type: ignore[no-untyped-call]
+                    image = sitk.Cast(image, sitk.sitkUInt8)  # type: ignore[no-untyped-call]
+
+                # convert to array if necessary
+                if isinstance(image, sitk.Image):
+                    image: np.ndarray = sitk.GetArrayFromImage(image)  # type: ignore[no-redef]
+
+            # ensure that the image is a numpy array and not e.g. dask/zarr array
+            image = np.asarray(image)  # type: ignore[assignment]
+
+            # apply crop mask
+            if self.crop_mask is not None:
+                image = self.crop_mask * image
+            elif self.crop_bbox is not None:
+                x, y, width, height = self.crop_bbox
+                image = image[y : y + height, x : x + width]
+            yield channel_name, channel_index, image
+
+    def _convert_image_to_pyramid(
+        self, image: np.ndarray, interpolation: ty.Any = cv2.INTER_LINEAR
+    ) -> ty.Generator[tuple[int, np.ndarray]]:
+        """Convert image to pyramid and yield the pyramid levels."""
+        for pyramid_index in range(1, self.n_pyr_levels):
+            resize_shape = (self.pyr_levels[pyramid_index][0], self.pyr_levels[pyramid_index][1])
+            yield pyramid_index, cv2.resize(image, resize_shape, interpolation)
+
+    def _write_image_rgb(
+        self,
+        name: str,
+        output_dir: Path | str = "",
+        write_pyramid: bool = True,
+        tile_size: int = 512,
+        compression: str | None = "default",
+        as_uint8: bool | None = None,
+        channel_ids: list[int | tuple[int, ...]] | None = None,
+        channel_names: list[str] | None = None,
+        overwrite: bool = False,
+    ) -> Path | None:
+        # make sure user did not provide filename with OME-TIFF
+        tmp_output_file_name, output_file_name, options, channel_ids, channel_names = self._prepare_tiff(
+            name=name,
+            output_dir=output_dir,
+            write_pyramid=write_pyramid,
+            tile_size=tile_size,
+            compression=compression,
+            as_uint8=as_uint8,
+            channel_ids=channel_ids,
+            channel_names=channel_names,
+            overwrite=overwrite,
+        )
+        # no output file name means we are skipping
+        if tmp_output_file_name is None:
+            return Path(output_file_name) if output_file_name else None
+        assert channel_names is not None, "Channel names must be defined"
+        assert channel_ids is not None, "Channel ids must be defined"
+
         # write OME-XML to the ImageDescription tag of the first page
         description = self.omexml
 
-        reader = self.reader
+        rgb_image: list[np.ndarray] = []
         with TiffWriter(tmp_output_file_name, bigtiff=True) as tif, MeasureTimer() as main_timer:
-            rgb_im_data: list[np.ndarray] = []
-            for index, channel_index in enumerate(
-                tqdm(
-                    channel_ids,
-                    desc="Writing channels..." if not reader.is_rgb else "Collecting channels...",
-                )
+            for _channel_name, _channel_index, image in self._processed_image_yield(
+                channel_ids, channel_names, as_uint8
             ):
-                channel_name = channel_names[index]
-                if channel_index not in channel_ids:
-                    logger.trace(f"Skipping channel {channel_index}")
-                    continue
+                rgb_image.append(image)  # type: ignore[arg-type]
 
-                # if channel_index is int, then it's simple, otherwise, let's get maximum intensity projection
-                if isinstance(channel_index, int):
-                    image: sitk.Image = np.squeeze(
-                        reader.get_channel(channel_index, split_rgb=True),  # type: ignore[assignment]
-                    )
-                else:
-                    images: list[sitk.Image] = [
-                        np.squeeze(reader.get_channel(i, split_rgb=True)) for i in channel_index
-                    ]
-                    images = np.dstack(images)  # type: ignore[assignment]
-                    image = np.max(images, axis=2)  # type: ignore[assignment]
-                    logger.trace(f"Max intensity projection for channel {channel_name} ({channel_index})")
+            # convert to numpy array
+            rgb_image: np.ndarray = np.dstack(rgb_image)  # type: ignore[no-redef]
 
-                # check whether we actually need to do any pre-processing
-                if self.transformer or as_uint8:
-                    # load data
-                    image = sitk.GetImageFromArray(image)  # type: ignore[arg-type]
-                    image.SetSpacing((reader.resolution, reader.resolution))  # type: ignore[no-untyped-call]
+            # write channel data
+            msg = "Writing RGB image"
+            past_msg = msg.replace("Writing", "Wrote")
+            # write channel data
+            logger.trace(f"{msg} - {image.shape}...")  # type: ignore[attr-defined]
 
-                    # transform
-                    if self.transformer and callable(self.transformer):
-                        with MeasureTimer() as timer:
-                            image = self.transformer(image)
-                        logger.trace(
-                            f"Transformed image shape: {image.GetSize()[::-1]} in {timer()}",  # type: ignore[no-untyped-call]
-                        )
+            with MeasureTimer() as write_timer:
+                tif.write(rgb_image, subifds=self.subifds, description=description, **options)
+                logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
 
-                    # change dtype
-                    if as_uint8:
-                        image = sitk.RescaleIntensity(image, 0, 255)  # type: ignore[no-untyped-call]
-                        image = sitk.Cast(image, sitk.sitkUInt8)  # type: ignore[no-untyped-call]
+                if write_pyramid:
+                    logger.info("Writing pyramid...")
+                    for pyramid_index, pyr_image in self._convert_image_to_pyramid(rgb_image):
+                        logger.trace(f"{msg} pyramid index {pyramid_index} - {pyr_image.shape}...")
+                        tif.write(pyr_image, **options, subfiletype=1)
+                        logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
 
-                    # convert to array if necessary
-                    if isinstance(image, sitk.Image):
-                        image: np.ndarray = sitk.GetArrayFromImage(image)  # type: ignore[no-redef]
-
-                # ensure that the image is a numpy array and not e.g. dask/zarr array
-                image = np.asarray(image)  # type: ignore[assignment]
-
-                # apply crop mask
-                if self.crop_mask is not None:
-                    image = self.crop_mask * image
-                elif self.crop_bbox is not None:
-                    x, y, width, height = self.crop_bbox
-                    image = image[y : y + height, x : x + width]
-
-                # if the image is RGB, let's accumulate the image data and write it at the end
-                if reader.is_rgb:
-                    rgb_im_data.append(image)  # type: ignore[arg-type]
-                    continue
-
-                msg = f"Writing image for channel={channel_name} ({channel_index})"
-                past_msg = msg.replace("Writing", "Wrote")
-                # write channel data
-                logger.trace(f"{msg} - {image.shape}...")  # type: ignore[attr-defined]
-                with MeasureTimer() as write_timer:
-                    tif.write(image, subifds=self.subifds, description=description, **options)
-                    logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
-                    if write_pyramid:
-                        for pyramid_index in range(1, self.n_pyr_levels):
-                            resize_shape = (self.pyr_levels[pyramid_index][0], self.pyr_levels[pyramid_index][1])
-                            image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
-                            logger.trace(
-                                f"{msg} pyramid index {pyramid_index} - {image.shape}...",  # type: ignore[attr-defined]
-                            )
-                            tif.write(image, **options, subfiletype=1)
-                            logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
-
-            if reader.is_rgb and rgb_im_data:
-                image: np.ndarray = np.dstack(rgb_im_data)  # type: ignore[no-redef]
-                del rgb_im_data
-
-                # if self.crop_mask is not None:
-                #     image = np.atleast_3d(self.crop_mask) * image
-                # elif self.crop_bbox is not None:
-                #     x, y, width, height = self.crop_bbox
-                #     image = image[y : y + height, x : x + width, :]
-
-                # write channel data
-                msg = "Writing RGB image"
-                past_msg = msg.replace("Writing", "Wrote")
-                # write channel data
-                logger.trace(f"{msg} - {image.shape}...")  # type: ignore[attr-defined]
-                with MeasureTimer() as write_timer:
-                    tif.write(image, subifds=self.subifds, description=description, **options)
-                    logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
-
-                    if write_pyramid:
-                        logger.info("Writing pyramid...")
-                        for pyramid_index in range(1, self.n_pyr_levels):
-                            resize_shape = (self.pyr_levels[pyramid_index][0], self.pyr_levels[pyramid_index][1])
-                            image = cv2.resize(image, resize_shape, cv2.INTER_LINEAR)
-                            logger.trace(
-                                f"{msg} pyramid index {pyramid_index} - {image.shape}...",  # type: ignore[attr-defined]
-                            )
-                            tif.write(image, **options, subfiletype=1)
-                            logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
         logger.trace(f"Exported OME-TIFF in {main_timer()}")
         # rename tmp file to output file
         retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type]
         logger.trace(f"Renamed tmp file to output file ({output_file_name})")
         return Path(output_file_name)
 
-    def write(
+    def _write_image_multichannel(
         self,
         name: str,
-        output_dir: Path,
+        output_dir: Path | str = "",
+        write_pyramid: bool = True,
         tile_size: int = 512,
+        compression: str | None = "default",
         as_uint8: bool | None = None,
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
         overwrite: bool = False,
-    ) -> Path:
-        """Write image."""
-        return self.write_image_by_plane(
-            name,
-            output_dir,
+    ) -> Path | None:
+        tmp_output_file_name, output_file_name, options, channel_ids, channel_names = self._prepare_tiff(
+            name=name,
+            output_dir=output_dir,
+            write_pyramid=write_pyramid,
             tile_size=tile_size,
-            channel_ids=channel_ids,
+            compression=compression,
             as_uint8=as_uint8,
+            channel_ids=channel_ids,
             channel_names=channel_names,
             overwrite=overwrite,
         )
+        # no output file name means we are skipping
+        if tmp_output_file_name is None:
+            return Path(output_file_name) if output_file_name else None
+        assert channel_names is not None, "Channel names must be defined"
+        assert channel_ids is not None, "Channel ids must be defined"
+
+        # write OME-XML to the ImageDescription tag of the first page
+        description = self.omexml
+
+        with TiffWriter(tmp_output_file_name, bigtiff=True) as tif, MeasureTimer() as main_timer:
+            for channel_name, channel_index, image in self._processed_image_yield(channel_ids, channel_names, as_uint8):
+                msg = f"Writing image for channel={channel_name} ({channel_index})"
+                past_msg = msg.replace("Writing", "Wrote")
+                # write channel data
+                logger.trace(f"{msg} - {image.shape}...")
+                with MeasureTimer() as write_timer:
+                    tif.write(image, subifds=self.subifds, description=description, **options)
+                    logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
+                    if write_pyramid:
+                        for pyramid_index, pyr_image in self._convert_image_to_pyramid(image):
+                            logger.trace(f"{msg} pyramid index {pyramid_index} - {pyr_image.shape}...")
+                            tif.write(pyr_image, **options, subfiletype=1)
+                            logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
+
+        logger.trace(f"Exported OME-TIFF in {main_timer()}")
+        # rename tmp file to output file
+        retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type]
+        logger.trace(f"Renamed tmp file to output file ({output_file_name})")
+        return Path(output_file_name)
+
+    def write_image_by_plane(
+        self,
+        name: str,
+        output_dir: Path | str = "",
+        write_pyramid: bool = True,
+        tile_size: int = 512,
+        compression: str | None = "default",
+        as_uint8: bool | None = None,
+        channel_ids: list[int | tuple[int, ...]] | None = None,
+        channel_names: list[str] | None = None,
+        overwrite: bool = False,
+    ) -> Path | None:
+        """Write OME-TIFF image plane-by-plane to disk.
+
+        WsiReg compatible RegImages all have methods to read an image channel-by-channel, thus each channel is read,
+        transformed, and written to reduce memory during file writing.
+
+        RGB images may run large memory footprints as they are interleaved before write, for RGB images,
+        using the `OmeTiledTiffWriter` is recommended.
+
+        Parameters
+        ----------
+        name: str
+            Name to be written WITHOUT extension
+            for example if image_name = "cool_image" the file
+            would be "cool_image.ome.tiff"
+        output_dir: Path or str
+            Directory where the image will be saved
+        write_pyramid: bool
+            Whether to write the OME-TIFF with sub-resolutions or not
+        tile_size: int
+            What size to write OME-TIFF tiles to disk
+        compression: str
+            tifffile string to pass to compression argument, defaults to "deflate" for minisblack
+            and "jpeg" for RGB type images
+        as_uint8: bool
+            Whether to save the image in the 0-255 intensity range, substantially reducing file size at the cost of some
+            intensity information.
+        channel_ids: list of int
+            Channel indices to write to OME-TIFF, if None, all channels are written
+        channel_names: list of str
+            Channel names.
+        overwrite: bool
+            Whether to overwrite the file if it already exists
+
+        Returns
+        -------
+        output_file_name: str
+            File path to the written OME-TIFF
+        """
+        # make sure user did not provide filename with OME-TIFF
+        reader = self.reader
+        if reader.is_rgb:
+            return self._write_image_rgb(
+                name,
+                output_dir,
+                write_pyramid=write_pyramid,
+                tile_size=tile_size,
+                compression=compression,
+                as_uint8=as_uint8,
+                channel_ids=channel_ids,
+                channel_names=channel_names,
+                overwrite=overwrite,
+            )
+        else:
+            return self._write_image_multichannel(
+                name,
+                output_dir,
+                write_pyramid=write_pyramid,
+                tile_size=tile_size,
+                compression=compression,
+                as_uint8=as_uint8,
+                channel_ids=channel_ids,
+                channel_names=channel_names,
+                overwrite=overwrite,
+            )

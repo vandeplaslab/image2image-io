@@ -211,7 +211,13 @@ def image_to_ome_tiff(
     resolution: float | None = None,
     overwrite: bool = False,
 ) -> ty.Generator[ExportProgress, None, None]:
-    """Convert image of any type to OME-TIFF."""
+    """Convert image of any type to OME-TIFF.
+
+    Returns
+    -------
+    ExportProgress
+        Tuple containing the key, current scene, total scenes, current total scene, and if the scene was exported
+    """
     from image2image_io.readers import get_key, get_simple_reader
 
     path = Path(path)

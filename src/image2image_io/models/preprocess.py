@@ -17,7 +17,7 @@ class PreProcessor(BaseModel):
 class NoopProcessor(PreProcessor):
     """A container class for no operation."""
 
-    name = "noop"
+    name: str = "noop"
 
     def __call__(self, channel_name: str, image: np.ndarray) -> np.ndarray:
         """Normalize image."""
