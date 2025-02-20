@@ -8,7 +8,6 @@ from pathlib import Path
 import cv2
 import numpy as np
 import SimpleITK as sitk
-import zarr
 from koyo.decorators import retry
 from koyo.timer import MeasureTimer
 from loguru import logger

@@ -322,8 +322,15 @@ class BaseReader:
         """Return thumbnail."""
         return self.pyramid[-1], self.scale_for_pyramid(-1)
 
-    def crop(
-        self, left: int, right: int, top: int, bottom: int, array: np.ndarray | None = None, multiply: bool = True
+    def crop_bbox(
+        self,
+        left: int,
+        right: int,
+        top: int,
+        bottom: int,
+        array: np.ndarray | None = None,
+        multiply: bool = True,
+        apply: bool = True,
     ) -> np.ndarray:
         """Crop image."""
         inv_resolution = self.inv_resolution if multiply else 1
@@ -352,11 +359,62 @@ class BaseReader:
         else:
             raise ValueError(f"Array has unsupported shape: {array.shape}")
         # check whether an array is dask array - if so, we need to compute it
-        if hasattr(array_, "compute"):
+        if hasattr(array_, "compute") and apply:
             array_ = array_.compute()
         return array_  # type: ignore[no-any-return]
 
     def crop_polygon(self, yx: np.ndarray) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+        """Crop image using polygon, however, try to minimize memory usage."""
+        import cv2
+
+        # reverse yx to xy
+        xy = yx[:, ::-1] * self.inv_resolution
+        xy = np.round(xy).astype(np.int32)
+
+        # get left/right/top/bottom from polygon
+        h, w = self.image_shape
+        left, bottom = np.min(xy, axis=0)
+        left = np.max([0, left])
+        bottom = np.max([0, bottom])
+        right, top = np.max(xy, axis=0)
+        right = np.min([w, right])
+        top = np.min([h, top])
+        top, bottom = sorted([top, bottom])
+        left, right = sorted([left, right])
+        print(left, right, top, bottom)
+
+        cropped_array = self.crop_bbox(left, right, top, bottom, multiply=False, apply=True)
+
+        # Adjust polygon coordinates for the cropped region
+        xy_cropped = xy - np.array([left, top])
+        print(xy)
+
+        # Create mask only for the cropped region
+        cropped_shape = self.get_image_shape_for_shape(cropped_array.shape)
+        mask = np.zeros(cropped_shape, dtype=np.uint8)
+        cv2.fillPoly(mask, pts=[xy_cropped], color=np.iinfo(np.uint8).max)
+        mask = mask.astype(bool)
+        print(mask.max())
+
+        # Apply mask
+        if cropped_array.ndim == 2:
+            cropped_array[~mask] = 0
+        else:
+            channel_axis, _ = self.get_channel_axis_and_n_channels()
+            if channel_axis == 0:
+                cropped_array *= mask
+            elif channel_axis in (1, 2):  # Assuming CxHxW, HxWxC, or HxW
+                cropped_array *= mask[:, :, None]
+            else:
+                raise ValueError(f"Unsupported array shape: {cropped_array.shape}")
+
+        # If the array is a dask array, compute it
+        if hasattr(cropped_array, "compute"):
+            cropped_array = cropped_array.compute()
+
+        return cropped_array, (left, right, top, bottom)
+
+    def crop_polygon_mask(self, yx: np.ndarray) -> tuple[np.ndarray, tuple[int, int, int, int]]:
         """Crop image."""
         import cv2
 
@@ -388,16 +446,14 @@ class BaseReader:
             channel_axis, _ = self.get_channel_axis_and_n_channels()
             if channel_axis == 0:
                 array_ = array_ * mask
-            elif channel_axis == 1:
-                array_ = array_ * mask[:, :, None]
-            elif channel_axis == 2:
+            elif channel_axis in [1, 2]:
                 array_ = array_ * mask[:, :, None]
             else:
                 raise ValueError(f"Array has unsupported shape: {array_.shape}")
         # check whether an array is dask array - if so, we need to compute it
         if hasattr(array_, "compute"):
             array_ = array_.compute()
-        array_ = self.crop(left, right, top, bottom, array=array_, multiply=False)
+        array_ = self.crop_bbox(left, right, top, bottom, array=array_, multiply=False)
         return array_, (left, right, top, bottom)
 
     def warp(self, array: np.ndarray, affine: np.ndarray | None = None) -> np.ndarray:
