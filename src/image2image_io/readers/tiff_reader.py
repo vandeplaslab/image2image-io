@@ -106,7 +106,7 @@ class TiffImageReader(BaseReader):
                 )[0]
             except KeyError:
                 warnings.warn(
-                    "Unable to parse pixel resolution information from file" " defaulting to 1",
+                    "Unable to parse pixel resolution information from file defaulting to 1",
                     stacklevel=2,
                 )
                 return 1.0

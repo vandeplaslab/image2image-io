@@ -286,7 +286,7 @@ def get_tifffile_info(image_filepath):
 
 def grayscale(rgb_image: np.ndarray | da.Array, is_interleaved: bool = False) -> np.ndarray:
     """
-    convert RGB image data to greyscale.
+    Convert RGB image data to greyscale.
 
     Parameters
     ----------

@@ -133,7 +133,7 @@ class BaseReader:
     def shape(self, value: tuple | np.ndarray) -> None:
         """Set shape."""
         if self._array_shape is not None:
-            warnings.warn("Shape is already set, overwriting it.")
+            warnings.warn("Shape is already set, overwriting it.", stacklevel=2)
         self._array_shape = tuple(value)
 
     @property
