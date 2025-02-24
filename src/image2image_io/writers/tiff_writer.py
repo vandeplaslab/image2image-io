@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import typing as ty
+from contextlib import contextmanager
 from pathlib import Path
 
 import cv2
@@ -168,6 +169,7 @@ class OmeTiffWriter:
         else:
             self.pyr_levels = [(self.y_size, self.x_size)]
         self.n_pyr_levels = len(self.pyr_levels)
+        write_pyramid = write_pyramid and self.n_pyr_levels > 1
 
         if self.transformer:
             self.PhysicalSizeX, self.PhysicalSizeY = self.transformer.output_spacing
@@ -233,7 +235,7 @@ class OmeTiffWriter:
         resolution: float | None = None,
         dtype: np.dtype | None = None,
         is_rgb: bool | None = None,
-    ) -> tuple[Path | None, Path, dict[str, ty.Any] | None, list[int] | None, list[str] | None, bool | None]:
+    ) -> tuple[Path | None, Path, dict[str, ty.Any] | None, list[int] | None, list[str] | None, bool | None, bool]:
         """Prepare all the necessary information to write a TIFF file."""
         name = name.replace(".ome", "").replace(".tiff", "").replace(".tif", "")
         output_file_name = Path(output_dir) / f"{name}.ome.tiff"
@@ -244,7 +246,7 @@ class OmeTiffWriter:
         if output_file_name.exists():
             if not overwrite:
                 logger.warning(f"File {output_file_name} already exists, skipping...")
-                return None, output_file_name, None, None, None, None
+                return None, output_file_name, None, None, None, as_uint8, write_pyramid
             try:
                 output_file_name.unlink()
             except (PermissionError, FileNotFoundError, Exception) as e:
@@ -304,7 +306,7 @@ class OmeTiffWriter:
 
         logger.trace(f"TIFF options: {options}")
         logger.trace(f"Pyramid levels: {self.pyr_levels} ({self.n_pyr_levels})")
-        return tmp_output_file_name, output_file_name, options, channel_ids, channel_names, as_uint8
+        return tmp_output_file_name, output_file_name, options, channel_ids, channel_names, as_uint8, write_pyramid
 
     def write(
         self,
@@ -356,10 +358,11 @@ class OmeTiffWriter:
             image = self._process_image(image, resolution=reader.resolution, as_uint8=as_uint8)
             yield channel_name, channel_index, image
 
-    def _process_image(self, image: sitk.Image, resolution: float, as_uint8: bool | None = None) -> np.ndarray:
+    def _process_image(
+        self, image: sitk.Image | np.ndarray, resolution: float, as_uint8: bool | None = None
+    ) -> np.ndarray:
         # check whether we actually need to do any pre-processing
         if self.transformer or as_uint8:
-            # load data
             image = sitk.GetImageFromArray(image)  # type: ignore[arg-type]
             image.SetSpacing((resolution, resolution))  # type: ignore[no-untyped-call]
 
@@ -392,10 +395,12 @@ class OmeTiffWriter:
         return image
 
     def _convert_image_to_pyramid(
-        self, image: np.ndarray, interpolation: ty.Any = cv2.INTER_LINEAR
+        self, image: np.ndarray, interpolation: ty.Any = cv2.INTER_LINEAR, pyr_levels: list[int] | None = None
     ) -> ty.Generator[tuple[int, np.ndarray]]:
         """Convert image to pyramid and yield the pyramid levels."""
-        for pyramid_index in range(1, self.n_pyr_levels):
+        if pyr_levels is None:
+            pyr_levels = list(range(1, self.n_pyr_levels))
+        for pyramid_index in pyr_levels:
             resize_shape = (self.pyr_levels[pyramid_index][0], self.pyr_levels[pyramid_index][1])
             yield pyramid_index, cv2.resize(image, resize_shape, interpolation)
 
@@ -412,16 +417,18 @@ class OmeTiffWriter:
         overwrite: bool = False,
     ) -> Path | None:
         # make sure user did not provide filename with OME-TIFF
-        tmp_output_file_name, output_file_name, options, channel_ids, channel_names, as_uint8 = self._prepare_tiff(
-            name=name,
-            output_dir=output_dir,
-            write_pyramid=write_pyramid,
-            tile_size=tile_size,
-            compression=compression,
-            as_uint8=as_uint8,
-            channel_ids=channel_ids,
-            channel_names=channel_names,
-            overwrite=overwrite,
+        tmp_output_file_name, output_file_name, options, channel_ids, channel_names, as_uint8, write_pyramid = (
+            self._prepare_tiff(
+                name=name,
+                output_dir=output_dir,
+                write_pyramid=write_pyramid,
+                tile_size=tile_size,
+                compression=compression,
+                as_uint8=as_uint8,
+                channel_ids=channel_ids,
+                channel_names=channel_names,
+                overwrite=overwrite,
+            )
         )
         # no output file name means we are skipping
         if tmp_output_file_name is None:
@@ -476,16 +483,18 @@ class OmeTiffWriter:
         channel_names: list[str] | None = None,
         overwrite: bool = False,
     ) -> Path | None:
-        tmp_output_file_name, output_file_name, options, channel_ids, channel_names, as_uint8 = self._prepare_tiff(
-            name=name,
-            output_dir=output_dir,
-            write_pyramid=write_pyramid,
-            tile_size=tile_size,
-            compression=compression,
-            as_uint8=as_uint8,
-            channel_ids=channel_ids,
-            channel_names=channel_names,
-            overwrite=overwrite,
+        tmp_output_file_name, output_file_name, options, channel_ids, channel_names, as_uint8, write_pyramid = (
+            self._prepare_tiff(
+                name=name,
+                output_dir=output_dir,
+                write_pyramid=write_pyramid,
+                tile_size=tile_size,
+                compression=compression,
+                as_uint8=as_uint8,
+                channel_ids=channel_ids,
+                channel_names=channel_names,
+                overwrite=overwrite,
+            )
         )
         # no output file name means we are skipping
         if tmp_output_file_name is None:
@@ -594,3 +603,142 @@ class OmeTiffWriter:
                 channel_names=channel_names,
                 overwrite=overwrite,
             )
+
+
+class OmeTiffWrapper:
+    """OME-TIFF wrapper."""
+
+    reader: BaseReader
+    writer: OmeTiffWriter
+    tiff: TiffWriter
+    path: Path
+
+    as_uint8: bool
+    description: str
+    options: dict
+    write_pyramid: bool
+
+    @property
+    def is_rgb(self) -> bool:
+        """Check if image is RGB."""
+        return self.reader.is_rgb
+
+    @property
+    def resolution(self) -> float:
+        """Resolution."""
+        return self.reader.resolution
+
+    @contextmanager
+    def write(
+        self,
+        channel_names: list[str],
+        resolution: float,
+        shape: tuple[int, ...],
+        dtype: np.dtype,
+        name: str,
+        output_dir: Path | str = "",
+        write_pyramid: bool = True,
+        tile_size: int = 512,
+        compression: str | None = "default",
+        as_uint8: bool | None = None,
+        overwrite: bool = False,
+        transformer: Transformer | None = None,
+    ) -> ty.Generator[OmeTiffWrapper, None, None]:
+        """Write."""
+        from image2image_io.readers._base_reader import DummyReader
+
+        self.reader = DummyReader(
+            channel_names=channel_names,
+            resolution=resolution,
+            shape=shape,
+            dtype=dtype,
+        )
+        self.writer = OmeTiffWriter(reader=self.reader, transformer=transformer)
+        (
+            tmp_output_file_name,
+            output_file_name,
+            self.options,
+            channel_ids,
+            channel_names,
+            self.as_uint8,
+            self.write_pyramid,
+        ) = self.writer._prepare_tiff(
+            name=name,
+            output_dir=output_dir,
+            write_pyramid=write_pyramid,
+            tile_size=tile_size,
+            compression=compression,
+            as_uint8=as_uint8,
+            channel_names=channel_names,
+            overwrite=overwrite,
+        )
+
+        # no output file name means we are skipping
+        if tmp_output_file_name is None:
+            raise ValueError("No output file name")
+        assert channel_names is not None, "Channel names must be defined"
+        assert channel_ids is not None, "Channel ids must be defined"
+
+        # write OME-XML to the ImageDescription tag of the first page
+        self.description = self.writer.omexml
+
+        # write channel data
+        with TiffWriter(tmp_output_file_name, bigtiff=True) as self.tiff, MeasureTimer() as timer:
+            yield self
+
+        logger.trace(f"Exported OME-TIFF in {timer()}")
+        # rename tmp file to output file
+        retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type]
+        logger.trace(f"Renamed tmp file to output file ({output_file_name})")
+        self.path = output_file_name
+
+    def add_channel(self, channel_index: int | list[int], channel_name: str | list[str], array: np.ndarray) -> None:
+        """Add channel."""
+        assert self.reader is not None, "Reader must be defined"
+        assert self.writer is not None, "Writer must be defined"
+        assert self.tiff is not None, "Tiff writer must be defined"
+        if self.is_rgb:
+            self._add_rgb_channel(channel_index, channel_name, array)
+        else:
+            self._add_multichannel_channel(channel_index, channel_name, array)
+
+    def _add_rgb_channel(self, channel_index: list[int], channel_name: list[str], array: np.ndarray) -> None:
+        array = np.dstack(
+            [
+                self.writer._process_image(array[:, :, index], resolution=self.resolution, as_uint8=self.as_uint8)
+                for index in channel_index
+            ]
+        )
+        msg = f"Writing image for channel={channel_name} ({channel_index})"
+        past_msg = msg.replace("Writing", "Wrote")
+        # write channel data
+        logger.trace(f"{msg} - {array.shape}...")
+        with MeasureTimer() as write_timer:
+            self.tiff.write(array, subifds=self.writer.subifds, description=self.description, **self.options)
+            logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
+
+            if self.write_pyramid:
+                for pyramid_index, pyr_image in self.writer._convert_image_to_pyramid(array):
+                    logger.trace(f"{msg} pyramid index {pyramid_index} - {pyr_image.shape}...")
+                    self.tiff.write(pyr_image, **self.options, subfiletype=1)
+                    logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
+                    del pyr_image
+            del array
+
+    def _add_multichannel_channel(self, channel_index: int, channel_name: str, array: np.ndarray) -> None:
+        msg = f"Writing image for channel={channel_name} ({channel_index})"
+        past_msg = msg.replace("Writing", "Wrote")
+        # write channel data
+        logger.trace(f"{msg} - {array.shape}...")
+        with MeasureTimer() as write_timer:
+            array = self.writer._process_image(array, resolution=self.resolution, as_uint8=self.as_uint8)
+            self.tiff.write(array, subifds=self.writer.subifds, description=self.description, **self.options)
+            logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
+
+            if self.write_pyramid:
+                for pyramid_index, pyr_image in self.writer._convert_image_to_pyramid(array):
+                    logger.trace(f"{msg} pyramid index {pyramid_index} - {pyr_image.shape}...")
+                    self.tiff.write(pyr_image, **self.options, subfiletype=1)
+                    logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
+                    del pyr_image
+            del array

@@ -75,7 +75,7 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ignore[
         self.reader = None if isinstance(array_or_reader, np.ndarray) else array_or_reader
         self.allow_extraction = self.reader is not None
         self._is_rgb = False
-        self._im_dtype = np.float32  # type: ignore[assignment]
+        self._array_dtype = np.float32  # type: ignore[assignment]
 
         self.data = data or {}
         if self.name not in self.data:
@@ -169,8 +169,8 @@ class LazyCoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ign
         self.y = y
         self.resolution = resolution
         self._is_rgb = False
-        self._im_dtype = lazy_wrapper.dtype
-        self._im_dims = (y.max(), x.max(), lazy_wrapper.shape[-1])
+        self._array_dtype = lazy_wrapper.dtype
+        self._array_shape = (y.max(), x.max(), lazy_wrapper.shape[-1])
         self.lazy_wrapper = lazy_wrapper
         if channel_names:
             self._channel_names = channel_names

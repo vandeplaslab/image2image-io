@@ -1,10 +1,11 @@
 """Writer tests."""
+
 import numpy as np
 import pytest
 
 from image2image_io.models import MergeImages
 from image2image_io.readers import ArrayImageReader, TiffImageReader
-from image2image_io.writers import MergeOmeTiffWriter, OmeTiffWriter
+from image2image_io.writers import MergeOmeTiffWriter, OmeTiffWrapper, OmeTiffWriter
 
 
 def test_write_rgb_array(tmp_path):
@@ -61,6 +62,85 @@ def test_write_float_array_as_uint8_channel_ids(tmp_path):
     tiff = TiffImageReader(path)
     assert tiff.dtype == np.uint8, "Tiff should be uint8"
     assert tiff.n_channels == 2, "Tiff should have 2 channels"
+
+
+def test_write_lazy_multichannel(tmp_path):
+    array = np.random.random((3, 1024, 1024))
+    channel_names = ["C1", "C2", "C3"]
+    resolution = 0.5
+
+    wrapper = OmeTiffWrapper()
+    with wrapper.write(
+        channel_names=channel_names,
+        resolution=resolution,
+        dtype=array.dtype,
+        shape=array.shape,
+        name="test",
+        output_dir=tmp_path,
+    ):
+        for i in range(array.shape[0]):
+            wrapper.add_channel(i, channel_names[i], array[:, :, i])
+    assert wrapper.path.exists(), "Path should exist"
+
+    tiff = TiffImageReader(wrapper.path)
+    assert tiff.dtype == array.dtype, "Tiff should be float32"
+    assert tiff.n_channels == 3, "Tiff should have 3 channels"
+    assert tiff.resolution == resolution, "Tiff should have resolution"
+    assert tiff.channel_names == channel_names, "Tiff should have channel names"
+
+
+def test_write_lazy_rgb(tmp_path):
+    array = np.random.randint(0, 255, (1024, 1024, 3), dtype=np.uint8)
+
+    channel_names = ["R", "G", "B"]
+    resolution = 0.5
+
+    wrapper = OmeTiffWrapper()
+    with wrapper.write(
+        channel_names=channel_names,
+        resolution=resolution,
+        dtype=array.dtype,
+        shape=array.shape,
+        name="test",
+        output_dir=tmp_path,
+    ):
+        assert wrapper.reader.is_rgb, "Array should be rgb"
+        assert wrapper.is_rgb, "Wrapper should be rgb"
+        wrapper.add_channel([0, 1, 2], channel_names, array)
+    assert wrapper.path.exists(), "Path should exist"
+
+    tiff = TiffImageReader(wrapper.path)
+    assert tiff.dtype == array.dtype, "Tiff should be float32"
+    assert tiff.n_channels == 3, "Tiff should have 3 channels"
+    assert tiff.resolution == resolution, "Tiff should have resolution"
+    assert tiff.channel_names == channel_names, "Tiff should have channel names"
+    assert tiff.is_rgb, "Tiff should be rgb"
+
+
+def test_write_lazy_multichannel_as_uint8(tmp_path):
+    array = np.random.random((3, 1024, 1024))
+    channel_names = ["C0", "C1", "C2"]
+    resolution = 0.5
+
+    wrapper = OmeTiffWrapper()
+    with wrapper.write(
+        channel_names=channel_names,
+        resolution=resolution,
+        dtype=array.dtype,
+        shape=array.shape,
+        name="test",
+        output_dir=tmp_path,
+        as_uint8=True,
+    ):
+        for i in range(array.shape[0]):
+            wrapper.add_channel(i, channel_names[i], array[i])
+    assert wrapper.path.exists(), "Path should exist"
+
+    tiff = TiffImageReader(wrapper.path)
+    assert tiff.dtype == np.uint8, "Tiff should be uint8"
+    assert tiff.n_channels == 3, "Tiff should have 3 channels"
+    assert tiff.resolution == resolution, "Tiff should have resolution"
+    assert tiff.channel_names == channel_names, "Tiff should have channel names"
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])

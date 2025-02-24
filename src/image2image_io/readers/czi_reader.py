@@ -22,7 +22,7 @@ class CziMixin:
     """Mixin class for CZI images."""
 
     fh: CziFile | CziSceneFile
-    im_dims: tuple[int, ...]
+    array_shape: tuple[int, ...]
     is_rgb: bool
     _is_rgb: bool | None = None
     auto_pyramid: bool | None = None
@@ -72,11 +72,11 @@ class CziMixin:
         x_dim_idx = self.fh.axes.index("X")
         shape = np.array(self.fh.shape)
         if shape[-1] > 1:
-            im_dims = np.array(shape)[[y_dim_idx, x_dim_idx, ch_dim_idx]]
+            array_shape = np.array(shape)[[y_dim_idx, x_dim_idx, ch_dim_idx]]
         else:
-            im_dims = np.array(shape)[[ch_dim_idx, y_dim_idx, x_dim_idx]]
+            array_shape = np.array(shape)[[ch_dim_idx, y_dim_idx, x_dim_idx]]
         im_shape = (shape[y_dim_idx], shape[x_dim_idx])
-        return ch_dim_idx, y_dim_idx, x_dim_idx, im_dims, im_shape, self.fh.dtype
+        return ch_dim_idx, y_dim_idx, x_dim_idx, array_shape, im_shape, self.fh.dtype
 
 
 class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
@@ -95,13 +95,12 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         self.fh = CziFile(self.path)
         self.n_scenes = CziSceneFile.get_num_scenes(self.path)
 
-        *_, self.im_dims, self._image_shape, self._im_dtype = self._get_image_info()
-        self.im_dims = self._im_dims = tuple(self.im_dims)
-        self._is_rgb = guess_rgb(self.im_dims)
+        *_, self.shape, self._image_shape, self._array_dtype = self._get_image_info()
+        self._is_rgb = guess_rgb(self.shape)
         self.resolution = self._get_pixel_size()
         self._channel_names = self._get_channel_names()
         logger.trace(
-            f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution:.3f}; n_ch={len(self._channel_names)}"
+            f"{path}: RGB={self.is_rgb}; dims={self.shape}; px={self.resolution:.3f}; n_ch={len(self._channel_names)}"
         )
 
         init_pyramid = init_pyramid if init_pyramid is not None else CONFIG.init_pyramid
@@ -113,7 +112,7 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
     @property
     def n_channels(self) -> int:
         """Return number of channels."""
-        return self.im_dims[2] if self.is_rgb else self.im_dims[0]
+        return self.shape[2] if self.is_rgb else self.shape[0]
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
@@ -145,13 +144,12 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         super().__init__(path, key, reader_kws={"scene_index": scene_index}, auto_pyramid=auto_pyramid)
         self.fh = CziSceneFile(self.path, scene_index=scene_index)
 
-        *_, self.im_dims, self._image_shape, self._im_dtype = self._get_image_info()
-        self.im_dims = self._im_dims = tuple(self.im_dims)
+        *_, self.shape, self._image_shape, self._array_dtype = self._get_image_info()
         self._is_rgb = self.fh.is_rgb
         self.resolution = self._get_pixel_size()
         self._channel_names = self._get_channel_names()
         logger.trace(
-            f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution:.3f}; n_ch={len(self._channel_names)}"
+            f"{path}: RGB={self.is_rgb}; dims={self.shape}; px={self.resolution:.3f}; n_ch={len(self._channel_names)}"
             f"; scene={scene_index}"
         )
 
@@ -164,7 +162,7 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
     @property
     def n_channels(self):
         """Return number of channels."""
-        return self.im_dims[2] if self.is_rgb else self.im_dims[0]
+        return self.shape[2] if self.is_rgb else self.shape[0]
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""

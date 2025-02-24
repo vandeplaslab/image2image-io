@@ -57,7 +57,6 @@ def calc_pyramid_levels(xy_final_shape: np.ndarray, tile_size: int) -> list[tupl
     while all(res_shape > tile_size):
         res_shape = res_shape // 2
         res_shapes.append((int(res_shape[0]), int(res_shape[1])))
-
     return res_shapes[:-1]
 
 

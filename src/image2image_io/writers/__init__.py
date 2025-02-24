@@ -19,7 +19,7 @@ from image2image_io.utils.utilities import (
     reshape_fortran,
 )
 from image2image_io.writers.merge_tiff_writer import MergeImages, MergeOmeTiffWriter
-from image2image_io.writers.tiff_writer import OmeTiffWriter, Transformer
+from image2image_io.writers.tiff_writer import OmeTiffWrapper, OmeTiffWriter, Transformer
 
 if ty.TYPE_CHECKING:
     from image2image_io.readers._base_reader import BaseReader

@@ -9,6 +9,7 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
+from koyo.typing import PathLike
 from loguru import logger
 from ome_types import from_xml
 from tifffile import TiffFile
@@ -36,7 +37,7 @@ class TiffImageReader(BaseReader):
 
     def __init__(
         self,
-        path,
+        path: PathLike,
         key: str | None = None,
         init_pyramid: bool | None = None,
         auto_pyramid: bool | None = None,
@@ -44,19 +45,14 @@ class TiffImageReader(BaseReader):
         super().__init__(path, key, auto_pyramid=auto_pyramid)
         self.fh = TiffFile(self.path)
 
-        self.im_dims, self.im_dtype, self.largest_series = self._get_image_info()
-        self.im_dims = tuple(self.im_dims)
-        self._is_rgb = guess_rgb(self.im_dims)
-        if self.is_rgb:
-            self._image_shape = self.im_dims[0:2]
-        else:
-            self._image_shape = self.im_dims[1::]
+        self.shape, self._array_dtype, self.largest_series = self._get_image_info()
+        self._image_shape = self.shape[0:2] if self.is_rgb else self.shape[1::]
 
         self.resolution = self._get_im_res()
         self._channel_names = self._get_channel_names()
         self._channel_colors = None
         logger.trace(
-            f"{path}: RGB={self.is_rgb}; dims={self.im_dims}; px={self.resolution:.3f}; n_ch={len(self._channel_names)}"
+            f"{path}: RGB={self.is_rgb}; dims={self.shape}; px={self.resolution:.3f}; n_ch={len(self._channel_names)}"
         )
         init_pyramid = init_pyramid if init_pyramid is not None else CONFIG.init_pyramid
         if init_pyramid:
@@ -66,7 +62,7 @@ class TiffImageReader(BaseReader):
     def n_channels(self) -> int:
         """Return number of channels."""
         _, n_channels = self.get_channel_axis_and_n_channels()
-        return self.im_dims[2] if self.is_rgb else n_channels
+        return self.shape[2] if self.is_rgb else n_channels
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
@@ -136,17 +132,17 @@ class TiffImageReader(BaseReader):
                     channel_names.append(f"C{str(idx + 1).zfill(2)}")
         return channel_names
 
-    def _get_image_info(self):
+    def _get_image_info(self) -> tuple:
         if len(self.fh.series) > 1:
             warnings.warn(
                 "The tiff contains multiple series, the largest series will be read by default",
                 stacklevel=2,
             )
 
-        im_dims, im_dtype, largest_series = get_tifffile_info(self.path)
+        array_shape, array_dtype, largest_series = get_tifffile_info(self.path)
         if not CONFIG.auto_pyramid:
             largest_series = 0
-        return im_dims, im_dtype, largest_series
+        return array_shape, array_dtype, largest_series
 
     def get_channel_axis_and_n_channels(self, shape: tuple | None = None) -> tuple[int | None, int]:
         """Return channel axis and number of channels."""

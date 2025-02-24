@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import typing as ty
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -13,7 +14,7 @@ from loguru import logger
 
 from image2image_io.config import CONFIG
 from image2image_io.enums import DEFAULT_TRANSFORM_NAME
-from image2image_io.models.preprocess import NoopProcessor, PreProcessor
+from image2image_io.models.preprocess import NoopProcessor
 from image2image_io.models.transform import TransformData
 from image2image_io.utils.utilities import guess_rgb
 
@@ -41,8 +42,8 @@ class BaseReader:
     _closed = False
     _pyramid = None
     _is_rgb: bool | None = None
-    _im_dtype: np.dtype | None = None
-    _im_dims: tuple[int, ...] | None = None
+    _array_dtype: np.dtype | None = None
+    _array_shape: tuple[int, ...] | None = None
     _image_shape: tuple[int, int] | None = None
     _zstore: zarr.storage.TempStore | None = None
     _scene_ids: list[int] | None = None
@@ -124,9 +125,16 @@ class BaseReader:
     @property
     def shape(self) -> tuple[int, ...]:
         """Return shape of the image, including channels, etc."""
-        if self._im_dims is None:
-            self._im_dims = self.pyramid[0].shape  # TODO: this is wrong!
-        return self._im_dims
+        if self._array_shape is None:
+            self._array_shape = self.pyramid[0].shape  # TODO: this is wrong!
+        return self._array_shape
+
+    @shape.setter
+    def shape(self, value: tuple | np.ndarray) -> None:
+        """Set shape."""
+        if self._array_shape is not None:
+            warnings.warn("Shape is already set, overwriting it.")
+        self._array_shape = tuple(value)
 
     @property
     def image_shape(self) -> tuple[int, int]:
@@ -198,15 +206,15 @@ class BaseReader:
     @property
     def dtype(self) -> np.dtype:
         """Return dtype."""
-        if self._im_dtype is None:
-            self._im_dtype = self.pyramid[0].dtype
-        return self._im_dtype
+        if self._array_dtype is None:
+            self._array_dtype = self.pyramid[0].dtype
+        return self._array_dtype
 
     @property
     def is_rgb(self) -> bool:
         """Return whether image is RGB."""
         if self._is_rgb is None:
-            self._is_rgb = guess_rgb(self.pyramid[0].shape)
+            self._is_rgb = guess_rgb(self.shape)
         return self._is_rgb
 
     @property
@@ -322,6 +330,23 @@ class BaseReader:
         """Return thumbnail."""
         return self.pyramid[-1], self.scale_for_pyramid(-1)
 
+    def crop_region(
+        self, bbox_or_yx: np.ndarray | tuple[int, int, int, int]
+    ) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+        """Crop region."""
+        if isinstance(bbox_or_yx, tuple) and len(bbox_or_yx) == 4:
+            return self.crop_bbox(*bbox_or_yx)
+        return self.crop_polygon(bbox_or_yx)
+
+    def crop_region_iter(
+        self, bbox_or_yx: np.ndarray | tuple[int, int, int, int]
+    ) -> ty.Generator[tuple[np.ndarray | None, tuple[int, int, int, int]], None, None]:
+        """Crop region."""
+        if isinstance(bbox_or_yx, tuple) and len(bbox_or_yx) == 4:
+            yield from self.crop_bbox_iter(*bbox_or_yx)
+        else:
+            yield from self.crop_polygon_iter(bbox_or_yx)
+
     def crop_bbox(
         self,
         left: int,
@@ -331,7 +356,7 @@ class BaseReader:
         array: np.ndarray | None = None,
         multiply: bool = True,
         apply: bool = True,
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, tuple[int, int, int, int]]:
         """Crop image."""
         inv_resolution = self.inv_resolution if multiply else 1
         top, bottom = sorted([top, bottom])
@@ -361,13 +386,41 @@ class BaseReader:
         # check whether an array is dask array - if so, we need to compute it
         if hasattr(array_, "compute") and apply:
             array_ = array_.compute()
-        return array_  # type: ignore[no-any-return]
+        return array_, (left, right, top, bottom)  # type: ignore[no-any-return]
+
+    def crop_bbox_iter(
+        self,
+        left: int,
+        right: int,
+        top: int,
+        bottom: int,
+        multiply: bool = True,
+        apply: bool = True,
+    ) -> ty.Generator[tuple[np.ndarray | None, tuple[int, int, int, int]], None, None]:
+        """Crop image."""
+        inv_resolution = self.inv_resolution if multiply else 1
+        top, bottom = sorted([top, bottom])
+        left, right = sorted([left, right])
+        left = math.floor(left * inv_resolution)
+        right = math.ceil(right * inv_resolution)
+        top = math.floor(top * inv_resolution)
+        bottom = math.ceil(bottom * inv_resolution)
+        yield None, (left, right, top, bottom)
+
+        for channel_id in range(self.n_channels):
+            array = self.get_channel(channel_id, split_rgb=True)
+            array_ = array[top:bottom, left:right]
+            # check whether an array is dask array - if so, we need to compute it
+            if hasattr(array_, "compute") and apply:
+                array_ = array_.compute()
+            yield array_, (left, right, top, bottom)  # type: ignore[no-any-return]
 
     def crop_polygon(self, yx: np.ndarray) -> tuple[np.ndarray, tuple[int, int, int, int]]:
         """Crop image using polygon, however, try to minimize memory usage."""
         import cv2
 
         # reverse yx to xy
+        yx = np.asarray(yx)
         xy = yx[:, ::-1] * self.inv_resolution
         xy = np.round(xy).astype(np.int32)
 
@@ -382,7 +435,7 @@ class BaseReader:
         top, bottom = sorted([top, bottom])
         left, right = sorted([left, right])
 
-        cropped_array = self.crop_bbox(left, right, top, bottom, multiply=False, apply=True)
+        cropped_array, _ = self.crop_bbox(left, right, top, bottom, multiply=False, apply=True)
 
         # Adjust polygon coordinates for the cropped region
         xy_cropped = xy - np.array([left, top])
@@ -410,11 +463,14 @@ class BaseReader:
             cropped_array = cropped_array.compute()
         return cropped_array, (left, right, top, bottom)
 
-    def crop_polygon_iter(self, yx: np.ndarray) -> ty.Generator[np.ndarray, tuple[int, int, int, int]]:
+    def crop_polygon_iter(
+        self, yx: np.ndarray
+    ) -> ty.Generator[tuple[np.ndarray | None, tuple[int, int, int, int]], None, None]:
         """Polygon iterator."""
         import cv2
 
         # reverse yx to xy
+        yx = np.asarray(yx)
         xy = yx[:, ::-1] * self.inv_resolution
         xy = np.round(xy).astype(np.int32)
 
@@ -431,11 +487,12 @@ class BaseReader:
 
         # Adjust polygon coordinates for the cropped region
         xy_cropped = xy - np.array([left, top])
+        yield None, (left, right, top, bottom)
 
         mask = None
         for channel_id in range(self.n_channels):
-            array = self.get_channel(channel_id)
-            cropped_array = self.crop_bbox(left, right, top, bottom, array=array, multiply=False, apply=True)
+            array = self.get_channel(channel_id, split_rgb=True)
+            cropped_array, _ = self.crop_bbox(left, right, top, bottom, array=array, multiply=False, apply=True)
 
             # create mask only once
             if mask is None:
@@ -490,8 +547,44 @@ class BaseReader:
         # check whether an array is dask array - if so, we need to compute it
         if hasattr(array_, "compute"):
             array_ = array_.compute()
-        array_ = self.crop_bbox(left, right, top, bottom, array=array_, multiply=False)
+        array_, _ = self.crop_bbox(left, right, top, bottom, array=array_, multiply=False)
         return array_, (left, right, top, bottom)
+
+    def crop_polygon_mask_iter(
+        self, yx: np.ndarray
+    ) -> ty.Generator[tuple[np.ndarray | None, tuple[int, int, int, int]], None, None]:
+        """Crop image."""
+        import cv2
+
+        # reverse yx to xy
+        xy = yx[:, ::-1] * self.inv_resolution
+        xy = np.round(xy).astype(np.int32)
+        # get left/right/top/bottom from polygon
+        h, w = self.image_shape
+        left, bottom = np.min(xy, axis=0)
+        left = np.max([0, left])
+        bottom = np.max([0, bottom])
+        right, top = np.max(xy, axis=0)
+        right = np.min([w, right])
+        top = np.min([h, top])
+        top, bottom = sorted([top, bottom])
+        left, right = sorted([left, right])
+
+        # get mask
+        mask = np.zeros(self.image_shape, dtype=np.uint8)
+        mask = cv2.fillPoly(mask, pts=[xy], color=np.iinfo(np.uint8).max)
+        mask = mask.astype(bool)
+        yield None, (left, right, top, bottom)
+
+        # get array
+        for channel_id in range(self.n_channels):
+            array_ = self.get_channel(channel_id)
+            array_[mask] = 0
+            # check whether an array is dask array - if so, we need to compute it
+            if hasattr(array_, "compute"):
+                array_ = array_.compute()
+            array_, _ = self.crop_bbox(left, right, top, bottom, array=array_, multiply=False)
+            yield array_, (left, right, top, bottom)
 
     def warp(self, array: np.ndarray, affine: np.ndarray | None = None) -> np.ndarray:
         """Warp array.
@@ -618,3 +711,18 @@ class BaseReader:
             overwrite=overwrite,
             transformer=transformer,
         )
+
+
+class DummyReader(BaseReader):
+    """Dummy reader."""
+
+    def __init__(self, resolution: float, channel_names: list[str], shape: tuple[int, ...], dtype: np.dtype):
+        super().__init__("", "", auto_pyramid=False)
+        self._channel_names = channel_names
+        self._resolution = resolution
+        self._array_dtype = dtype
+        self.shape = shape
+
+    def pyramid(self) -> list[np.ndarray]:
+        """Pyramid."""
+        return []
