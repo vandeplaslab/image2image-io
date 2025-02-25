@@ -255,11 +255,6 @@ def image_to_ome_tiff(
         scene_metadata = {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
         logger.trace(f"Metadata not specified for {path}. Using default metadata.")
 
-    # scene_metadata: dict[str, list[int | str]] = (
-    #     metadata.get(0, {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names})
-    #     if metadata
-    #     else {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
-    # )
     if scene_metadata:
         assert "channel_ids" in scene_metadata, "Channel IDs must be specified in metadata."
         assert "channel_names" in scene_metadata, "Channel names must be specified in metadata."
