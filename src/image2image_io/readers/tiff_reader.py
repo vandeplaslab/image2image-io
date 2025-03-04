@@ -139,7 +139,7 @@ class TiffImageReader(BaseReader):
                 stacklevel=2,
             )
 
-        array_shape, array_dtype, largest_series = get_tifffile_info(self.path)
+        array_shape, _, array_dtype, largest_series = get_tifffile_info(self.path)
         if not CONFIG.auto_pyramid:
             largest_series = 0
         return array_shape, array_dtype, largest_series

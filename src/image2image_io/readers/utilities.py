@@ -118,7 +118,7 @@ def centered_transform(
     return rot_mat
 
 
-def tf_get_largest_series(image_filepath):
+def get_largest_pyramid_series_tiff(image_filepath):
     """Determine the largest series for .scn files by examining metadata.
 
     For other multi-series files, find the one with the most pixels.
@@ -273,15 +273,13 @@ def read_preprocess_array(array, preprocessing, force_rgb=None):
 
 def get_tifffile_info(image_filepath):
     """Get tiff file information."""
-    largest_series = tf_get_largest_series(image_filepath)
+    largest_series = get_largest_pyramid_series_tiff(image_filepath)
     zarr_im = zarr.open(imread(image_filepath, aszarr=True, series=largest_series))
     zarr_im = zarr_get_base_pyr_layer(zarr_im)
-    im_dims = np.squeeze(zarr_im.shape)
-    if len(im_dims) == 2:
-        im_dims = np.concatenate([[1], im_dims])
-    im_dtype = zarr_im.dtype
-
-    return im_dims, im_dtype, largest_series
+    image_shape = image_shape_ = np.squeeze(zarr_im.shape)
+    if len(image_shape_) == 2:
+        image_shape_ = np.concatenate([[1], image_shape_])
+    return image_shape, image_shape_, zarr_im.dtype, largest_series
 
 
 def grayscale(rgb_image: np.ndarray | da.Array, is_interleaved: bool = False) -> np.ndarray:
@@ -335,7 +333,7 @@ def tf_zarr_read_single_ch(image_filepath, channel_idx, is_rgb, is_rgb_interleav
     im:np.ndarray
         image as a np.ndarray
     """
-    largest_series = tf_get_largest_series(image_filepath)
+    largest_series = get_largest_pyramid_series_tiff(image_filepath)
     zarr_im = zarr.open(imread(image_filepath, aszarr=True, series=largest_series))
     zarr_im = zarr_get_base_pyr_layer(zarr_im)
     try:
