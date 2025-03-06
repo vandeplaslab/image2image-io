@@ -1,7 +1,7 @@
 """Normalizer model class."""
 
 import numpy as np
-from pydantic import validator
+from pydantic import field_validator
 
 from image2image_io.models.base import BaseModel
 
@@ -32,7 +32,7 @@ class IMSNormalizer(PreProcessor):
     array: np.ndarray
 
     # noinspection PyMethodParameters
-    @validator("array")
+    @field_validator("array")
     def _validate_array(cls, array: np.ndarray) -> np.ndarray:
         """Validate array."""
         if not isinstance(array, np.ndarray):
