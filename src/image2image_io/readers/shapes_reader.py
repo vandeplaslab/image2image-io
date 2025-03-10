@@ -212,7 +212,7 @@ class ShapesReader(BaseReader):
         shape_arrays = [s["array"][:, [1, 0]] for s in shape_data]  # expect y, x
         shape_props = {"name": shape_names}
         shape_text = {
-            "text": "{name}",
+            "string": "{name}",
             "color": "white",
             "anchor": "center",
             "size": 12,
@@ -238,10 +238,9 @@ class ShapesReader(BaseReader):
             shape_type = CONFIG.shape_display
 
         kws = {
-            "data": shape_arrays,
+            "data": [(shape, shape_type) for shape in shape_arrays],
             "properties": shape_props,
             "text": shape_text,
-            "shape_type": shape_type,
             "scale": self.scale,
             "affine": self.transform,
             "edge_width": 10,

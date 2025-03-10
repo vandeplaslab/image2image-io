@@ -166,7 +166,10 @@ def read_geojson(json_file: PathLike) -> tuple[list, list]:
                 with z.open(filename) as f:
                     data = f.read()
                     gj_data = json.loads(data.decode("utf-8"))
+    return _parse_geojson_data(gj_data)
 
+
+def _parse_geojson_data(gj_data: dict | list) -> tuple[list, list]:
     if isinstance(gj_data, dict):
         # handle GeoPandas GeoJSON
         if "type" in gj_data and "features" in gj_data:

@@ -105,7 +105,7 @@ class Config(BaseConfig):
             "in_app": False,
         },
     )
-    subsample_random_seed: float = Field(
+    subsample_random_seed: int = Field(
         -1,
         title="Subsample random seed",
         description="Shapes subsample ratio.",
