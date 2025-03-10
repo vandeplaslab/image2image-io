@@ -196,7 +196,7 @@ class MergeOmeTiffWriter:
     ) -> None:
         """Prepare OME-XML and other data needed for saving."""
         if transformer:
-            self.x_size, self.y_size = transformer.output_size
+            self.x_size, self.y_size = transformer.output_size[::-1]
         elif self.crop_mask is not None:
             self.y_size, self.x_size = self.crop_mask.shape
         else:

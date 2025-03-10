@@ -41,6 +41,25 @@ def is_txt_and_has_columns(
     return check_df_columns(df, required, either, either_dtype)
 
 
+def get_shape_columns(path: PathLike) -> tuple[str, str, str | None]:
+    """Get columns."""
+    path = Path(path)
+    if path.suffix == ".csv":
+        df = pd.read_csv(path, nrows=1)
+    elif path.suffix in [".txt", ".tsv"]:
+        temp = pd.read_csv(path, delimiter="\t", nrows=1)
+        sep = "\t" if len(temp.columns) > 1 else " "
+        df = pd.read_csv(path, delimiter=sep, nrows=1)
+    elif path.suffix == ".parquet":
+        df = pd.read_parquet(path)
+    else:
+        raise ValueError(f"Invalid file extension: {path.suffix}")
+    x_key = get_column_name(df, ["vertex_x", "x", "x:x", "x_location", "x_centroid"])
+    y_key = get_column_name(df, ["vertex_y", "y", "y:y", "y_location", "y_centroid"])
+    group_by = get_column_name(df, ["cell", "cell_id", "shape", "shape_name"])
+    return x_key, y_key, group_by
+
+
 def read_shapes(path: PathLike) -> tuple:
     """Read shapes."""
     path = Path(path)
@@ -54,10 +73,6 @@ def read_shapes(path: PathLike) -> tuple:
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
-
-    get_column_name(df, ["vertex_x", "x"])
-    get_column_name(df, ["vertex_y", "y"])
-    get_column_name(df, ["cell", "cell_id", "shape", "shape_name"])
     return read_shapes_from_df(df)
 
 
