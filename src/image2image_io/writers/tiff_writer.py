@@ -417,18 +417,24 @@ class OmeTiffWriter:
         overwrite: bool = False,
     ) -> Path | None:
         # make sure user did not provide filename with OME-TIFF
-        tmp_output_file_name, output_file_name, options, channel_ids, channel_names, as_uint8, write_pyramid = (
-            self._prepare_tiff(
-                name=name,
-                output_dir=output_dir,
-                write_pyramid=write_pyramid,
-                tile_size=tile_size,
-                compression=compression,
-                as_uint8=as_uint8,
-                channel_ids=channel_ids,
-                channel_names=channel_names,
-                overwrite=overwrite,
-            )
+        (
+            tmp_output_file_name,
+            output_file_name,
+            options,
+            channel_ids,
+            channel_names,
+            as_uint8,
+            write_pyramid,
+        ) = self._prepare_tiff(
+            name=name,
+            output_dir=output_dir,
+            write_pyramid=write_pyramid,
+            tile_size=tile_size,
+            compression=compression,
+            as_uint8=as_uint8,
+            channel_ids=channel_ids,
+            channel_names=channel_names,
+            overwrite=overwrite,
         )
         # no output file name means we are skipping
         if tmp_output_file_name is None:
@@ -483,18 +489,24 @@ class OmeTiffWriter:
         channel_names: list[str] | None = None,
         overwrite: bool = False,
     ) -> Path | None:
-        tmp_output_file_name, output_file_name, options, channel_ids, channel_names, as_uint8, write_pyramid = (
-            self._prepare_tiff(
-                name=name,
-                output_dir=output_dir,
-                write_pyramid=write_pyramid,
-                tile_size=tile_size,
-                compression=compression,
-                as_uint8=as_uint8,
-                channel_ids=channel_ids,
-                channel_names=channel_names,
-                overwrite=overwrite,
-            )
+        (
+            tmp_output_file_name,
+            output_file_name,
+            options,
+            channel_ids,
+            channel_names,
+            as_uint8,
+            write_pyramid,
+        ) = self._prepare_tiff(
+            name=name,
+            output_dir=output_dir,
+            write_pyramid=write_pyramid,
+            tile_size=tile_size,
+            compression=compression,
+            as_uint8=as_uint8,
+            channel_ids=channel_ids,
+            channel_names=channel_names,
+            overwrite=overwrite,
         )
         # no output file name means we are skipping
         if tmp_output_file_name is None:
