@@ -46,7 +46,7 @@ class TiffImageReader(BaseReader):
         self.fh = TiffFile(self.path)
 
         self.shape, self._array_dtype, self.largest_series = self._get_image_info()
-        self._image_shape = self.shape[0:2] if self.is_rgb else self.shape[1::]
+        self._image_shape = self.shape[0:2] if self.is_rgb else (self.shape[1::] if len(self.shape) > 2 else self.shape)
 
         self.resolution = self._get_im_res()
         self._channel_names = self._get_channel_names()

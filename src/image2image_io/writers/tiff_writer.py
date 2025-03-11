@@ -105,7 +105,7 @@ class OmeTiffWriter:
         if y < 0:
             y = 0
         if self.transformer is not None:
-            image_shape = self.transformer.output_size
+            image_shape = self.transformer.output_size[::-1]
         else:
             image_shape = self.reader.image_shape
         if x + width > image_shape[1]:
