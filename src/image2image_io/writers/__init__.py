@@ -421,6 +421,7 @@ def write_ome_tiff_alt(
     channel_names: list[str] | None = None,
     transformer: Transformer | None = None,
     overwrite: bool = False,
+    write: bool = True,
 ) -> Path:
     """Write OME-TIFF."""
     from image2image_io.writers.tiff_writer import OmeTiffWriter
@@ -428,17 +429,19 @@ def write_ome_tiff_alt(
     path = Path(path)
     filename = path.name.replace(".ome.tiff", "")
     writer = OmeTiffWriter(reader, transformer=transformer)
-    output_path = writer.write_image_by_plane(
-        filename,
-        path.parent,
-        write_pyramid=tile_size > 0,
-        as_uint8=as_uint8,
-        channel_ids=channel_ids,
-        channel_names=channel_names,
-        tile_size=tile_size,
-        overwrite=overwrite,
-    )
-    return output_path
+    if write:
+        output_path = writer.write_image_by_plane(
+            filename,
+            path.parent,
+            write_pyramid=tile_size > 0,
+            as_uint8=as_uint8,
+            channel_ids=channel_ids,
+            channel_names=channel_names,
+            tile_size=tile_size,
+            overwrite=overwrite,
+        )
+        return output_path
+    return writer
 
 
 def images_to_fusion(

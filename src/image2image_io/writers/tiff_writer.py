@@ -217,7 +217,7 @@ class OmeTiffWriter:
             self.compression = "jpeg" if is_rgb else "deflate"
         else:
             self.compression = compression
-        logger.info(f"Saving using {self.compression} compression")
+        logger.info(f"Saving using {self.compression} compression. Datatype: {dtype} (as_uint8={as_uint8})")
 
     def _prepare_tiff(
         self,
@@ -298,7 +298,7 @@ class OmeTiffWriter:
             options = {
                 "tile": (self.tile_size, self.tile_size),
                 "compression": self.compression,
-                "photometric": "rgb" if self.reader.is_rgb else "minisblack",
+                "photometric": "minisblack",
                 "metadata": None,
             }
         if self.tile_size == 0 or np.max(self.reader.image_shape) < self.tile_size:
