@@ -70,7 +70,7 @@ def merge_images(
     name: str,
     paths: ty.Iterable[PathLike],
     output_dir: PathLike,
-    as_uint8: bool = False,
+    as_uint8: bool | None = None,
     tile_size: int = 512,
     metadata: MetadataDict | None = None,
     overwrite: bool = False,
@@ -148,7 +148,7 @@ def merge_images(
 def images_to_ome_tiff(
     paths: ty.Iterable[PathLike],
     output_dir: PathLike | None = None,
-    as_uint8: bool = False,
+    as_uint8: bool | None = None,
     tile_size: int = 512,
     metadata: MetadataDict | None = None,
     path_to_scene: dict[Path, list[int]] | None = None,
@@ -203,7 +203,7 @@ def images_to_ome_tiff(
 def image_to_ome_tiff(
     path: PathLike,
     output_dir: PathLike | None = None,
-    as_uint8: bool = False,
+    as_uint8: bool | None = None,
     tile_size: int = 512,
     suffix: str = "",
     metadata: MetadataReader | None = None,
@@ -276,7 +276,7 @@ def image_to_ome_tiff(
 def czis_to_ome_tiff(
     paths: ty.Iterable[PathLike],
     output_dir: PathLike | None = None,
-    as_uint8: bool = False,
+    as_uint8: bool | None = None,
     tile_size: int = 512,
     metadata: MetadataDict | None = None,
 ) -> ty.Generator[ExportProgress, None, None]:
@@ -302,7 +302,7 @@ def czis_to_ome_tiff(
 def czi_to_ome_tiff(
     path: PathLike,
     output_dir: PathLike | None = None,
-    as_uint8: bool = False,
+    as_uint8: bool | None = None,
     tile_size: int = 512,
     metadata: MetadataReader | None = None,
     reader_scenes: list[int] | None = None,
