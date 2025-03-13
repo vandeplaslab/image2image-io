@@ -245,6 +245,11 @@ class BaseReader:
         return self.path.stem
 
     @property
+    def clean_key(self) -> str:
+        """Key without extras."""
+        return self.key[0:-4]
+
+    @property
     def clean_name(self) -> str:
         """Return name of the input path."""
         name = self.name
