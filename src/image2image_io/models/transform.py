@@ -152,20 +152,24 @@ class TransformModel(BaseModel):
         """Return list of transform names."""
         return [Path(t).name for t in self.transforms] if self.transforms else []
 
-    def add_transform(self, name_or_path: PathLike, transform_data: TransformData, with_inverse: bool = True) -> None:
+    def add_transform(
+        self, name_or_path: PathLike, transform_data: TransformData, with_inverse: bool = True, silent: bool = False
+    ) -> None:
         """Add transformation matrix."""
         if self.transforms is None:
             self.transforms = {}
 
         path = Path(name_or_path)
         self.transforms[path] = transform_data
-        logger.info(f"Added '{path.name}' to list of transformations")
+        if not silent:
+            logger.info(f"Added '{path.name}' to list of transformations")
         if with_inverse:
             path = Path(name_or_path).parent / (path.name + " (inverse)")
             transform_data = deepcopy(transform_data)
             transform_data.is_inverse = True
             self.transforms[path] = transform_data
-            logger.info(f"Added '{path.name}' to list of transformations")
+            if not silent:
+                logger.info(f"Added '{path.name}' to list of transformations")
 
     def remove_transform(self, name_or_path: PathLike) -> None:
         """Remove transformation matrix."""
@@ -200,3 +204,20 @@ class TransformModel(BaseModel):
         if name_or_path in self.transforms:
             return self.transforms[name_or_path]
         return None
+
+    def get_info(self) -> str:
+        info = ""
+        transform = self.compute()
+        if hasattr(transform, "scale"):
+            scale = transform.scale
+            scale = (scale, scale) if isinstance(scale, float) else scale
+            info += f"\nScale: {scale[0]:.3f}, {scale[1]:.3f}"
+        if hasattr(transform, "translation"):
+            translation = transform.translation
+            translation = (translation, translation) if isinstance(translation, float) else translation
+            info += f"\nTranslation: {translation[0]:.3f}, {translation[1]:.3f}"
+        if hasattr(transform, "rotation"):
+            radians = transform.rotation
+            degrees = radians * 180 / 3.141592653589793
+            info += f"\nRotation: {radians:.3f} ({degrees:.3f}°)"
+        return info

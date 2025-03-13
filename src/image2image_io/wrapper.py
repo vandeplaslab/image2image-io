@@ -74,7 +74,10 @@ class ImageWrapper:
 
     def get_reader_for_key(self, key: str) -> BaseReader:
         """Return reader for specified key."""
-        return self.data[key]
+        try:
+            return self.data[key]
+        except KeyError:
+            return None
 
     def is_loaded(self, path: PathLike) -> bool:
         """Check if the path is loaded."""
@@ -260,9 +263,8 @@ class ImageWrapper:
                 channel_names = ["RGB"]
             else:
                 channel_names = [reader.channel_names[index]]
-        except (IndexError, NotImplementedError) as err:
+        except (IndexError, NotImplementedError):
             channel_names = [f"C{index}"]
-            logger.error(f"Error getting channel names: {err}")
         channel_names = [f"{name} | {key}" for name in channel_names]
         return channel_names
 

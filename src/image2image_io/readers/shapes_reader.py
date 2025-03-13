@@ -132,6 +132,7 @@ class ShapesReader(BaseReader):
             return
         self.geojson_data, self.shape_data = read_data(self.path)
         self._channel_names = [self.path.stem]
+        self._array_dtype = np.dtype("float32")
 
     @classmethod
     def create(cls, name: str = "", channel_names: list[str] | None = None):
