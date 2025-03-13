@@ -55,6 +55,7 @@ class BaseReader:
     auto_pyramid: bool | None = None
     reader: str = "base"
     reader_type: str = "image"
+    display_type: str | None = None
     n_scenes: int = 1
     lazy: bool = False
     fh: ty.Any | None = None

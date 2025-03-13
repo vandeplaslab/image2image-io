@@ -127,12 +127,12 @@ class ShapesReader(BaseReader):
 
     def __init__(self, path: PathLike, key: str | None = None, auto_pyramid: bool | None = None, init: bool = True):
         super().__init__(path, key=key, auto_pyramid=auto_pyramid)
+        self._array_dtype = np.dtype("float32")
         if not init:
             self.geojson_data, self.shape_data = [], []
             return
         self.geojson_data, self.shape_data = read_data(self.path)
         self._channel_names = [self.path.stem]
-        self._array_dtype = np.dtype("float32")
 
     @classmethod
     def create(cls, name: str = "", channel_names: list[str] | None = None):
