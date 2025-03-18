@@ -115,8 +115,8 @@ class CziFile(_CziFile):
         with MeasureTimer() as timer:
             self.as_tzcyx0_array(out=out, max_workers=cpu_count() if CONFIG.multicore else 1)
             z_array = da.squeeze(da.from_zarr(zarr.open(zarr_fp)[0]))
-            dask_pyr.append(da.squeeze(z_array))
-        logger.trace(f"Loaded data in {timer()} ({z_array.shape})")
+            dask_pyr.append(z_array)
+        logger.trace(f"Loaded data in {timer()} to shape {z_array.shape}")
 
         if not pyramid:
             logger.trace("Pyramid creation disabled")
@@ -125,9 +125,10 @@ class CziFile(_CziFile):
         ds = 1
         while np.min(yx_shape) // 2**ds >= tile_size:
             ds += 1
-        logger.trace(f"Generating {ds} down-sampled images")
 
-        for ds_factor in range(1, ds):
+        ds_levels = list(range(1, ds))
+        logger.trace(f"Generating {ds_levels} down-sampled images")
+        for ds_factor in ds_levels:
             with MeasureTimer() as timer:
                 zres = zarr.storage.TempStore()
                 rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
@@ -135,7 +136,7 @@ class CziFile(_CziFile):
                 z_array_ds = compute_sub_res(z_array, ds_factor, tile_size, is_rgb, self.dtype)
                 da.to_zarr(z_array_ds, zres, component="0")
                 dask_pyr.append(da.squeeze(da.from_zarr(zres, component="0")))
-            logger.trace(f"Down-sampled {ds_factor} in {timer()} ({z_array_ds.shape})")
+            logger.trace(f"Down-sampled {ds_factor} in {timer()} to shape {z_array_ds.shape}")
         return dask_pyr
 
     @cached_property
@@ -278,7 +279,7 @@ class CziSceneFile(CziFile):
 
 def czi_tile_grayscale(rgb_image):
     """
-    convert RGB image data to greyscale.
+    Convert RGB image data to greyscale.
 
     Parameters
     ----------

@@ -111,7 +111,7 @@ class TiffImageReader(BaseReader):
                 )
                 return 1.0
 
-    def _get_channel_names(self):
+    def _get_channel_names(self) -> list[str]:
         channel_names = []
         if any(suffix in self.path.name for suffix in [".qptiff", ".qptiff.intermediate", ".qptiff.raw"]):
             channel_names = qptiff_channel_names(self.fh)
@@ -121,11 +121,8 @@ class TiffImageReader(BaseReader):
                 channel_names = []
 
         if not channel_names or len(channel_names) != self.n_channels:
-            # logger.warning(
-            #     f"Number of channels ({self.n_channels}) does not match number of channel names ({channel_names})"
-            # )
             if self.is_rgb:
-                channel_names = ["R", "G", "B"]
+                channel_names = ["R", "G", "B"] if CONFIG.split_rgb else ["RGB"]
             else:
                 channel_names = []
                 for idx, _ch in enumerate(range(self.n_channels)):

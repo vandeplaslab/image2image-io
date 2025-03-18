@@ -783,3 +783,20 @@ def _read_imzml_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImageR
     y = y - np.min(y)  # minimized
     key = get_key(path)
     return path, {path.name: CoordinateImageReader(path, x, y, array_or_reader=reader, key=key)}
+
+
+def get_czi_metadata(path: PathLike) -> dict[str, dict[str, ty.Any]]:
+    """Read CZI metadata."""
+    from image2image_io.readers._czi import CziSceneFile
+
+    path = Path(path)
+    assert path.suffix == ".czi", "Only .czi files are supported"
+
+    metadata = {}
+    n = CziSceneFile.get_num_scenes(path)
+    if n == 1:
+        metadata[get_key(path)] = {"path": path, "scene_index": None}
+    else:
+        for scene_index in range(n):
+            metadata[get_key(path, scene_index)] = {"path": path, "scene_index": scene_index}
+    return metadata
