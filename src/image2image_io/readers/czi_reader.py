@@ -112,7 +112,10 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
     @property
     def n_channels(self) -> int:
         """Return number of channels."""
-        return self.shape[2] if self.is_rgb else self.shape[0]
+        if self.is_rgb:
+            return self.shape[2]
+        _, n_channels = self.get_channel_axis_and_n_channels()
+        return n_channels
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
@@ -160,9 +163,12 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
             logger.trace(f"{path}: pyramid={len(self._pyramid)} in {timer()}")
 
     @property
-    def n_channels(self):
+    def n_channels(self) -> int:
         """Return number of channels."""
-        return self.shape[2] if self.is_rgb else self.shape[0]
+        if self.is_rgb:
+            return self.shape[2]
+        _, n_channels = self.get_channel_axis_and_n_channels()
+        return n_channels
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""

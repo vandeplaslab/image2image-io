@@ -151,6 +151,13 @@ class BaseReader:
         """Return channel names."""
         return self._channel_names
 
+    def get_channel_names(self, split_rgb: bool | None = None) -> list[str]:
+        """Get channel names."""
+        split_rgb = split_rgb if split_rgb is not None else CONFIG.split_rgb
+        if self.is_rgb:
+            return ["R", "B", "B"] if split_rgb else ["RGB"]
+        return self.channel_names
+
     @property
     def channel_ids(self) -> list[int]:
         """Return channel indices."""
@@ -652,13 +659,19 @@ class BaseReader:
 
         array: np.ndarray = self.pyramid[pyramid]
         channel_axis, n_channels = self.get_channel_axis_and_n_channels()
-        if channel_axis is None or (self.is_rgb and (not CONFIG.split_rgb and not split_rgb)):
-            return self.preprocessor("rgb", array)
+        # if channel_axis in [None, 2] or (self.is_rgb and (not CONFIG.split_rgb and not split_rgb)):
+        #     return self.preprocessor("rgb", array)
+        if channel_axis is None:
+            return self.preprocessor("gray", array)
         if channel_axis == 0:
             return self.preprocessor(self.channel_names[index], array[index])
         elif channel_axis == 1:
             return self.preprocessor(self.channel_names[index], array[:, index])
         elif channel_axis == 2:
+            if self.is_rgb:
+                if CONFIG.split_rgb or split_rgb:
+                    return self.preprocessor("RGB"[index], array[:, :, index])
+                return self.preprocessor("RGB", array[:, :, index])
             return self.preprocessor(self.channel_names[index], array[:, :, index])
         raise ValueError(f"Array has unsupported shape: {array.shape}")
 

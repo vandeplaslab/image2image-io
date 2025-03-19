@@ -61,8 +61,10 @@ class TiffImageReader(BaseReader):
     @property
     def n_channels(self) -> int:
         """Return number of channels."""
+        if self.is_rgb:
+            return self.shape[2]
         _, n_channels = self.get_channel_axis_and_n_channels()
-        return self.shape[2] if self.is_rgb else n_channels
+        return n_channels
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
