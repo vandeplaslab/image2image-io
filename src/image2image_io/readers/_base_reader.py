@@ -171,12 +171,12 @@ class BaseReader:
         """Set channel indices."""
         if not isinstance(value, list):
             value = list(value)
-        assert len(value) <= len(
-            self._channel_names
-        ), f"Too many channels selected: {len(value)} > {len(self._channel_names)}"
-        assert max(value) < len(
-            self._channel_names
-        ), f"Channel index out of range: {max(value)} > {len(self._channel_names)}"
+        assert len(value) <= len(self._channel_names), (
+            f"Too many channels selected: {len(value)} > {len(self._channel_names)}"
+        )
+        assert max(value) < len(self._channel_names), (
+            f"Channel index out of range: {max(value)} > {len(self._channel_names)}"
+        )
         self._channel_ids = value
 
     @property
