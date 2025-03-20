@@ -74,6 +74,9 @@ class BaseReader:
         self.transform_name = DEFAULT_TRANSFORM_NAME
         self.preprocessor = NoopProcessor()
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}<{self.key!r}; {self.path!r}; RGB={self.is_rgb}; {self.shape!r}>"
+
     def find_channel_name(self, name: str) -> int | None:
         """Find cycle by name or part of the name."""
         if name in self.channel_names:
@@ -671,7 +674,7 @@ class BaseReader:
             if self.is_rgb:
                 if CONFIG.split_rgb or split_rgb:
                     return self.preprocessor("RGB"[index], array[:, :, index])
-                return self.preprocessor("RGB", array[:, :, index])
+                return self.preprocessor("RGB", array)
             return self.preprocessor(self.channel_names[index], array[:, :, index])
         raise ValueError(f"Array has unsupported shape: {array.shape}")
 

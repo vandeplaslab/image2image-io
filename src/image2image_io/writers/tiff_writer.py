@@ -241,7 +241,7 @@ class OmeTiffWriter:
         output_file_name = Path(output_dir) / f"{name}.ome.tiff"
         tmp_output_file_name = output_file_name.parent / f"{name}.ome.tiff.tmp"
         logger.info(f"Saving to '{output_file_name}'")
-        logger.trace(f"Using transformer: {self.transformer}")
+        logger.info(f"Using transformer: {self.transformer}")
 
         if output_file_name.exists():
             if not overwrite:
