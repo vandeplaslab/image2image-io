@@ -124,10 +124,11 @@ class ShapesReader(BaseReader):
     _is_rgb = False
     reader_type = "shapes"
     _channel_names: list[str]
+    _is_rgb: bool = False
+    _array_dtype = np.dtype("float32")
 
     def __init__(self, path: PathLike, key: str | None = None, auto_pyramid: bool | None = None, init: bool = True):
         super().__init__(path, key=key, auto_pyramid=auto_pyramid)
-        self._array_dtype = np.dtype("float32")
         if not init:
             self.geojson_data, self.shape_data = [], []
             return

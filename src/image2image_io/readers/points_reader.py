@@ -58,6 +58,8 @@ class PointsReader(BaseReader):
 
     reader_type = "points"
     _channel_names: list[str]
+    _is_rgb: bool = False
+    _array_dtype = np.dtype("float32")
 
     def __init__(
         self,
