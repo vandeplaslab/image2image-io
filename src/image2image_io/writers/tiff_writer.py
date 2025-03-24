@@ -235,6 +235,7 @@ class OmeTiffWriter:
         resolution: float | None = None,
         dtype: np.dtype | None = None,
         is_rgb: bool | None = None,
+        ome_name: str | None = None,
     ) -> tuple[Path | None, Path, dict[str, ty.Any] | None, list[int] | None, list[str] | None, bool | None, bool]:
         """Prepare all the necessary information to write a TIFF file."""
         name = name.replace(".ome", "").replace(".tiff", "").replace(".tif", "")
@@ -265,7 +266,7 @@ class OmeTiffWriter:
             write_pyramid = False
 
         self._prepare_image_info(
-            name,
+            ome_name or name,
             write_pyramid=write_pyramid,
             tile_size=tile_size,
             compression=compression,
@@ -415,6 +416,7 @@ class OmeTiffWriter:
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
         overwrite: bool = False,
+        ome_name: str | None = None,
     ) -> Path | None:
         # make sure user did not provide filename with OME-TIFF
         (
@@ -435,6 +437,7 @@ class OmeTiffWriter:
             channel_ids=channel_ids,
             channel_names=channel_names,
             overwrite=overwrite,
+            ome_name=ome_name,
         )
         # no output file name means we are skipping
         if tmp_output_file_name is None:
@@ -488,6 +491,7 @@ class OmeTiffWriter:
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
         overwrite: bool = False,
+        ome_name: str | None = None,
     ) -> Path | None:
         (
             tmp_output_file_name,
@@ -507,6 +511,7 @@ class OmeTiffWriter:
             channel_ids=channel_ids,
             channel_names=channel_names,
             overwrite=overwrite,
+            ome_name=ome_name,
         )
         # no output file name means we are skipping
         if tmp_output_file_name is None:
@@ -550,6 +555,7 @@ class OmeTiffWriter:
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
         overwrite: bool = False,
+        ome_name: str | None = None,
     ) -> Path | None:
         """Write OME-TIFF image plane-by-plane to disk.
 
@@ -583,6 +589,8 @@ class OmeTiffWriter:
             Channel names.
         overwrite: bool
             Whether to overwrite the file if it already exists
+        ome_name: str
+            Name to be written to the OME-XML metadata, if None, the name is the same as the image name
 
         Returns
         -------
@@ -602,6 +610,7 @@ class OmeTiffWriter:
                 channel_ids=channel_ids,
                 channel_names=channel_names,
                 overwrite=overwrite,
+                ome_name=ome_name,
             )
         else:
             return self._write_image_multichannel(
@@ -614,6 +623,7 @@ class OmeTiffWriter:
                 channel_ids=channel_ids,
                 channel_names=channel_names,
                 overwrite=overwrite,
+                ome_name=ome_name,
             )
 
 
