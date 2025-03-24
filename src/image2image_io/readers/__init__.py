@@ -210,35 +210,35 @@ def get_reader(
     readers: dict[str, BaseReader]
     suffix = path.suffix.lower()
     if suffix in TIFF_EXTENSIONS:
-        logger.trace(f"Reading TIFF file: {path}")
+        CONFIG.trace(f"Reading TIFF file: {path}")
         path, readers = _read_tiff(path)
     elif suffix in CZI_EXTENSIONS:
         if split_czi and _check_multi_scene_czi(path):
             logger.trace(f"Reading multi-scene CZI file: {path}")
             path, readers = _read_multi_scene_czi(path, scene_index=scene_index)
         else:
-            logger.trace(f"Reading single-scene CZI file: {path}")
+            CONFIG.trace(f"Reading single-scene CZI file: {path}")
             path, readers = _read_single_scene_czi(path)
     elif suffix in IMAGE_EXTENSIONS:
-        logger.trace(f"Reading image file: {path}")
+        CONFIG.trace(f"Reading image file: {path}")
         path, readers = _read_image(path)
     elif suffix in NPY_EXTENSIONS:
-        logger.trace(f"Reading NPY file: {path}")
+        CONFIG.trace(f"Reading NPY file: {path}")
         path, readers = _read_npy_coordinates(path)
     elif suffix in NPZ_EXTENSIONS:
-        logger.trace(f"Reading NPY file: {path}")
+        CONFIG.trace(f"Reading NPY file: {path}")
         path, readers = _read_npz_coordinates(path)
     elif suffix in BRUKER_EXTENSIONS:
-        logger.trace(f"Reading Bruker file: {path}")
+        CONFIG.trace(f"Reading Bruker file: {path}")
         if IS_MAC or split_roi:
             path, readers = _read_tsf_tdf_coordinates(path, split_roi, scene_index=scene_index, include_all=include_all)
         else:
             path, readers = _read_tsf_tdf_reader(path)
     elif suffix in IMZML_EXTENSIONS:
-        logger.trace(f"Reading imzML file: {path}")
+        CONFIG.trace(f"Reading imzML file: {path}")
         path, readers = _read_imzml_reader(path)
     elif suffix in H5_EXTENSIONS + IMSPY_EXTENSIONS:
-        logger.trace(f"Reading HDF5 file: {path}")
+        CONFIG.trace(f"Reading HDF5 file: {path}")
         if path.suffix == ".data":
             path = path / "dataset.metadata.h5"
         if path.name.startswith("dataset.metadata"):
@@ -255,10 +255,10 @@ def get_reader(
                 path, ["x", "y"], [("cell", "cell_id", "shape", "shape_name")], (np.dtype("O"), np.dtype("S"))
             )
         ):
-            logger.trace(f"Reading shape file: {path}")
+            CONFIG.trace(f"Reading shape file: {path}")
             path, readers = _read_shapes(path)
         else:
-            logger.trace(f"Reading points file: {path}")
+            CONFIG.trace(f"Reading points file: {path}")
             path, readers = _read_points(path)  # type: ignore
     else:
         raise UnsupportedFileFormatError(f"Unsupported file format: '{suffix}'")
@@ -270,9 +270,12 @@ def get_simple_reader(
     init_pyramid: bool = True,
     auto_pyramid: bool = True,
     quick: bool = False,
+    quiet: bool = False,
     scene_index: int | None = None,
 ) -> BaseReader:
     """Get simple reader."""
+    quiet_ = CONFIG.quiet
+    CONFIG.quiet = quiet
     init_pyramid_ = CONFIG.init_pyramid
     CONFIG.init_pyramid = init_pyramid
     auto_pyramid_ = CONFIG.auto_pyramid
@@ -280,6 +283,7 @@ def get_simple_reader(
     path, readers = get_reader(path, split_czi=False, quick=quick, scene_index=scene_index)
     CONFIG.init_pyramid = init_pyramid_
     CONFIG.auto_pyramid = auto_pyramid_
+    CONFIG.quiet = quiet_
     return next(iter(readers.values()))
 
 
@@ -337,7 +341,7 @@ def _read_multi_scene_czi(
             raise ValueError(f"Scene index {scene_index} not found in the file")
         scenes = [scene_index]
 
-    logger.trace(f"Found {n} scenes in CZI file: {path}")
+    CONFIG.trace(f"Found {n} scenes in CZI file: {path}")
     return path, {
         f"S{i}_{path.name}": CziSceneImageReader(path, scene_index=i, key=get_key(path, scene_index=i)) for i in scenes
     }

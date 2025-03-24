@@ -99,7 +99,7 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         self._is_rgb = guess_rgb(self.shape)
         self.resolution = self._get_pixel_size()
         self._channel_names = self._get_channel_names()
-        logger.trace(
+        CONFIG.trace(
             f"{path}: RGB={self.is_rgb}; dims={self.shape}; px={self.resolution:.3f}; n_ch={len(self._channel_names)}"
         )
 
@@ -107,7 +107,7 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         if init_pyramid:
             with MeasureTimer() as timer:
                 self._pyramid = self.pyramid
-            logger.trace(f"{path}: pyramid={len(self._pyramid)} in {timer()}")
+            CONFIG.trace(f"{path}: pyramid={len(self._pyramid)} in {timer()}")
 
     @property
     def n_channels(self) -> int:
@@ -151,7 +151,7 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         self._is_rgb = self.fh.is_rgb
         self.resolution = self._get_pixel_size()
         self._channel_names = self._get_channel_names()
-        logger.trace(
+        CONFIG.trace(
             f"{path}: RGB={self.is_rgb}; dims={self.shape}; px={self.resolution:.3f}; n_ch={len(self._channel_names)}"
             f"; scene={scene_index}"
         )
@@ -160,7 +160,7 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         if init_pyramid:
             with MeasureTimer() as timer:
                 self._pyramid = self.pyramid
-            logger.trace(f"{path}: pyramid={len(self._pyramid)} in {timer()}")
+            CONFIG.trace(f"{path}: pyramid={len(self._pyramid)} in {timer()}")
 
     @property
     def n_channels(self) -> int:

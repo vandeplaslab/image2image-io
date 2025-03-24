@@ -4,6 +4,7 @@ import typing as ty
 from contextlib import contextmanager
 
 from koyo.config import BaseConfig
+from loguru import logger
 from pydantic import Field, field_serializer, field_validator
 
 from image2image_io.enums import ViewType
@@ -17,6 +18,14 @@ class Config(BaseConfig):
     USER_CONFIG_DIR = USER_CONFIG_DIR
     USER_CONFIG_FILENAME = "config_reader.json"
 
+    quiet: bool = Field(
+        False,
+        title="Quiet",
+        description="Quiet mode.",
+        json_schema_extra={
+            "in_app": True,
+        },
+    )
     init_pyramid: bool = Field(
         True,
         title="Initialize pyramid",
@@ -145,6 +154,11 @@ class Config(BaseConfig):
         yield
         for key, value in old_values.items():
             setattr(self, key, value)
+
+    def trace(self, msg: str) -> None:
+        """Trace logging."""
+        if not self.quiet:
+            logger.trace(msg)
 
 
 CONFIG = Config()  # type: ignore[call-arg]

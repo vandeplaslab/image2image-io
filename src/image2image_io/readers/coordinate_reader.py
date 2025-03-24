@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
-from loguru import logger
 
+from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
 from image2image_io.utils.lazy import LazyImageWrapper
 from image2image_io.utils.utilities import format_mz
@@ -103,11 +103,11 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ignore[
         if self.reader is None:
             raise ValueError("Cannot extract ion images from a numpy array.")
         mzs = np.atleast_1d(mzs)
-        logger.trace(f"Extracting {len(mzs)} ion images from {self.path.name} ({self.name})")
+        CONFIG.trace(f"Extracting {len(mzs)} ion images from {self.path.name} ({self.name})")
 
         with MeasureTimer() as timer:
             images = self.reader.get_ion_images(mzs, ppm=ppm)
-        logger.trace(f"Extracted {len(mzs)} ion images in {timer}")
+        CONFIG.trace(f"Extracted {len(mzs)} ion images in {timer}")
 
         labels = []
         for i, mz in enumerate(mzs):
