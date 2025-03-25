@@ -439,6 +439,7 @@ class OmeTiffWriter:
         # no output file name means we are skipping
         if tmp_output_file_name is None:
             return Path(output_file_name) if output_file_name else None
+
         assert channel_names is not None, "Channel names must be defined"
         assert channel_ids is not None, "Channel ids must be defined"
 
@@ -511,6 +512,7 @@ class OmeTiffWriter:
         # no output file name means we are skipping
         if tmp_output_file_name is None:
             return Path(output_file_name) if output_file_name else None
+
         assert channel_names is not None, "Channel names must be defined"
         assert channel_ids is not None, "Channel ids must be defined"
 
