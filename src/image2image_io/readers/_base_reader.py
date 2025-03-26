@@ -13,7 +13,7 @@ from koyo.typing import PathLike
 from loguru import logger
 
 from image2image_io.config import CONFIG
-from image2image_io.enums import DEFAULT_TRANSFORM_NAME
+from image2image_io.enums import DEFAULT_TRANSFORM_NAME, DisplayType
 from image2image_io.models.preprocess import NoopProcessor
 from image2image_io.models.transform import TransformData
 from image2image_io.utils.utilities import guess_rgb
@@ -55,7 +55,7 @@ class BaseReader:
     auto_pyramid: bool | None = None
     reader: str = "base"
     reader_type: str = "image"
-    display_type: str | None = None
+    display_type: DisplayType | None = None
     n_scenes: int = 1
     lazy: bool = False
     fh: ty.Any | None = None

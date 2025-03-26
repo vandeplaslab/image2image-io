@@ -54,7 +54,7 @@ def get_int_dtype(value: int) -> np.dtype:
         raise ValueError("Too many shapes")
 
 
-def geojson_to_numpy(gj: dict) -> list[dict]:
+def geojson_to_numpy(gj: dict) -> tuple[list[dict], bool]:
     """
     Convert geojson representation to np.ndarray representation of shape.
 
@@ -71,6 +71,7 @@ def geojson_to_numpy(gj: dict) -> list[dict]:
             "shape_type": str - indicates GeoJSON shape_type (Polygon, MultiPolygon, etc.)
             "shape_name": str - name inherited from QuPath GeoJSON
     """
+    is_points = False
     if gj["geometry"].get("type") == "MultiPolygon":
         pts = []
         for geo in gj["geometry"].get("coordinates"):
@@ -88,8 +89,10 @@ def geojson_to_numpy(gj: dict) -> list[dict]:
         # pts = np.squeeze(np.asarray(gj["geometry"].get("coordinates")))
     elif gj["geometry"].get("type") == "Point":
         pts = np.expand_dims(np.asarray(gj["geometry"].get("coordinates")), 0)
+        is_points = True
     elif gj["geometry"].get("type") == "MultiPoint":
         pts = np.asarray(gj["geometry"].get("coordinates"))
+        is_points = True
     elif gj["geometry"].get("type") == "LineString":
         pts = np.asarray(gj["geometry"].get("coordinates"))
     else:
@@ -111,7 +114,7 @@ def geojson_to_numpy(gj: dict) -> list[dict]:
                 "shape_name": shape_name,
             }
             for pt in pts
-        ]
+        ], is_points
     # elif len(pts.shape) == 1:
     #     return [
     #         {
@@ -127,7 +130,7 @@ def geojson_to_numpy(gj: dict) -> list[dict]:
                 "shape_type": gj["geometry"].get("type"),
                 "shape_name": shape_name,
             }
-        ]
+        ], is_points
 
 
 def add_unnamed(gj: dict) -> dict:
@@ -140,7 +143,7 @@ def add_unnamed(gj: dict) -> dict:
     return gj
 
 
-def read_geojson(json_file: PathLike) -> tuple[list, list]:
+def read_geojson(json_file: PathLike) -> tuple[list, list, bool]:
     """Read GeoJSON files (and some QuPath metadata).
 
     Parameters
@@ -169,7 +172,7 @@ def read_geojson(json_file: PathLike) -> tuple[list, list]:
     return _parse_geojson_data(gj_data)
 
 
-def _parse_geojson_data(gj_data: dict | list) -> tuple[list, list]:
+def _parse_geojson_data(gj_data: dict | list) -> tuple[list, list, bool]:
     if isinstance(gj_data, dict):
         # handle GeoPandas GeoJSON
         if "type" in gj_data and "features" in gj_data:
@@ -177,11 +180,12 @@ def _parse_geojson_data(gj_data: dict | list) -> tuple[list, list]:
         else:
             gj_data = [gj_data]
 
-    shapes_np = []
+    shapes_np, is_points = [], False
     for gj in gj_data:
-        shapes_np.extend(geojson_to_numpy(gj))
+        data, is_points = geojson_to_numpy(gj)
+        shapes_np.extend(data)
     gj_data = [add_unnamed(gj) for gj in gj_data]
-    return gj_data, shapes_np
+    return gj_data, shapes_np, is_points
 
 
 def numpy_to_geojson(
@@ -237,7 +241,7 @@ def numpy_to_geojson(
     return shape_gj, shape_np
 
 
-def shape_reader(shape_data: list, **kwargs: ty.Any) -> tuple[dict, dict]:
+def shape_reader(shape_data: list, **kwargs: ty.Any) -> tuple[dict, dict, bool]:
     """Read shape data for transformation.
 
     Shape data is stored as numpy arrays for operations but also as GeoJSON
@@ -266,6 +270,7 @@ def shape_reader(shape_data: list, **kwargs: ty.Any) -> tuple[dict, dict]:
 
     shapes_gj = []
     shapes_np = []
+    is_points = False
     for sh in shape_data:
         if isinstance(sh, dict):
             out_shape_gj, out_shape_np = numpy_to_geojson(sh["array"], sh["shape_type"], sh["shape_name"])
@@ -278,7 +283,7 @@ def shape_reader(shape_data: list, **kwargs: ty.Any) -> tuple[dict, dict]:
                 sh_fp = Path(sh)
 
                 if sh_fp.suffix in [".json", ".geojson", ".zip"]:
-                    out_shape_gj, out_shape_np = read_geojson(str(sh_fp))
+                    out_shape_gj, out_shape_np, is_points = read_geojson(str(sh_fp))
                 # elif sh_fp.suffix == ".cz":
                 #     out_shape_gj = read_zen_shapes(str(sh_fp))
                 #     out_shape_np = [gj_to_np(s) for s in out_shape_gj]
@@ -296,8 +301,7 @@ def shape_reader(shape_data: list, **kwargs: ty.Any) -> tuple[dict, dict]:
             shapes_np.extend(out_shape_np)
         else:
             shapes_np.append(out_shape_np)
-
-    return shapes_gj, shapes_np
+    return shapes_gj, shapes_np, is_points
 
 
 def scale_shape_coordinates(poly: dict, scale_factor: float):

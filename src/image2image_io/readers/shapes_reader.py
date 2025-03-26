@@ -21,6 +21,9 @@ if ty.TYPE_CHECKING:
     from shapely.geometry import Polygon
 
 
+PATH_IF_COUNT = 1_000
+
+
 def is_txt_and_has_columns(
     path: PathLike, required: list[str], either: list[tuple[str, ...]], either_dtype: tuple[np.dtype, ...] | None = None
 ) -> bool:
@@ -109,22 +112,21 @@ def napari_to_shapes_data(name: str, data: list[np.ndarray], shapes: list[str]) 
     return shape_data
 
 
-def read_data(path: Path) -> dict[str, dict[str, np.ndarray | str]]:
+def read_data(path: Path) -> dict[str, dict[str, np.ndarray | str], bool]:
     """Read data."""
     if path.suffix.lower() in [".json", ".geojson"]:
-        geojson_data, shape_data = read_geojson(path)
+        geojson_data, shape_data, is_points = read_geojson(path)
     else:
-        geojson_data, shape_data = read_shapes(path)
-    return geojson_data, shape_data
+        geojson_data, shape_data, is_points = read_shapes(path)
+    return geojson_data, shape_data, is_points
 
 
 class ShapesReader(BaseReader):
     """GeoJSON reader for image2image."""
 
-    _is_rgb = False
+    _is_rgb: bool = False
     reader_type = "shapes"
     _channel_names: list[str]
-    _is_rgb: bool = False
     _array_dtype = np.dtype("float32")
 
     def __init__(self, path: PathLike, key: str | None = None, auto_pyramid: bool | None = None, init: bool = True):
@@ -132,7 +134,8 @@ class ShapesReader(BaseReader):
         if not init:
             self.geojson_data, self.shape_data = [], []
             return
-        self.geojson_data, self.shape_data = read_data(self.path)
+        self.geojson_data, self.shape_data, is_points = read_data(self.path)
+        self.display_type = "points" if is_points else None
         self._channel_names = [self.path.stem]
 
     @classmethod
@@ -213,7 +216,7 @@ class ShapesReader(BaseReader):
     def parse_data(self) -> tuple:
         """Parse data."""
         shape_data = self.shape_data
-        shapes_geojson, _ = shape_reader(shape_data)
+        shapes_geojson, _, _ = shape_reader(shape_data)
         n_shapes = len(shapes_geojson)
         if n_shapes > 10_000 and CONFIG.subsample and CONFIG.subsample_ratio < 1.0:
             n_subsample = int(CONFIG.subsample_ratio * n_shapes)
@@ -240,7 +243,7 @@ class ShapesReader(BaseReader):
     def to_shapes(self) -> tuple[str, dict[str, np.ndarray | str]]:
         """Convert to shapes that can be exported to Shapes layer."""
         _, shape_types, shape_names, shape_arrays, *_ = self.parse_data()
-        if len(shape_types) > 1_000:
+        if len(shape_types) > PATH_IF_COUNT:
             shape_types = ["path"] * len(shape_types)
         else:
             shape_types = [s.lower() for s in shape_types]  # expected polygon not Polygon
@@ -250,7 +253,7 @@ class ShapesReader(BaseReader):
         """Return data so it's compatible with Shapes layer."""
         n_shapes, _, _, shape_arrays, shape_props, shape_text = self.parse_data()
         if CONFIG.shape_display == "polygon or path":
-            shape_type = "polygon" if n_shapes < 500 else "path"
+            shape_type = "polygon" if n_shapes < PATH_IF_COUNT else "path"
         else:
             shape_type = CONFIG.shape_display
 
