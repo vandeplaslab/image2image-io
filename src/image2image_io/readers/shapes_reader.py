@@ -275,13 +275,18 @@ class ShapesReader(BaseReader):
         x = df["x"].values
         y = df["y"].values
         n = len(x)
+        size = 15
+        if n > 5_000:
+            size = 5
+        elif n > 50_000:
+            size = 1
 
         kws = {
             "data": np.c_[y, x],
             "scale": self.scale,
             "affine": self.transform,
             "face_color": face_color,
-            "size": 5 if n < 50_000 else 1,
+            "size": size,
         }
         kws.update(kwargs)
         return kws
