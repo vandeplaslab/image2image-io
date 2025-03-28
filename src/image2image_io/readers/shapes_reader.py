@@ -84,6 +84,7 @@ def read_shapes_from_df(df: pd.DataFrame) -> tuple:
     x_key = get_column_name(df, ["vertex_x", "x"])
     y_key = get_column_name(df, ["vertex_y", "y"])
     group_by = get_column_name(df, ["cell", "cell_id", "shape", "shape_name"])
+    is_points = x_key == "x"
     shapes_geojson, shape_data = [], []
     for group, indices in df.groupby(group_by).groups.items():
         dff = df.iloc[indices]
@@ -95,7 +96,7 @@ def read_shapes_from_df(df: pd.DataFrame) -> tuple:
             }
         )
         shapes_geojson.append({"geometry": {"type": "Polygon"}, "properties": {"classification": {"name": group}}})
-    return shapes_geojson, shape_data
+    return shapes_geojson, shape_data, is_points
 
 
 def napari_to_shapes_data(name: str, data: list[np.ndarray], shapes: list[str]) -> dict:
