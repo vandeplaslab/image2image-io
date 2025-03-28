@@ -276,7 +276,7 @@ def image(
         transform_seq = ImageWarper(transform_, inv=inverse)
     else:
         try:
-            from image2image_reg.models.transform_sequence import TransformSequence
+            from image2image_reg.elastix.transform_sequence import TransformSequence
 
             transform_seq = TransformSequence.from_path(transform_)
         except ImportError:
