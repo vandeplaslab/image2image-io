@@ -242,6 +242,7 @@ class OmeTiffWriter:
         output_file_name = Path(output_dir) / f"{name}.ome.tiff"
         tmp_output_file_name = output_file_name.parent / f"{name}.ome.tiff.tmp"
         logger.info(f"Saving to '{output_file_name}'")
+        logger.info(f"Using reader: {self.reader}")
         logger.info(f"Using transformer: {self.transformer}")
 
         if output_file_name.exists():
@@ -366,13 +367,14 @@ class OmeTiffWriter:
         if self.transformer or as_uint8:
             image = sitk.GetImageFromArray(image)  # type: ignore[arg-type]
             image.SetSpacing((resolution, resolution))  # type: ignore[no-untyped-call]
+            print(image.GetSpacing())
 
             # transform
             if self.transformer and callable(self.transformer):
                 with MeasureTimer() as timer:
                     image = self.transformer(image)
                 logger.trace(
-                    f"Transformed image shape: {image.GetSize()[::-1]} in {timer()}",  # type: ignore[no-untyped-call]
+                    f"Transformed image shape: {image.GetSize()[::-1]} ({image.GetSpacing()})in {timer()}",
                 )
 
             # change dtype

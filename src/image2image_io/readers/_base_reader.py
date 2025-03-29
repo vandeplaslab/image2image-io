@@ -75,7 +75,10 @@ class BaseReader:
         self.preprocessor = NoopProcessor()
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}<{self.key!r}; {self.path!r}; RGB={self.is_rgb}; {self.shape!r}>"
+        return (
+            f"{self.__class__.__name__}<{self.key!r}; {self.path!r}; RGB={self.is_rgb}; {self.shape!r}"
+            f" @ {self.resolution:.4f}>"
+        )
 
     def find_channel_name(self, name: str) -> int | None:
         """Find cycle by name or part of the name."""
