@@ -701,6 +701,13 @@ class BaseReader:
         """Return number of images in the pyramid."""
         return len(self.pyramid)
 
+    @property
+    def n_in_pyramid_quick(self) -> int | None:
+        """Return number of images in the pyramid, if pyramid is available."""
+        if self._pyramid is None:
+            return None
+        return self.n_in_pyramid
+
     def scale_for_pyramid(self, pyramid: int = 0) -> tuple[float, float]:
         """Return scale for pyramid."""
         if pyramid < 0:
