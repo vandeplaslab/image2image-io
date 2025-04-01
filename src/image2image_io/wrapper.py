@@ -284,5 +284,3 @@ class ImageWrapper:
             raise ValueError("No transformation data found")
         affine = transform_data.compute(moving_resolution=moving_resolution, px=False)
         return np.asarray(affine.params)
-
-
