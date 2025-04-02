@@ -367,7 +367,6 @@ class OmeTiffWriter:
         if self.transformer or as_uint8:
             image = sitk.GetImageFromArray(image)  # type: ignore[arg-type]
             image.SetSpacing((resolution, resolution))  # type: ignore[no-untyped-call]
-            print(image.GetSpacing())
 
             # transform
             if self.transformer and callable(self.transformer):
