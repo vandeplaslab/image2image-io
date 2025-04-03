@@ -9,7 +9,7 @@ from koyo.click import Parameter, arg_parse_framelist_multi, cli_parse_paths_sor
 from koyo.timer import MeasureTimer
 from loguru import logger
 
-from image2image_io.cli._common import arg_split_bbox, as_uint8_, fmt_, overwrite_
+from image2image_io.cli._common import as_uint8_, fmt_, overwrite_
 from image2image_io.enums import WriterMode
 
 

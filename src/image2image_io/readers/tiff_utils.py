@@ -3,6 +3,7 @@
 Taken from:
 https://github.com/NHPatterson/napari-imsmicrolink/blob/master/src/napari_imsmicrolink/utils/tifffile_meta.py
 """
+
 from __future__ import annotations
 
 from ome_types.model import OME

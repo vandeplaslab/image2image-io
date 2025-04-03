@@ -1,4 +1,5 @@
 """Various image readers."""
+
 from importlib.metadata import PackageNotFoundError, version
 
 try:

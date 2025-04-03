@@ -363,7 +363,7 @@ def _read_image(path: PathLike) -> tuple[Path, dict[str, ArrayImageReader]]:
     from skimage.io import imread
 
     # disable decompression bomb protection
-    Image.MAX_IMAGE_PIXELS = int(30_000 * 30_000)  # 30k x 30k pixels
+    Image.MAX_IMAGE_PIXELS = 30_000 * 30_000  # 30k x 30k pixels
 
     path = Path(path)
     assert path.exists(), f"File does not exist: {path}"
