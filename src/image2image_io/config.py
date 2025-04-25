@@ -75,7 +75,7 @@ class Config(BaseConfig):
         },
     )
     view_type: ViewType = Field(
-        ViewType.RANDOM,
+        ViewType.OVERLAY,
         title="View type",
         description="IMS view type.",
         json_schema_extra={
