@@ -46,7 +46,7 @@ from tqdm import tqdm
 )
 @click.command()
 def thumbnail(input_: str, output_dir: str, with_title: bool, first_only: bool) -> None:
-    """Create thumbnail for image(s)."""
+    """Create a thumbnail for image(s)."""
     from image2image_io.utils.utilities import write_thumbnail
 
     for path in tqdm(input_, desc="Creating thumbnails..."):
