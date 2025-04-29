@@ -37,11 +37,9 @@ dependencies = [
     "imagecodecs",
     "aicsimageio[bioformats]",  # maybe can go?
     "ome_types",
-#    "wsireg",
     "rasterio",
     "shapely",
     "pint",
-#    "napari-czifile2",
     "pydantic>=2",
     "scikit-image",
     "SimpleITK",
@@ -51,6 +49,7 @@ dependencies = [
     "geojson",
     "pyarrow",
     "fastparquet",
+    "numcodecs<0.16.0"
 ]
 
 # extras

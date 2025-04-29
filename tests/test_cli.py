@@ -20,8 +20,8 @@ def test_cli_entrypoint():
 def test_thumbnail(tmp_path, with_title):
     tmp = tmp_path
     tiffs = get_test_files("*.ome.tiff")
-    files = " ".join([f"-i '{tiff!s}'" for tiff in tiffs])
-    exit_status = os.system(f"i2io thumbnail {files} -o '{tmp!s}' {with_title}")
+    files = " ".join([f"-i {tiff!s}" for tiff in tiffs])
+    exit_status = os.system(f"i2io thumbnail {files} -o {tmp!s} {with_title}")
     assert exit_status == 0, "Exit status was not 0"
     assert len(list(tmp.glob("*.jpg"))) > 0, "No thumbnail images"
 
@@ -31,5 +31,5 @@ def test_thumbnail(tmp_path, with_title):
 def test_transform(tmp_path, transform):
     tmp = tmp_path
     tiff = get_test_file("transform/test-1.ome.tiff")
-    exit_status = os.system(f"i2io transform image -i '{tiff!s}' -o '{tmp!s}' -T '{transform}'")
+    exit_status = os.system(f"i2io transform image -i {tiff!s} -o {tmp!s} -T {transform}")
     assert exit_status == 0, "Exit status was not 0"
