@@ -264,7 +264,7 @@ class ShapesReader(BaseReader):
             "text": shape_text,
             "scale": self.scale,
             "affine": self.transform,
-            "edge_width": 10,
+            "edge_width": 10 if n_shapes < 500 else 3,
             "edge_color": edge_color,
         }
         kws.update(kwargs)
