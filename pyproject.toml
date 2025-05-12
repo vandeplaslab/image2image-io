@@ -1,11 +1,9 @@
 [build-system]
-requires = [
-  "setuptools >= 42",
-  "wheel",
-  "build",
-  "setuptools_scm[toml]>=3.4"
-]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
 
 # https://peps.python.org/pep-0621/
 [project]
@@ -48,7 +46,7 @@ dependencies = [
     "czifile",
     "tifffile",
     "imagecodecs",
-    "aicsimageio[bioformats]",  # maybe can go?
+    "aicsimageio",
     "ome_types",
     "rasterio",
     "shapely",
@@ -62,7 +60,8 @@ dependencies = [
     "geojson",
     "pyarrow",
     "fastparquet",
-    "numcodecs<0.16.0"
+    "numcodecs<0.16.0; python_version < '3.12'",
+    "numcodecs>=0.16.0; python_version >= '3.12'",
 ]
 
 # extras
@@ -87,21 +86,6 @@ repository = "https://github.com/vandeplaslab/image2image-io"
 # same as console_scripts entry point
 [project.scripts]
 i2io = "image2image_io.cli:main"
-
-# Entry points
-# https://peps.python.org/pep-0621/#entry-points
-# [project.entry-points."spam.magical"]
-# tomatoes = "spam:main_tomatoes"
-
-[tool.setuptools_scm]
-write_to = "src/image2image_io/_version.py"
-
-# https://github.com/psf/black
-[tool.black]
-line-length = 120
-target-version = ['py37', 'py38', 'py39']
-include = '\.pyi?$'
-
 
 # https://github.com/charliermarsh/ruff
 [tool.ruff]
@@ -150,6 +134,22 @@ minversion = "6.0"
 testpaths = ["tests"]
 filterwarnings = ["ignore"]
 
+
+# https://coverage.readthedocs.io/en/6.4/config.html
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "@overload",
+    "except ImportError",
+    "\\.\\.\\.",
+    "raise NotImplementedError()",
+]
+
+[tool.coverage.run]
+source = ["image2image-io"]
+
+
 # https://mypy.readthedocs.io/en/stable/config_file.html
 [tool.mypy]
 files = "src/**/"
@@ -180,21 +180,6 @@ exclude = [
 # [[tool.mypy.overrides]]
 # module = ["numpy.*",]
 # ignore_errors = true
-
-
-# https://coverage.readthedocs.io/en/6.4/config.html
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "if TYPE_CHECKING:",
-    "@overload",
-    "except ImportError",
-    "\\.\\.\\.",
-    "raise NotImplementedError()",
-]
-
-[tool.coverage.run]
-source = ["image2image-io"]
 
 # https://github.com/mgedmin/check-manifest#configuration
 [tool.check-manifest]
