@@ -78,8 +78,8 @@ dev = [
     "pre-commit",
     "rich",
     "ruff",
-
 ]
+
 [project.urls]
 homepage = "https://github.com/vandeplaslab/image2image-io"
 repository = "https://github.com/vandeplaslab/image2image-io"
