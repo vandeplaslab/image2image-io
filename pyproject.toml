@@ -60,8 +60,8 @@ dependencies = [
     "geojson",
     "pyarrow",
     "fastparquet",
-    "numcodecs<0.16.0; python_version < '3.12'",
-    "numcodecs>=0.16.0; python_version >= '3.12'",
+    "numcodecs<0.16.0; python_version < '3.13'",
+    "numcodecs>=0.16.0; python_version >= '3.13'",
 ]
 
 # extras
