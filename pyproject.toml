@@ -134,8 +134,13 @@ minversion = "6.0"
 testpaths = ["tests"]
 filterwarnings = ["ignore"]
 
-
 # https://coverage.readthedocs.io/en/6.4/config.html
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "**/*_version.py"
+]
+
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
@@ -145,9 +150,6 @@ exclude_lines = [
     "\\.\\.\\.",
     "raise NotImplementedError()",
 ]
-
-[tool.coverage.run]
-source = ["image2image-io"]
 
 
 # https://mypy.readthedocs.io/en/stable/config_file.html
