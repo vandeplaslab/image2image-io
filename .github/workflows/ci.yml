@@ -25,7 +25,7 @@ jobs:
       - run: uvx check-manifest
 
   test:
-    name: Test (${{ matrix.os }} py${{ matrix.python-version }} ${{ matrix.backend }})
+    name: Test (${{ matrix.os }} py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     env:
       UV_NO_SYNC: "1"
