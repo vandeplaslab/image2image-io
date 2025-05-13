@@ -64,21 +64,21 @@ dependencies = [
     "numcodecs>=0.16.0; python_version >= '3.13'",
 ]
 
-# extras
-# https://peps.python.org/pep-0621/#dependencies-optional-dependencies
-[project.optional-dependencies]
-test = ["pytest>=6.0", "pytest-cov"]
+[dependency-groups]
+test = [
+    "pytest>=8.3.5",
+    "pytest-cov>=6.1.1",
+]
 dev = [
-    "black",
+    { include-group = "test" },
     "ipython",
     "mypy",
     "pdbpp",
     "pre-commit",
     "rich",
     "ruff",
-    "image2image-io[test]",
-]
 
+]
 [project.urls]
 homepage = "https://github.com/vandeplaslab/image2image-io"
 repository = "https://github.com/vandeplaslab/image2image-io"
