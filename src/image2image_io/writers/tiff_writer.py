@@ -365,6 +365,8 @@ class OmeTiffWriter:
     ) -> np.ndarray:
         # check whether we actually need to do any pre-processing
         if self.transformer or as_uint8:
+            if hasattr(image, "compute"):  # convert dask array to numpy
+                image = image.compute()
             image = sitk.GetImageFromArray(image)  # type: ignore[arg-type]
             image.SetSpacing((resolution, resolution))  # type: ignore[no-untyped-call]
 
