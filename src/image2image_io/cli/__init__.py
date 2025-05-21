@@ -6,7 +6,7 @@ from loguru import logger
 
 from image2image_io import __version__
 from image2image_io.cli.convert import convert
-from image2image_io.cli.czi2tiff import czi2tiff
+from image2image_io.cli.czi2tiff import czi2tiff, cziinfo
 from image2image_io.cli.merge import merge
 from image2image_io.cli.thumbnail import thumbnail
 from image2image_io.cli.transform import transform
@@ -59,6 +59,8 @@ def cli(verbosity: int, no_color: bool, dev: bool) -> None:
     from koyo.hooks import install_debugger_hook, uninstall_debugger_hook
     from koyo.logging import get_loguru_config, set_loguru_env, set_loguru_log
 
+    if verbosity is None:
+        verbosity = 1
     verbosity = 2 - int(verbosity)  # default is INFO
     if verbosity < 0:
         verbosity = 0
@@ -84,6 +86,7 @@ def cli(verbosity: int, no_color: bool, dev: bool) -> None:
 
 # register commands
 cli.add_command(czi2tiff)
+cli.add_command(cziinfo)
 cli.add_command(thumbnail)
 cli.add_command(merge)
 cli.add_command(convert)

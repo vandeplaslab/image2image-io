@@ -84,7 +84,11 @@ def czi2tiff(
     channel_ids: list[int] | None,
     channel_names: list[str | None],
 ) -> None:
-    """Convert CZI to OME-TIFF."""
+    """Convert CZI to OME-TIFF.
+
+    This command converts a CZI to OME-TIFF while allowing the user to specify the scene, channel names, channel IDs and
+    OME-TIFF tile size and output data type.
+    """
     from image2image_io.writers import czi_to_ome_tiff
 
     metadata = None
@@ -97,3 +101,32 @@ def czi2tiff(
         input_, output_dir, as_uint8=as_uint8, tile_size=int(tile_size), metadata=metadata, scenes=[scene_index]
     ):
         logger.info(f"Converted {key} scene {scene_index}/{total}")
+
+
+@click.option(
+    "-i",
+    "--input",
+    "input_",
+    help="Path to the CZI file that should be converted.",
+    type=click.Path(exists=False, resolve_path=False, file_okay=True, dir_okay=False),
+    show_default=True,
+    required=True,
+)
+@click.command()
+def cziinfo(input_: str) -> None:
+    """Print information about the CZI file."""
+    from image2image_io.config import CONFIG
+    from image2image_io.readers import get_reader
+
+    with CONFIG.temporary_overwrite(init_pyramid=False, auto_pyramid=False):
+        path, readers = get_reader(input_, split_czi=True)
+        print(f"File: {path!r}")
+        print(f"Number of scenes: {len(readers)}")
+        for index, reader in enumerate(readers.values()):
+            print(f"Scene {index}")
+            print(f"Image shape: {reader.image_shape}")
+            print(f"Pixel size: {reader.resolution}")
+            print(f"  Number of channels: {reader.n_channels}")
+            for channel_index, channel_name in enumerate(reader.channel_names):
+                print(f"    Channel {channel_index}: {channel_name}")
+            print("-" * 80)

@@ -157,6 +157,8 @@ def images_to_ome_tiff(
 ) -> ty.Generator[ExportProgress, None, None]:
     """Convert multiple images to OME-TIFF."""
     output_dir = Path(output_dir) if output_dir else None
+    if output_dir:
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     # get total number of scenes
     total_n_scenes, paths = get_total_n_scenes(paths)
