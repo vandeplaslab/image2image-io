@@ -85,8 +85,8 @@ def cli(verbosity: int, no_color: bool, dev: bool) -> None:
 
 
 # register commands
-cli.add_command(czi2tiff)
 cli.add_command(cziinfo)
+cli.add_command(czi2tiff)
 cli.add_command(thumbnail)
 cli.add_command(merge)
 cli.add_command(convert)
