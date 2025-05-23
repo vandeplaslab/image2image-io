@@ -1,7 +1,8 @@
 """Main CLI."""
 
 import click
-import koyo.compat
+from click_groups import GroupedGroup
+from koyo.compat import enable_compat
 from loguru import logger
 
 from image2image_io import __version__
@@ -10,6 +11,8 @@ from image2image_io.cli.czi2tiff import czi2tiff, cziinfo
 from image2image_io.cli.merge import merge
 from image2image_io.cli.thumbnail import thumbnail
 from image2image_io.cli.transform import transform
+
+enable_compat()
 
 LOG_FMT = "[<level>{level: <8}</level>][{time:YYYY-MM-DD HH:mm:ss:SSS}][{extra[src]}] {message}"
 COLOR_LOG_FMT = (
@@ -26,7 +29,8 @@ COLOR_LOG_FMT = (
         "help_option_names": ["-h", "--help"],
         "max_content_width": 120,
         "ignore_unknown_options": True,
-    }
+    },
+    cls=GroupedGroup,
 )
 @click.option(
     "--dev",
@@ -85,13 +89,13 @@ def cli(verbosity: int, no_color: bool, dev: bool) -> None:
 
 
 # register commands
-cli.add_command(cziinfo)
-cli.add_command(czi2tiff)
-cli.add_command(thumbnail)
-cli.add_command(merge)
-cli.add_command(convert)
+cli.add_command(convert, help_group="OME-TIFF")
+cli.add_command(merge, help_group="OME-TIFF")
+cli.add_command(cziinfo, help_group="CZI")
+cli.add_command(czi2tiff, help_group="CZI")
+cli.add_command(thumbnail, help_group="Utility")
 if transform:
-    cli.add_command(transform)
+    cli.add_command(transform, help_group="Utility")
 
 
 def main():
