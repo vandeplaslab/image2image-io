@@ -55,10 +55,17 @@ def get_affine_from_config(
     return affine_inv, image_shape, pixel_size_um
 
 
+def arrange_warped(warped: list[np.ndarray], reader) -> np.ndarray:
+    # stack image
+    warped = np.dstack(warped)
+    # ensure that RGB remains RGB but AF remain AF
+    if warped.ndim == 3 and np.argmin(warped.shape) == 2 and not reader.is_rgb:
+        warped = np.moveaxis(warped, 2, 0)
+    return warped
+
+
 def warp_path(config_path: PathLike, from_transform: PathLike) -> np.ndarray:
     """Warp image with image2image transformation matrix."""
-    import cv2
-    from scipy.ndimage import affine_transform
 
     from image2image_io.readers import get_simple_reader
 
@@ -72,24 +79,22 @@ def warp_path(config_path: PathLike, from_transform: PathLike) -> np.ndarray:
     from_reader = get_simple_reader(from_transform)
 
     # due to a limitation in the opencv implementation, we need to use scipy if the image is too large
-    use_cv2 = max(max(from_reader.image_shape), max(output_shape)) < 32767
     warped = []
     for channel in trange(from_reader.n_channels, desc="Warping images..."):
-        img = from_reader.get_channel(channel)
-        if use_cv2:
-            if isinstance(img, dask.array.Array):
-                img = img.T.compute()
-            warp_img = cv2.warpAffine(img, np.linalg.inv(affine_inv)[:2, :], output_shape[::-1]).T
-        else:
-            warp_img = affine_transform(img, affine_inv, order=1, output_shape=output_shape)
-        warped.append(warp_img)
+        warped.append(
+            warp(affine_inv, output_shape, from_reader.get_channel(channel), order=order)
+        )
+    return arrange_warped(warped, from_reader)
 
-    # stack image
-    warped = np.dstack(warped)
-    # ensure that RGB remains RGB but AF remain AF
-    if warped.ndim == 3 and np.argmin(warped.shape) == 2 and not from_reader.is_rgb:
-        warped = np.moveaxis(warped, 2, 0)
-    return warped
+
+def warp_reader(affine_inv: np.ndarray, output_shape: tuple[int, int], reader, order: int = 1) -> np.ndarray:
+    # due to a limitation in the opencv implementation, we need to use scipy if the image is too large
+    warped = []
+    for channel in trange(reader.n_channels, desc="Warping images..."):
+        warped.append(
+            warp(affine_inv, output_shape, reader.get_channel(channel), order=order)
+        )
+    return arrange_warped(warped, reader)
 
 
 def warp(affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarray, order: int = 1) -> np.ndarray:
