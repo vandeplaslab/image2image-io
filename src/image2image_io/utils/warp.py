@@ -56,6 +56,7 @@ def get_affine_from_config(
 
 
 def arrange_warped(warped: list[np.ndarray], reader) -> np.ndarray:
+    """Arrange warped images into a single array."""
     # stack image
     warped = np.dstack(warped)
     # ensure that RGB remains RGB but AF remain AF
@@ -64,9 +65,8 @@ def arrange_warped(warped: list[np.ndarray], reader) -> np.ndarray:
     return warped
 
 
-def warp_path(config_path: PathLike, from_transform: PathLike) -> np.ndarray:
+def warp_path(config_path: PathLike, from_transform: PathLike, order: int = 1) -> np.ndarray:
     """Warp image with image2image transformation matrix."""
-
     from image2image_io.readers import get_simple_reader
 
     # load affine matrix
@@ -81,9 +81,7 @@ def warp_path(config_path: PathLike, from_transform: PathLike) -> np.ndarray:
     # due to a limitation in the opencv implementation, we need to use scipy if the image is too large
     warped = []
     for channel in trange(from_reader.n_channels, desc="Warping images..."):
-        warped.append(
-            warp(affine_inv, output_shape, from_reader.get_channel(channel), order=order)
-        )
+        warped.append(warp(affine_inv, output_shape, from_reader.get_channel(channel), order=order))
     return arrange_warped(warped, from_reader)
 
 
@@ -91,20 +89,21 @@ def warp_reader(affine_inv: np.ndarray, output_shape: tuple[int, int], reader, o
     # due to a limitation in the opencv implementation, we need to use scipy if the image is too large
     warped = []
     for channel in trange(reader.n_channels, desc="Warping images..."):
-        warped.append(
-            warp(affine_inv, output_shape, reader.get_channel(channel), order=order)
-        )
+        warped.append(warp(affine_inv, output_shape, reader.get_channel(channel), order=order))
     return arrange_warped(warped, reader)
 
 
-def warp(affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarray, order: int = 1) -> np.ndarray:
+def warp(
+    affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarray, order: int = 1, silent: bool = False
+) -> np.ndarray:
     """Warp image."""
     import cv2
     from scipy.ndimage import affine_transform
 
     use_cv2 = max(max(image.shape), max(output_shape)) < 32767
+    if not silent:
+        logger.trace(f"Using {'cv2' if use_cv2 else 'scipy'} for warping.")
     if use_cv2:
-        logger.debug("Using cv2 for warping.")
         if isinstance(image, dask.array.Array):
             image = image.compute()
         warped = cv2.warpAffine(
