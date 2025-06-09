@@ -59,7 +59,7 @@ COLOR_LOG_FMT = (
 @click.option("--quiet", "-q", "verbosity", flag_value=0, help="Minimal output")
 @click.option("--debug", "verbosity", flag_value=0.5, help="Maximum output")
 def cli(verbosity: int, no_color: bool, dev: bool) -> None:
-    """image2image-io CLI."""
+    """Convert, merge, and manipulate image files."""
     from koyo.hooks import install_debugger_hook, uninstall_debugger_hook
     from koyo.logging import get_loguru_config, set_loguru_env, set_loguru_log
 
