@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from pathlib import Path
 
 import cv2
 import numpy as np
+from koyo.secret import hash_iterable, hash_parameters
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
@@ -284,3 +286,101 @@ def transform_shapes_or_points(
             if reader.reader_type == "points":
                 x, y = reader.x, reader.y
                 transform_seq.transform_points(x, y)
+
+
+def _prepare_bbox(
+    left: int, right: int, top: int, bottom: int, inv_resolution: float, multiply: bool = True
+) -> tuple[int, int, int, int]:
+    """Prepare bounding box."""
+    inv_resolution = inv_resolution if multiply else 1
+    top, bottom = sorted([top, bottom])
+    left, right = sorted([left, right])
+    left = math.floor(left * inv_resolution)
+    right = math.ceil(right * inv_resolution)
+    top = math.floor(top * inv_resolution)
+    bottom = math.ceil(bottom * inv_resolution)
+    return left, right, top, bottom
+
+
+def _apply_bbox(array: np.ndarray, left: int, right: int, top: int, bottom: int, channel_axis: int) -> np.ndarray:
+    if array.ndim == 2:
+        array = array[top:bottom, left:right]
+    elif array.ndim == 3:
+        if channel_axis == 0:
+            array = array[:, top:bottom, left:right]
+        elif channel_axis == 1:
+            array = array[top:bottom, :, left:right]
+        elif channel_axis == 2:
+            array = array[top:bottom, left:right, :]
+        else:
+            raise ValueError(f"Array has unsupported shape: {array.shape}")
+    else:
+        raise ValueError(f"Array has unsupported shape: {array.shape}")
+    return array
+
+
+def _prepare_bbox_mask(image_shape: tuple[int, int], left: int, right: int, top: int, bottom: int) -> np.ndarray:
+    # create the mask for the bounding box and then apply it to the image
+    mask = np.zeros(image_shape, dtype=bool)
+    mask[top:bottom, left:right] = True
+    return mask
+
+
+def _prepare_polygon(
+    yx: np.ndarray, inv_resolution: float, image_shape: tuple[int, int], multiply: bool = True
+) -> np.ndarray:
+    """Prepare polygon."""
+    inv_resolution = inv_resolution if multiply else 1
+    # reverse yx to xy
+    yx = np.asarray(yx)
+    xy = yx[:, ::-1] * inv_resolution
+    xy = np.round(xy).astype(np.int32)
+
+    # get left/right/top/bottom from polygon
+    h, w = image_shape
+    left, bottom = np.min(xy, axis=0)
+    left = np.max([0, left])
+    bottom = np.max([0, bottom])
+    right, top = np.max(xy, axis=0)
+    right = np.min([w, right])
+    top = np.min([h, top])
+    top, bottom = sorted([top, bottom])
+    left, right = sorted([left, right])
+    return xy, (left, right, top, bottom)
+
+
+def _prepare_polygon_mask(image_shape: np.ndarray, xy: np.ndarray) -> np.ndarray:
+    """Prepare polygon mask."""
+    import cv2
+
+    mask = np.zeros(image_shape, dtype=np.uint8)
+    mask = cv2.fillPoly(mask, pts=[xy], color=np.iinfo(np.uint8).max)
+    mask = mask.astype(bool)
+    return mask
+
+
+def _apply_mask(array: np.ndarray, mask: np.ndarray, channel_axis: int) -> np.ndarray:
+    if array.ndim == 2:
+        array = array.copy()
+        array[~mask] = 0
+    elif array.ndim == 3:
+        if channel_axis == 0:
+            array = array * mask
+        elif channel_axis in [1, 2]:
+            array = array * mask[:, :, None]
+        else:
+            raise ValueError(f"Array has unsupported shape: {array.shape}")
+    return array
+
+
+def _hash_bbox_or_polygon(
+    yx: np.ndarray | None = None,
+    left: int | None = None,
+    right: int | None = None,
+    top: int | None = None,
+    bottom: int | None = None,
+) -> str:
+    """Hash the bounding box or polygon."""
+    if yx is not None:
+        return hash_iterable(np.asarray(yx).flatten(), n_in_hash=4)
+    return hash_parameters(left=left, right=right, top=top, bottom=bottom, n_in_hash=4)
