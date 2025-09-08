@@ -99,7 +99,9 @@ class CziFile(_CziFile):
 
         pyramid_seq = 0
         rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
-        chunking = (1, 1, 1, tile_size, tile_size, rgb_chunk)
+        n_dims = len(all_axes) - 3
+        chunking = (*[1] * n_dims, tile_size, tile_size, rgb_chunk)
+
         out_shape = list(self.shape)
         out_dtype = self.dtype
         synchronizer = zarr.ThreadSynchronizer() if CONFIG.multicore else None
