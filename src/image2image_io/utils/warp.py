@@ -15,7 +15,7 @@ from tqdm import trange
 
 def get_affine_from_config(
     config_or_path: PathLike | dict, yx: bool = True, px: bool = True, inv: bool = False
-) -> tuple[np.ndarray, tuple[int, int], float]:
+) -> tuple[np.ndarray, tuple[int, int], float, tuple[int, int], float]:
     """Get affine transformation matrix from config."""
     from koyo.json import read_json_data
     from koyo.toml import read_toml_data
@@ -38,21 +38,27 @@ def get_affine_from_config(
     key += "_inv" if inv else ""
 
     # get affine transformation
-    affine_inv = config[key]
-    affine_inv = np.asarray(affine_inv)
+    affine_matrix = config[key]
+    affine_matrix = np.asarray(affine_matrix)
+
+    def _get_paths_metadata(key: str) -> tuple[float, tuple[int, int]]:
+        paths = config[key]
+        if not paths:
+            raise ValueError(f"{key} not found in config.")
+        image_shapes = [tuple(t["image_shape"]) for t in paths]
+        if len(set(image_shapes)) != 1:
+            raise ValueError(f"Different image shapes found in config for {key}.")
+        image_shape: tuple[int, int] = tuple(image_shapes[0])
+        pixel_sizes_um = [float(t["pixel_size_um"]) for t in paths]
+        if len(set(pixel_sizes_um)) != 1:
+            raise ValueError(f"Different pixel sizes found in config for {key}.")
+        pixel_size_um: float = pixel_sizes_um[0]
+        return pixel_size_um, image_shape
+
     # get output image shape
-    fixed_paths = config["fixed_paths"]
-    if not fixed_paths:
-        raise ValueError("Fixed paths not found in config.")
-    image_shapes = [tuple(t["image_shape"]) for t in fixed_paths]
-    if len(set(image_shapes)) != 1:
-        raise ValueError("Different image shapes found in config.")
-    image_shape: tuple[int, int] = tuple(image_shapes[0])
-    pixel_sizes_um = [float(t["pixel_size_um"]) for t in fixed_paths]
-    if len(set(pixel_sizes_um)) != 1:
-        raise ValueError("Different pixel sizes found in config.")
-    pixel_size_um: float = pixel_sizes_um[0]
-    return affine_inv, image_shape, pixel_size_um
+    fixed_pixel_size_um, fixed_image_shape = _get_paths_metadata("fixed_paths")
+    moving_pixel_size_um, moving_image_shape = _get_paths_metadata("moving_paths")
+    return affine_matrix, fixed_image_shape, fixed_pixel_size_um, moving_image_shape, moving_pixel_size_um
 
 
 def arrange_warped(warped: list[np.ndarray], reader) -> np.ndarray:

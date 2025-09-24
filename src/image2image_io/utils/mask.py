@@ -8,7 +8,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from koyo.secret import hash_iterable, hash_parameters
+from koyo.secret import hash_iterable, hash_obj, hash_parameters
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
@@ -206,7 +206,7 @@ def transform_masks(
     if not fmt:
         raise ValueError("No output format specified.")
 
-    affine, mask_shape, pixel_size = get_affine_from_config(config_path, yx=True, px=True, inv=False)
+    affine, mask_shape, pixel_size, *_ = get_affine_from_config(config_path, yx=True, px=True, inv=False)
     mask_inv_pixel_size = 1 / pixel_size
     affine = np.asarray(affine, dtype=float)
     if affine.shape != (3, 3):
@@ -216,7 +216,8 @@ def transform_masks(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # image that masks are transformed to
-    image_reader = get_simple_reader(transform_to, init_pyramid=False, auto_pyramid=False, scene_index=scene_index)
+    warper = get_simple_reader(transform_to, init_pyramid=False, auto_pyramid=False, scene_index=scene_index)
+    warped_to = warper.path.stem
     # mask_shape = image_reader.image_shape
     # mask_inv_pixel_size = image_reader.inv_resolution
     logger.trace(f"Initial mask shape {mask_shape} with {1 / mask_inv_pixel_size:.4f} resolution.")
@@ -240,15 +241,15 @@ def transform_masks(
                 _, shapes = mask_reader.to_shapes()
             # masks must be transformed to the image shape - sometimes that might involve warping if affine matrix
             # is specified
-            transformed_mask = image_reader.warp(mask, affine=affine)
+            transformed_mask = warper.warp(mask, affine=affine)
             transformed_mask_indexed = None
             if mask_indexed is not None:
-                transformed_mask_indexed = image_reader.warp(mask_indexed, affine=affine)
+                transformed_mask_indexed = warper.warp(mask_indexed, affine=affine)
             logger.trace(f"Transformed mask {display_name} in {timer(since_last=True)}")
 
             for fmt_ in fmt:
                 extension = {"hdf5": "h5", "binary": "png", "geojson": "geojson"}[fmt_]
-                output_path = output_dir / f"{display_name}_ds={image_reader.path.stem}.{extension}"
+                output_path = output_dir / f"{display_name}_ds={warped_to}.{extension}"
                 if fmt_ == "hdf5":
                     write_masks_as_hdf5(
                         output_path,
@@ -265,6 +266,61 @@ def transform_masks(
                 else:
                     raise ValueError(f"Unsupported format '{fmt_}'")
                 logger.info(f"Exported {output_path} in {timer(since_last=True)}")
+
+
+def transform_masks_to_ims(
+    masks: list[PathLike],
+    output_dir: PathLike,
+    config_path: PathLike,
+    overwrite: bool = False,
+) -> None:
+    """Transform and export masks."""
+    from image2image_io.readers import ShapesReader, get_simple_reader
+    from image2image_io.utils.warp import get_affine_from_config
+
+    affine, fixed_shape, _, moving_shape, _ = get_affine_from_config(config_path, yx=True, px=True, inv=False)
+    affine = np.asarray(affine, dtype=float)
+    if affine.shape != (3, 3):
+        raise ValueError("Expected 3x3 affine matrix.")
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    hash_obj(str(config_path), n_in_hash=4)
+    logger.trace(f"Initial mask shape {fixed_shape}.")
+
+    for mask in tqdm(masks, desc="Exporting masks..."):
+        with MeasureTimer() as timer:
+            mask_reader = ShapesReader(mask)
+            display_name = mask_reader.display_name or mask_reader.path.stem
+            logger.trace(f"Read mask {display_name} in {timer()}")
+            output_path = output_dir / f"{display_name}.h5"
+            if output_path.exists() and not overwrite:
+                logger.warning(
+                    f"The file {output_path} already exists. Will be skipping it unless you set overwrite=True."
+                )
+                continue
+
+            mask = mask_reader.to_mask(fixed_shape, silent=False)
+            mask_indexed = mask_reader.to_mask(fixed_shape, with_index=True, silent=False)
+            _, shapes = mask_reader.to_shapes()
+            # masks must be transformed to the image shape - sometimes that might involve warping if affine matrix
+            # is specified
+            transformed_mask = transform_mask(mask, affine, moving_shape)
+            transformed_mask_indexed = None
+            if mask_indexed is not None:
+                transformed_mask_indexed = transform_mask(mask_indexed, affine, moving_shape)
+            logger.trace(f"Transformed mask {display_name} in {timer(since_last=True)}")
+
+            write_masks_as_hdf5(
+                output_path,
+                display_name,
+                transformed_mask,
+                shapes,
+                display_name,
+                metadata={"polygon_index": transformed_mask_indexed},
+            )
+            logger.info(f"Exported {output_path} in {timer(since_last=True)}")
 
 
 def transform_shapes_or_points(

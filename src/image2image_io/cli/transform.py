@@ -5,7 +5,14 @@ from __future__ import annotations
 import typing as ty
 
 import click
-from koyo.click import Parameter, arg_split_int, arg_split_str, cli_parse_paths_sort, print_parameters, warning_msg
+from koyo.click import (
+    Parameter,
+    arg_split_int,
+    arg_split_str,
+    cli_parse_paths_sort_auto_glob,
+    print_parameters,
+    warning_msg,
+)
 from loguru import logger
 
 from image2image_io.enums import MaskOutputFmt
@@ -60,7 +67,7 @@ def transform():
     show_default=True,
     required=True,
     multiple=True,
-    callback=cli_parse_paths_sort,
+    callback=cli_parse_paths_sort_auto_glob,
 )
 @click.option(
     "-i",
@@ -86,7 +93,6 @@ def mask(
 
     if not any(ext in transform_ for ext in (".i2r.json", ".i2r.toml")):
         raise ValueError("Only i2r.json or i2r.toml files are supported for mask transformation.")
-
     transform_masks(image_, mask_, output_dir, fmt, transform_, scene_index=scene_index, overwrite=overwrite)
 
 
@@ -119,12 +125,12 @@ def mask(
 @click.option(
     "-f",
     "--files",
-    help="Path to the mask file(s) that should be transformed. Can be GeoJSON or text format.",
-    type=click.Path(exists=False, resolve_path=False, file_okay=True, dir_okay=False),
+    help="Path to the image, shape (e.g. GeoJSON) or point files.",
+    type=click.UNPROCESSED,
     show_default=True,
-    required=True,
     multiple=True,
-    callback=cli_parse_paths_sort,
+    required=True,
+    callback=cli_parse_paths_sort_auto_glob,
 )
 @transform.command(name="attachment")
 def attachment(
@@ -241,7 +247,7 @@ def attachment(
     show_default=True,
     required=True,
     multiple=True,
-    callback=cli_parse_paths_sort,
+    callback=cli_parse_paths_sort_auto_glob,
 )
 @transform.command(name="image")
 def image(
@@ -303,3 +309,54 @@ def image(
             resolution=resolution,
         ):
             logger.info(f"Transformed {key} {scene_index}/{total}")
+
+
+@click.option(
+    "-W",
+    "--overwrite",
+    help="Overwrite existing data.",
+    is_flag=True,
+    default=None,
+    show_default=True,
+)
+@click.option(
+    "-o",
+    "--output_dir",
+    help="Path to directory where mask files will be saved.",
+    default=".",  # cwd
+    type=click.Path(exists=False, resolve_path=True, file_okay=False, dir_okay=True),
+    show_default=True,
+    required=True,
+)
+@click.option(
+    "-T",
+    "--transform",
+    "transform_",
+    help="Path to the i2r.json transformation file.",
+    type=click.Path(exists=False, resolve_path=False, file_okay=True, dir_okay=False),
+    show_default=True,
+    required=True,
+)
+@click.option(
+    "-f",
+    "--files",
+    help="Path to the mask file(s) that should be transformed. Can be GeoJSON or text format.",
+    type=click.UNPROCESSED,
+    show_default=True,
+    required=True,
+    multiple=True,
+    callback=cli_parse_paths_sort_auto_glob,
+)
+@transform.command(name="geojson2ims")
+def geojson2ims(
+    files: list[str],
+    output_dir: str,
+    transform_: str,
+    overwrite: bool,
+) -> None:
+    """Transform GeoJSON or point mask using image2image transformation matrix (i2r.json)."""
+    from image2image_io.utils.mask import transform_masks_to_ims
+
+    if not any(ext in transform_ for ext in (".i2r.json", ".i2r.toml")):
+        raise ValueError("Only i2r.json or i2r.toml files are supported for mask transformation.")
+    transform_masks_to_ims(files, output_dir, transform_, overwrite=overwrite)
