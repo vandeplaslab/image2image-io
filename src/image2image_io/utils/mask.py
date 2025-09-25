@@ -116,7 +116,7 @@ def write_masks_as_hdf5(
         grp.attrs["display_name"] = display_name
         grp.attrs["creation_date"] = creation_date
         # write mask data
-        grp.create_dataset("mask", data=mask)
+        grp.create_dataset("mask", data=mask, compression="gzip", compression_opts=5)
         grp.create_dataset("color", data=color)
         # write shapes data
         if shapes_data:
@@ -133,7 +133,7 @@ def write_masks_as_hdf5(
                         f"Skipped metadata key={meta_name} as it had wrong shape or dimension. {meta_data.shape}"
                     )
                     continue
-                grp.create_dataset(f"{meta_name}", data=meta_data)
+                grp.create_dataset(f"{meta_name}", data=meta_data, compression="gzip", compression_opts=5)
 
 
 def write_masks_as_geojson(path: PathLike, shapes_data: dict[str, np.ndarray | str], display_name: str) -> None:
