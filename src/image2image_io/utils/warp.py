@@ -76,7 +76,7 @@ def warp_path(config_path: PathLike, from_transform: PathLike, order: int = 1) -
     from image2image_io.readers import get_simple_reader
 
     # load affine matrix
-    affine_inv, output_shape, pixel_size = get_affine_from_config(config_path)
+    affine_inv, fixed_image_shape, fixed_pixel_size_um, _, _ = get_affine_from_config(config_path)
 
     if not Path(from_transform).exists():
         raise FileNotFoundError(f"File not found: {from_transform}")
@@ -87,11 +87,12 @@ def warp_path(config_path: PathLike, from_transform: PathLike, order: int = 1) -
     # due to a limitation in the opencv implementation, we need to use scipy if the image is too large
     warped = []
     for channel in trange(from_reader.n_channels, desc="Warping images..."):
-        warped.append(warp(affine_inv, output_shape, from_reader.get_channel(channel), order=order))
+        warped.append(warp(affine_inv, fixed_image_shape, from_reader.get_channel(channel), order=order))
     return arrange_warped(warped, from_reader)
 
 
 def warp_reader(affine_inv: np.ndarray, output_shape: tuple[int, int], reader, order: int = 1) -> np.ndarray:
+    """Warp image with image2image transformation matrix."""
     # due to a limitation in the opencv implementation, we need to use scipy if the image is too large
     warped = []
     for channel in trange(reader.n_channels, desc="Warping images..."):
@@ -129,7 +130,7 @@ class ImageWarper:
     def __init__(self, config_or_path: PathLike | dict, yx: bool = True, inv: bool = False):
         """Initialize."""
         self.config_or_path = Path(config_or_path) if not isinstance(config_or_path, dict) else config_or_path
-        self.affine_inv, self.output_size_yx, pixel_size = get_affine_from_config(self.config_or_path, yx=yx, inv=inv)
+        self.affine_inv, self.output_size_yx, pixel_size, _, _ = get_affine_from_config(self.config_or_path, yx=yx, inv=inv)
         self.output_size = self.output_size_yx[::-1]  # x, y
         self.output_spacing = (pixel_size, pixel_size)
 
