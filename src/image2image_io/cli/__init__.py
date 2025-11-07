@@ -99,7 +99,7 @@ if transform:
 
 
 def main():
-    """Execute the "imimspy" command line program."""
+    """Execute the "image2image" command line program."""
     cli.main(windows_expand_args=False)
 
 
