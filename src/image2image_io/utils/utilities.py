@@ -144,11 +144,6 @@ def guess_rgb(shape: tuple[int, ...]) -> bool:
     ----------
     shape : list of int
         Shape of the data that should be checked.
-
-    Returns
-    -------
-    bool
-        If data is rgb or not.
     """
     if hasattr(shape, "shape"):
         shape = shape.shape
