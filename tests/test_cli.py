@@ -7,7 +7,7 @@ from koyo.utilities import is_installed
 
 from image2image_io.utils._test import get_test_file, get_test_files
 
-has_reg = is_installed("image2image_reg")
+has_i2reg = is_installed("image2image_reg")
 
 
 def test_cli_entrypoint():
@@ -29,7 +29,7 @@ def test_thumbnail(tmp_path, input_key, with_title):
 
 
 @pytest.mark.xfail(reason="needs to be resolved.")
-@pytest.mark.skipif(not has_reg, reason="image2image-reg is not installed.")
+@pytest.mark.skipif(not has_i2reg, reason="image2image-reg is not installed.")
 @pytest.mark.parametrize("transform", get_test_files("transform/*.i2r.json"))
 def test_transform(tmp_path, transform):
     tmp = tmp_path
