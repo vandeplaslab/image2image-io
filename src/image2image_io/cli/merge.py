@@ -78,7 +78,7 @@ def merge_runner(
     overwrite: bool = False,
 ) -> None:
     """Register images."""
-    from image2image_io.workflows.merge import merge as merge_images
+    from image2image_io.merge import merge as merge_images
 
     print_parameters(
         Parameter("Name", "-n/--name", name),
