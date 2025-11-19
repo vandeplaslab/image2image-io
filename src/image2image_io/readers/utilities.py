@@ -14,6 +14,7 @@ from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import TiffFile, imread, xml2dict
 
+from image2image_io._zarr import Array, Group
 from image2image_io.utils.utilities import guess_rgb
 
 logger = logger.bind(src="Tiff")
@@ -25,7 +26,7 @@ def tifffile_to_dask(im_fp: str | Path, largest_series: int) -> list[da.Array]:
         imdata = zarr.open(imread(im_fp, aszarr=True, series=largest_series))
     logger.trace(f"Loaded OME-TIFF data in {timer()}")
     with MeasureTimer() as timer:
-        if isinstance(imdata, zarr.hierarchy.Group):
+        if isinstance(imdata, Group):
             imdata = [da.from_zarr(imdata[z]) for z in imdata.array_keys()]
         else:
             imdata = [da.from_zarr(imdata)]
@@ -221,9 +222,9 @@ def zarr_get_base_pyr_layer(zarr_store):
     zarr_im: zarr.core.Array
         zarr array of base layer
     """
-    if isinstance(zarr_store, zarr.hierarchy.Group):
+    if isinstance(zarr_store, Group):
         zarr_im = zarr_store[str(0)]
-    elif isinstance(zarr_store, zarr.core.Array):
+    elif isinstance(zarr_store, Array):
         zarr_im = zarr_store
     else:
         raise ValueError("Could not find base pyramid layer.")
@@ -235,7 +236,7 @@ def ensure_dask_array(image):
     if isinstance(image, da.core.Array):
         return image
 
-    if isinstance(image, zarr.Array):
+    if isinstance(image, Array):
         return da.from_zarr(image)
 
     # handles np.ndarray _and_ other array like objects.
