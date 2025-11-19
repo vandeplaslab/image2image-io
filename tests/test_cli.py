@@ -16,7 +16,6 @@ def test_cli_entrypoint():
     assert exit_status == 0, "Exit status was not 0"
 
 
-@pytest.mark.xfail(reason="needs to be resolved.")
 @pytest.mark.parametrize("input_key", ["-i", "--input"])
 @pytest.mark.parametrize("with_title", ["-t", "-T"])
 def test_thumbnail(tmp_path, input_key, with_title):
@@ -28,7 +27,6 @@ def test_thumbnail(tmp_path, input_key, with_title):
     assert len(list(tmp.glob("*.jpg"))) > 0, "No thumbnail images"
 
 
-@pytest.mark.xfail(reason="needs to be resolved.")
 @pytest.mark.skipif(not has_i2reg, reason="image2image-reg is not installed.")
 @pytest.mark.parametrize("transform", get_test_files("transform/*.i2r.json"))
 def test_transform(tmp_path, transform):

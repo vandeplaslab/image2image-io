@@ -44,6 +44,7 @@ dependencies = [
     "h5py",
     "imzy",
     "czifile>=2019.7.2.1",
+    "dask[array,distributed]",
     "tifffile",
     "imagecodecs",
 #    "aicsimageio",

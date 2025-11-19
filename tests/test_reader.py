@@ -15,6 +15,22 @@ def test_get_simple_reader_tiff(path):
     assert reader.reader_type == "image", "Reader should be image"
 
 
+@pytest.mark.parametrize("path", get_test_files("2d-image*.czi"))
+def test_get_simple_reader_czi_2d(path):
+    reader = get_simple_reader(path)
+    assert not reader.is_rgb, "Reader should not be rgb"
+    assert reader.n_channels == 1, "Reader should have 1 channel"
+    assert reader.reader_type == "image", "Reader should be image"
+
+
+# @pytest.mark.parametrize("path", get_test_files("multichannel*.czi"))
+# def test_get_simple_reader_czi_multichannel(path):
+#     reader = get_simple_reader(path)
+#     assert not reader.is_rgb, "Reader should not be rgb"
+#     assert reader.n_channels == 1, "Reader should have more than 1 channel"
+#     assert reader.reader_type == "image", "Reader should be image"
+
+
 @pytest.mark.parametrize("path", get_test_files("*.png"))
 def test_get_simple_reader_png(path):
     reader = get_simple_reader(path)

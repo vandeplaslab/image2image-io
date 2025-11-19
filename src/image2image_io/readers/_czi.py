@@ -224,10 +224,13 @@ class CziFile(_CziFile):
         for axis_index in range(len(self.axes)):
             if axis_index not in tzcyx0_axis_indices:
                 tzcyx0_axis_indices.append(axis_index)
-        data = data.transpose(tzcyx0_axis_indices)
+        if hasattr(data, "transpose"):
+            data = data.transpose(tzcyx0_axis_indices)
+        else:
+            data = np.transpose(data, tzcyx0_axis_indices)
         data.shape = data.shape[:6]
         return data
-
+    
     def _get_scale(self, dimension: str, multiplier: float = 1.0):
         scale_element = self._metadata_xml.find(f'.//Metadata/Scaling/Items/Distance[@Id="{dimension}"]/Value')
         if scale_element is not None:
