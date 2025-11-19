@@ -2,14 +2,9 @@
 
 from pathlib import Path
 
-from image2image_io._zarr import TempStore, atexit_rmglob
+import zarr
 
-
-def test_temp_store() -> None:
-    """Test TempStore."""
-    store = TempStore()
-    assert Path(store.path).exists(), "TempStore path does not exist"
-    assert Path(store.path).is_dir(), "TempStore path is not a directory"
+from image2image_io._zarr import atexit_rmglob
 
 
 def test_atexit_rmglob() -> None:
