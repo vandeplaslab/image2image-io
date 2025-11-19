@@ -5,11 +5,11 @@ from __future__ import annotations
 import typing as ty
 
 import numpy as np
-import zarr.storage
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
 
+from image2image_io._zarr import TempStore
 from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers._czi import CziFile, CziSceneFile, get_czi_thumbnail
@@ -120,7 +120,7 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
         auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
-        self._zstore = zarr.storage.TempStore()
+        self._zstore = TempStore()
         return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
 
     def get_thumbnail(self) -> tuple[np.ndarray, tuple[float, float]]:
@@ -173,5 +173,5 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
         auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
-        self._zstore = zarr.storage.TempStore()
+        self._zstore = TempStore()
         return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)

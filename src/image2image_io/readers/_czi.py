@@ -20,6 +20,7 @@ from loguru import logger
 from tifffile import create_output
 from tqdm import tqdm
 
+from image2image_io._zarr import TempStore
 from image2image_io.config import CONFIG
 from image2image_io.readers.utilities import compute_sub_res, guess_rgb
 
@@ -132,7 +133,7 @@ class CziFile(_CziFile):
         logger.trace(f"Generating {ds_levels} down-sampled images")
         for ds_factor in ds_levels:
             with MeasureTimer() as timer:
-                zres = zarr.storage.TempStore()
+                zres = TempStore()
                 rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
                 is_rgb = True if rgb_chunk > 1 else False
                 z_array_ds = compute_sub_res(z_array, ds_factor, tile_size, is_rgb, self.dtype)
@@ -230,7 +231,7 @@ class CziFile(_CziFile):
             data = np.transpose(data, tzcyx0_axis_indices)
         data.shape = data.shape[:6]
         return data
-    
+
     def _get_scale(self, dimension: str, multiplier: float = 1.0):
         scale_element = self._metadata_xml.find(f'.//Metadata/Scaling/Items/Distance[@Id="{dimension}"]/Value')
         if scale_element is not None:

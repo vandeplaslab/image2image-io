@@ -8,10 +8,10 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-import zarr.storage
 from koyo.typing import PathLike
 from loguru import logger
 
+from image2image_io._zarr import TempStore, atexit_rmtree
 from image2image_io.config import CONFIG
 from image2image_io.enums import DEFAULT_TRANSFORM_NAME, DisplayType
 from image2image_io.models.preprocess import NoopProcessor
@@ -54,7 +54,7 @@ class BaseReader:
     _array_dtype: np.dtype | None = None
     _array_shape: tuple[int, ...] | None = None
     _image_shape: tuple[int, int] | None = None
-    _zstore: zarr.storage.TempStore | None = None
+    _zstore: TempStore | None = None
     _scene_ids: list[int] | None = None
     _resolution: float = 1.0
     _channel_names: list[str] | None = None
@@ -338,7 +338,7 @@ class BaseReader:
         if self._zstore is not None and hasattr(self._zstore, "path") and self._zstore.path:
             zarr_path = Path(self._zstore.path)
             if zarr_path.exists():
-                zarr.storage.atexit_rmtree(zarr_path)
+                atexit_rmtree(zarr_path)
                 logger.trace(f"Removed temporary zarr store: {zarr_path}")
         self.fh = None
         self._pyramid = None

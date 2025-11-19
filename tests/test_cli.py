@@ -35,7 +35,14 @@ def test_merge(tmp_path, as_uint8) -> None:
 
 @pytest.mark.parametrize("file", get_test_files("*.czi"))
 def test_cziinfo(file) -> None:
-    exit_status = os.system(f"i2io cziinfo -i {file}")
+    exit_status = os.system(f"i2io cziinfo -i {file!s}")
+    assert exit_status == 0, "Exit status was not 0"
+
+
+@pytest.mark.parametrize("as_uint8", ["-u", "-U"])
+@pytest.mark.parametrize("file", get_test_files("multichannel-image.czi"))
+def test_czi2tiff(tmp_path, file, as_uint8) -> None:
+    exit_status = os.system(f"i2io czi2tiff -i {file!s} -o {tmp_path!s} {as_uint8} --scene 0")
     assert exit_status == 0, "Exit status was not 0"
 
 

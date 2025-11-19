@@ -15,6 +15,7 @@ from koyo.click import (
 )
 from loguru import logger
 
+from image2image_io.cli._common import as_uint8_, overwrite_, tile_size_
 from image2image_io.enums import MaskOutputFmt
 
 
@@ -23,14 +24,7 @@ def transform():
     """Transform command."""
 
 
-@click.option(
-    "-W",
-    "--overwrite",
-    help="Overwrite existing data.",
-    is_flag=True,
-    default=None,
-    show_default=True,
-)
+@overwrite_
 @click.option("-s", "--scene_index", help="Scene index to transform.", type=click.INT, default=None, show_default=True)
 @click.option(
     "-f",
@@ -96,14 +90,7 @@ def mask(
     transform_masks(image_, mask_, output_dir, fmt, transform_, scene_index=scene_index, overwrite=overwrite)
 
 
-@click.option(
-    "-W",
-    "--overwrite",
-    help="Overwrite existing data.",
-    is_flag=True,
-    default=None,
-    show_default=True,
-)
+@overwrite_
 @click.option(
     "-o",
     "--output_dir",
@@ -148,14 +135,7 @@ def attachment(
     transform_shapes_or_points(files, output_dir, transform_, overwrite=overwrite)
 
 
-@click.option(
-    "-W",
-    "--overwrite",
-    help="Overwrite existing data.",
-    is_flag=True,
-    default=None,
-    show_default=True,
-)
+@overwrite_
 @click.option(
     "-R",
     "--resolution",
@@ -203,23 +183,8 @@ def attachment(
     show_default=True,
     required=False,
 )
-@click.option(
-    "-u",
-    "--as_uint8",
-    is_flag=True,
-    help="Convert to uint8. If not specified, the original data type will be used.",
-    show_default=True,
-    required=False,
-)
-@click.option(
-    "-t",
-    "--tile_size",
-    help="Tile size.",
-    type=click.Choice(["256", "512", "1024", "2048"], case_sensitive=False),
-    default="512",
-    show_default=True,
-    required=False,
-)
+@as_uint8_
+@tile_size_
 @click.option(
     "-o",
     "--output_dir",
@@ -311,14 +276,7 @@ def image(
             logger.info(f"Transformed {key} {scene_index}/{total}")
 
 
-@click.option(
-    "-W",
-    "--overwrite",
-    help="Overwrite existing data.",
-    is_flag=True,
-    default=None,
-    show_default=True,
-)
+@overwrite_
 @click.option(
     "-o",
     "--output_dir",

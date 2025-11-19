@@ -5,44 +5,13 @@ from __future__ import annotations
 import click
 from koyo.click import Parameter, cli_parse_paths_sort, print_parameters
 
-from image2image_io.cli._common import ALLOW_EXTRA_ARGS
+from image2image_io.cli._common import ALLOW_EXTRA_ARGS, as_uint8_, fmt_, overwrite_, tile_size_
 
 
-@click.option(
-    "-W",
-    "--overwrite",
-    help="Overwrite existing data.",
-    is_flag=True,
-    default=None,
-    show_default=True,
-)
-@click.option(
-    "-u/-U",
-    "--as_uint8/--no_as_uint8",
-    help="Downcast the image data format to uint8 which will substantially reduce the size of the files (unless it's"
-    " already in uint8...).",
-    is_flag=True,
-    default=None,
-    show_default=True,
-)
-@click.option(
-    "-t",
-    "--tile_size",
-    help="Tile size.",
-    type=click.Choice(["256", "512", "1024", "2048"], case_sensitive=False),
-    default="512",
-    show_default=True,
-    required=False,
-)
-@click.option(
-    "-f",
-    "--fmt",
-    help="Output format.",
-    type=click.Choice(["ome-tiff"], case_sensitive=False),
-    default="ome-tiff",
-    show_default=True,
-    required=False,
-)
+@overwrite_
+@as_uint8_
+@tile_size_
+@fmt_
 @click.option(
     "-o",
     "--output_dir",

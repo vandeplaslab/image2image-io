@@ -29,6 +29,15 @@ as_uint8_ = click.option(
     default=None,
     show_default=True,
 )
+tile_size_ = click.option(
+    "-t",
+    "--tile_size",
+    help="Tile size.",
+    type=click.Choice(["256", "512", "1024", "2048"], case_sensitive=False),
+    default="512",
+    show_default=True,
+    required=False,
+)
 fmt_ = click.option(
     "-f",
     "--fmt",

@@ -6,6 +6,8 @@ import click
 from koyo.click import arg_split_int, arg_split_str
 from loguru import logger
 
+from image2image_io.cli._common import as_uint8_, tile_size_
+
 
 @click.option(
     "-N",
@@ -29,23 +31,8 @@ from loguru import logger
     show_default=True,
     required=False,
 )
-@click.option(
-    "-u",
-    "--as_uint8",
-    is_flag=True,
-    help="Convert to uint8. If not specified, the original data type will be used.",
-    show_default=True,
-    required=False,
-)
-@click.option(
-    "-t",
-    "--tile_size",
-    help="Tile size.",
-    type=click.Choice(["256", "512", "1024", "2048"], case_sensitive=False),
-    default="512",
-    show_default=True,
-    required=False,
-)
+@as_uint8_
+@tile_size_
 @click.option(
     "-s",
     "--scene",
@@ -97,7 +84,7 @@ def czi2tiff(
             raise ValueError("Number of channel IDs and channel names must be equal.")
         metadata = {scene_index: {"channel_ids": channel_ids, "channel_names": channel_names}}
 
-    for key, scene_index, total, _ in czi_to_ome_tiff(
+    for key, scene_index, total, _, _ in czi_to_ome_tiff(
         input_, output_dir, as_uint8=as_uint8, tile_size=int(tile_size), metadata=metadata, scenes=[scene_index]
     ):
         logger.info(f"Converted {key} scene {scene_index}/{total}")
