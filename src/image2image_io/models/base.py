@@ -5,15 +5,13 @@ from pathlib import Path
 
 from koyo.typing import PathLike
 from pydantic import BaseModel as _BaseModel
+from pydantic import ConfigDict
 
 
 class BaseModel(_BaseModel):
     """Base model."""
 
-    class Config:
-        """Config."""
-
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def update(self, **kwargs: ty.Dict) -> None:
         """Update transformation."""

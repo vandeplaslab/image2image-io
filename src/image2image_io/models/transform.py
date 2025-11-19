@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from koyo.typing import PathLike
 from loguru import logger
-from pydantic import PrivateAttr
+from pydantic import ConfigDict, PrivateAttr
 from skimage.transform import AffineTransform, ProjectiveTransform
 
 from image2image_io.enums import DEFAULT_TRANSFORM_NAME
@@ -125,12 +125,9 @@ class TransformData(BaseModel):
 class TransformModel(BaseModel):
     """Model containing transformation data."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     transforms: ty.Optional[ty.Dict[Path, TransformData]] = None
-
-    class Config:
-        """Config."""
-
-        arbitrary_types_allowed = True
 
     @property
     def name_to_path_map(self) -> ty.Dict[ty.Union[str, Path], Path]:
