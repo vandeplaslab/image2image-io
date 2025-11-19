@@ -110,7 +110,7 @@ class CziFile(_CziFile):
         if hasattr(zarr, "ThreadSynchronizer"):
             kws["synchronizer"] = zarr.ThreadSynchronizer() if CONFIG.multicore else None
         out = root.create_dataset(
-            pyramid_seq, shape=tuple(out_shape), chunks=chunking, dtype=out_dtype, overwrite=True, **kws
+            str(pyramid_seq), shape=tuple(out_shape), chunks=chunking, dtype=out_dtype, overwrite=True, **kws
         )
 
         with MeasureTimer() as timer:
