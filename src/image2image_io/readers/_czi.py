@@ -87,7 +87,7 @@ class CziFile(_CziFile):
             out.flush()
         return out
 
-    def zarr_pyramidize_czi(self, zarr_fp, pyramid: bool = True, tile_size: int = 1024) -> list:
+    def zarr_pyramidize_czi(self, zarr_fp: TempStore, pyramid: bool = True, tile_size: int = 1024) -> list:
         """Create a pyramidal zarr store from a CZI file."""
         dask_pyr = []
         root = zarr.open_group(zarr_fp, mode="a")
@@ -110,12 +110,17 @@ class CziFile(_CziFile):
         if hasattr(zarr, "ThreadSynchronizer"):
             kws["synchronizer"] = zarr.ThreadSynchronizer() if CONFIG.multicore else None
         out = root.create_dataset(
-            str(pyramid_seq), shape=tuple(out_shape), chunks=chunking, dtype=out_dtype, overwrite=True, **kws
+            str(pyramid_seq),
+            shape=tuple(out_shape),
+            chunks=chunking,
+            dtype=out_dtype,
+            overwrite=True,
+            **kws,
         )
 
         with MeasureTimer() as timer:
             self.as_tzcyx0_array(out=out, max_workers=cpu_count() if CONFIG.multicore else 1)
-            z_array = da.squeeze(da.from_zarr(zarr.open(zarr_fp)[0]))
+            z_array = da.squeeze(da.from_zarr(zarr.open(zarr_fp)[str(pyramid_seq)]))
             dask_pyr.append(z_array)
         logger.trace(f"Loaded data in {timer()} to shape {z_array.shape}")
 
