@@ -48,10 +48,9 @@ except (AttributeError, ModuleNotFoundError):
         """Temporary Zarr store that is removed at exit."""
 
         def __init__(self) -> None:
-            path = TemporaryDirectory()
-            super().__init__(path)
+            super().__init__(TemporaryDirectory().name)
 
         @property
         def path(self) -> Path:
-            """Return the path to temporary directory."""
+            """Return the path to the temporary directory."""
             return self.root
