@@ -1,6 +1,6 @@
 """Zarr storage."""
 
-from zarr.core import Array
+from zarr import Array
 
 try:
     from zarr.hierarchy import Group
