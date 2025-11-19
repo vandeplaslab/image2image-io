@@ -46,7 +46,7 @@ dependencies = [
     "czifile>=2019.7.2.1",
     "tifffile",
     "imagecodecs",
-    "aicsimageio",
+#    "aicsimageio",
     "ome_types",
     "rasterio",
     "shapely",
