@@ -15,7 +15,8 @@ from loguru import logger
 from tifffile import TiffWriter
 from tqdm import tqdm
 
-from image2image_io.readers.utilities import get_pyramid_info, prepare_ome_xml_str
+from image2image_io.readers.utilities import prepare_ome_xml_str
+from image2image_io.utils.utilities import get_pyramid_info
 
 if ty.TYPE_CHECKING:
     from image2image_io.readers._base_reader import BaseReader

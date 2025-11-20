@@ -15,7 +15,7 @@ from tqdm import tqdm
 from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.geojson_utils import get_int_dtype, read_geojson, shape_reader
-from image2image_io.readers.utilities import check_df_columns, get_column_name
+from image2image_io.utils.utilities import check_df_columns, get_column_name
 
 if ty.TYPE_CHECKING:
     from shapely.geometry import Polygon

@@ -14,11 +14,11 @@ from loguru import logger
 from tifffile import TiffWriter
 from tqdm import tqdm
 
-from image2image_io.enums import SITK_TO_NP_DTYPE
+from image2image_io.constants import SITK_TO_NP_DTYPE
 from image2image_io.models.merge import MergeImages
 from image2image_io.readers import BaseReader
-from image2image_io.readers.utilities import get_pyramid_info, prepare_ome_xml_str
-from image2image_io.utils.utilities import format_merge_channel_names
+from image2image_io.readers.utilities import prepare_ome_xml_str
+from image2image_io.utils.utilities import format_merge_channel_names, get_pyramid_info
 
 
 class Transformer(ty.Protocol):

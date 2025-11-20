@@ -13,7 +13,7 @@ from loguru import logger
 
 from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
-from image2image_io.readers.utilities import get_column_name
+from image2image_io.utils.utilities import get_column_name
 
 
 def read_points(path: PathLike, return_df: bool = False) -> tuple[np.ndarray, np.ndarray, pd.DataFrame] | pd.DataFrame:

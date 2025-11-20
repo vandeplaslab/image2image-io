@@ -1,5 +1,7 @@
 """Test reader."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -13,15 +15,29 @@ def test_get_simple_reader_tiff(path):
     assert not reader.is_rgb, "Reader should not be rgb"
     assert reader.n_channels == 1, "Reader should have 1 channel"
     assert reader.reader_type == "image", "Reader should be image"
+    assert reader.pyramid is not None, "Reader should have pyramid"
+    assert reader.n_in_pyramid == 1, "Reader should have 1 pyramid"
+    if reader._zstore:
+        zarr_path = Path(reader._zstore.path)
+        assert zarr_path.exists(), "Zarr path should exist"
+        reader.close()
+        assert not zarr_path.exists(), "Zarr path should be removed after close"
 
 
-@pytest.mark.xfail(reason="Needs to be fixed on zarr-v3")
+# @pytest.mark.xfail(reason="Needs to be fixed on zarr-v3")
 @pytest.mark.parametrize("path", get_test_files("2d-image*.czi"))
 def test_get_simple_reader_czi_2d(path):
     reader = get_simple_reader(path)
     assert not reader.is_rgb, "Reader should not be rgb"
     assert reader.n_channels == 1, "Reader should have 1 channel"
     assert reader.reader_type == "image", "Reader should be image"
+    assert reader.pyramid is not None, "Reader should have pyramid"
+    assert reader.n_in_pyramid == 1, "Reader should have 1 pyramid"
+    if reader._zstore:
+        zarr_path = Path(reader._zstore.path)
+        assert zarr_path.exists(), "Zarr path should exist"
+        reader.close()
+        assert not zarr_path.exists(), "Zarr path should be removed after close"
 
 
 # @pytest.mark.parametrize("path", get_test_files("multichannel*.czi"))

@@ -8,6 +8,10 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import numpy as np
+import pandas as pd
+from dask import array as da
+from zarr import Array
+
 from koyo.typing import PathLike
 
 if ty.TYPE_CHECKING:
@@ -257,3 +261,133 @@ def get_yx_coordinates_from_shape(shape: tuple[int, int]) -> tuple[np.ndarray, n
     _y, _x = np.indices(shape)
     yx_coordinates = np.c_[np.ravel(_y), np.ravel(_x)]
     return yx_coordinates[:, 0], yx_coordinates[:, 1]
+
+
+def calc_pyramid_levels(xy_final_shape: np.ndarray, tile_size: int) -> list[tuple[int, int]]:
+    """Calculate the number of pyramids for a given image dimension, and tile size.
+
+    Stops when further downsampling would be smaller than tile_size.
+
+    Parameters
+    ----------
+    xy_final_shape:np.ndarray
+        final shape in xy order
+    tile_size: int
+        size of the tiles in the pyramidal layers
+
+    Returns
+    -------
+    res_shapes:list
+        list of tuples of the shapes of the downsampled images
+
+    """
+    res_shape = xy_final_shape[::-1]
+    res_shapes = [(int(res_shape[0]), int(res_shape[1]))]
+
+    while all(res_shape > tile_size):
+        res_shape = res_shape // 2
+        res_shapes.append((int(res_shape[0]), int(res_shape[1])))
+    return res_shapes[:-1]
+
+
+def get_pyramid_info(
+    y_size: int, x_size: int, n_ch: int, tile_size: int
+) -> tuple[list[tuple[int, int]], list[tuple[int, int, int, int, int]]]:
+    """
+    Get pyramidal info for OME-tiff output.
+
+    Parameters
+    ----------
+    y_size: int
+        y dimension of base layer
+    x_size:int
+        x dimension of base layer
+    n_ch:int
+        number of channels in the image
+    tile_size:int
+        tile size of the image
+
+    Returns
+    -------
+    pyr_levels
+        pyramidal levels
+    pyr_shapes:
+        OME-zarr pyramid shapes for all levels
+
+    """
+    yx_size = np.asarray([y_size, x_size], dtype=np.int32)
+    pyr_levels = calc_pyramid_levels(yx_size, tile_size)
+    pyr_shapes = [(1, n_ch, 1, int(pl[0]), int(pl[1])) for pl in pyr_levels]
+    return pyr_levels, pyr_shapes
+
+
+def ensure_dask_array(image):
+    """Ensure array is a dask array."""
+    if isinstance(image, da.core.Array):
+        return image
+
+    if isinstance(image, Array):
+        return da.from_zarr(image)
+
+    # handles np.ndarray _and_ other array like objects.
+    return da.from_array(image)
+
+
+def grayscale(rgb_image: np.ndarray | da.Array, is_interleaved: bool = False) -> np.ndarray:
+    """
+    Convert RGB image data to greyscale.
+
+    Parameters
+    ----------
+    rgb_image: np.ndarray
+        image data
+    is_interleaved: bool
+        whether the image is interleaved
+
+    Returns
+    -------
+    image:np.ndarray
+        returns 8-bit greyscale image for 24-bit RGB image
+    """
+    if is_interleaved:
+        result = (
+            (rgb_image[..., 0] * 0.2125).astype(np.uint8)
+            + (rgb_image[..., 1] * 0.7154).astype(np.uint8)
+            + (rgb_image[..., 2] * 0.0721).astype(np.uint8)
+        )
+    else:
+        result = (
+            (rgb_image[0, ...] * 0.2125).astype(np.uint8)
+            + (rgb_image[1, ...] * 0.7154).astype(np.uint8)
+            + (rgb_image[2, ...] * 0.0721).astype(np.uint8)
+        )
+    return result
+
+
+def check_df_columns(
+    df: pd.DataFrame,
+    required: list[str],
+    either: list[tuple[str, ...]] | None = None,
+    either_dtype: tuple[np.dtype, ...] | None = None,
+) -> bool:
+    """Check if a DataFrame has the required columns."""
+    if not all(col in df.columns for col in required):
+        return False
+    if either is not None:
+        if either_dtype is not None:
+            return all(any((col in df.columns) and (df[col].dtype in either_dtype) for col in cols) for cols in either)
+        return all(any(col in df.columns for col in cols) for cols in either)
+    return True
+
+
+def get_column_name(df: pd.DataFrame, options: list[str]) -> str:
+    """Get columns from a DataFrame."""
+    for key in options:
+        if key in df.columns:
+            return key
+    raise ValueError(f"None of the options {options} are in the DataFrame. Available columns are {df.columns}")
+
+
+def sort_pyramid(pyramid: list[da.Array]) -> list[da.Array]:
+    """Sort pyramid levels from highest to lowest resolution."""
+    return sorted(pyramid, key=lambda x: x.size, reverse=True)

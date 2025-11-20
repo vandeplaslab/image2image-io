@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import typing as ty
 import warnings
 from pathlib import Path
@@ -25,7 +24,7 @@ from image2image_io.utils.mask import (
     _prepare_polygon,
     _prepare_polygon_mask,
 )
-from image2image_io.utils.utilities import guess_rgb
+from image2image_io.utils.utilities import guess_rgb, sort_pyramid
 
 if ty.TYPE_CHECKING:
     from image2image_io.writers.tiff_writer import Transformer
@@ -342,7 +341,6 @@ class BaseReader:
                 logger.trace(f"Removed temporary zarr store: {zarr_path}")
         self.fh = None
         self._pyramid = None
-        # check_if_open(self.path)
         if not self._closed:
             logger.trace(f"Closed file handle '{self.path}'")
             self._closed = True
@@ -351,7 +349,7 @@ class BaseReader:
     def pyramid(self) -> list:
         """Pyramid."""
         if self._pyramid is None:
-            self._pyramid = self.get_dask_pyr()
+            self._pyramid = sort_pyramid(self.get_dask_pyr())
         return self._pyramid
 
     def get_dask_pyr(self) -> list[ty.Any]:
