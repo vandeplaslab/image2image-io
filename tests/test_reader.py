@@ -17,6 +17,10 @@ def test_get_simple_reader_tiff(path):
     assert reader.reader_type == "image", "Reader should be image"
     assert reader.pyramid is not None, "Reader should have pyramid"
     assert reader.n_in_pyramid == 1, "Reader should have 1 pyramid"
+    thumbnail, scale = reader.get_thumbnail(100)
+    assert isinstance(thumbnail, np.ndarray), "thumbnail should be np.ndarray"
+    assert all(s > 0 for s in scale), "scale should be greater than 0"
+
     if reader._zstore:
         zarr_path = Path(reader._zstore.path)
         assert zarr_path.exists(), "Zarr path should exist"
@@ -33,6 +37,10 @@ def test_get_simple_reader_czi_2d(path):
     assert reader.reader_type == "image", "Reader should be image"
     assert reader.pyramid is not None, "Reader should have pyramid"
     assert reader.n_in_pyramid == 1, "Reader should have 1 pyramid"
+    thumbnail, scale = reader.get_thumbnail(100)
+    assert isinstance(thumbnail, np.ndarray), "thumbnail should be np.ndarray"
+    assert all(s > 0 for s in scale), "scale should be greater than 0"
+
     if reader._zstore:
         zarr_path = Path(reader._zstore.path)
         assert zarr_path.exists(), "Zarr path should exist"
@@ -54,6 +62,9 @@ def test_get_simple_reader_png(path):
     assert reader.is_rgb, "Reader should not be rgb"
     assert reader.n_channels == 4, "Reader should have 1 channel"
     assert reader.reader_type == "image", "Reader should be image"
+    thumbnail, scale = reader.get_thumbnail(100)
+    assert isinstance(thumbnail, np.ndarray), "thumbnail should be np.ndarray"
+    assert all(s > 0 for s in scale), "scale should be greater than 0"
 
 
 @pytest.mark.parametrize("path", get_test_files("*.jpg"))
@@ -62,6 +73,9 @@ def test_get_simple_reader_jpg(path):
     assert reader.is_rgb, "Reader should not be rgb"
     assert reader.n_channels == 4, "Reader should have 1 channel"
     assert reader.reader_type == "image", "Reader should be image"
+    thumbnail, scale = reader.get_thumbnail(100)
+    assert isinstance(thumbnail, np.ndarray), "thumbnail should be np.ndarray"
+    assert all(s > 0 for s in scale), "scale should be greater than 0"
 
 
 @pytest.mark.parametrize("path", get_test_files("*.imzML") + get_test_files("*.ibd"))

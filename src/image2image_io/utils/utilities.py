@@ -10,8 +10,6 @@ from xml.etree import ElementTree as ET
 import numpy as np
 import pandas as pd
 from dask import array as da
-from zarr import Array
-
 from koyo.typing import PathLike
 
 if ty.TYPE_CHECKING:
@@ -19,14 +17,20 @@ if ty.TYPE_CHECKING:
 
 
 def resize(array: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
-    """Resize image which could be grayscale, RGB or multi-channel."""
+    """Resize an image which could be grayscale, RGB or multi-channel."""
     import cv2
 
-    _, channel_axis, _ = get_shape_of_image(array)
+    n_channels, channel_axis, _ = get_shape_of_image(array)
+    array = ensure_numpy_array(array)
     if channel_axis is None:
         array = cv2.resize(array, shape[::-1], interpolation=cv2.INTER_LINEAR)
-    else:
+    elif channel_axis == 2:
         array = cv2.resize(array, shape[::-1], interpolation=cv2.INTER_LINEAR)
+    else:
+        array_ = np.empty((n_channels, *shape), dtype=array.dtype)
+        for i in range(array.shape[0]):
+            array_[i] = cv2.resize(array[i], shape[::-1], interpolation=cv2.INTER_LINEAR)
+        array = array_
     return array
 
 
@@ -78,6 +82,7 @@ def xmlstr_to_dict(xmlstr: str) -> dict:
 
 
 def etree_to_dict(t: ET) -> dict:
+    """Convert ElementTree to dict."""
     d = {t.tag: {} if t.attrib else None}
     children = list(t)
     if children:
@@ -216,11 +221,13 @@ def get_dtype_for_array(array: np.ndarray) -> np.dtype:
             return np.uint32
         elif n < np.iinfo(np.uint64).max:
             return np.uint64
+        return array.dtype
     else:
         if n < np.finfo(np.float32).max:
             return np.float32
         elif n < np.finfo(np.float64).max:
             return np.float64
+        return array.dtype
 
 
 def reshape_fortran(x: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
@@ -321,16 +328,21 @@ def get_pyramid_info(
     return pyr_levels, pyr_shapes
 
 
-def ensure_dask_array(image):
+def ensure_dask_array(image: np.ndarray | da.Array) -> da.Array:
     """Ensure array is a dask array."""
     if isinstance(image, da.core.Array):
         return image
-
-    if isinstance(image, Array):
-        return da.from_zarr(image)
-
-    # handles np.ndarray _and_ other array like objects.
+    # handles np.ndarray _and_ another array like objects.
     return da.from_array(image)
+
+
+def ensure_numpy_array(image: np.ndarray | da.Array) -> np.ndarray:
+    """Ensure an array is a numpy array."""
+    if isinstance(image, np.ndarray):
+        return image
+    if isinstance(image, da.core.Array):
+        return image.compute()
+    return np.array(image)
 
 
 def grayscale(rgb_image: np.ndarray | da.Array, is_interleaved: bool = False) -> np.ndarray:

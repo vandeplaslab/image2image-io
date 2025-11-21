@@ -356,9 +356,25 @@ class BaseReader:
         """Get dask representation of the pyramid."""
         raise NotImplementedError("Must implement method")
 
-    def get_thumbnail(self) -> tuple[np.ndarray, tuple[float, float]]:
+    def get_thumbnail(self, max_size: int = 1024) -> tuple[np.ndarray, tuple[float, float]]:
         """Return thumbnail."""
-        return self.pyramid[-1], self.scale_for_pyramid(-1)
+        image, scale = self.pyramid[-1], self.scale_for_pyramid(-1)
+        return self._process_thumbnail(image, scale, max_size)
+
+    @staticmethod
+    def _process_thumbnail(
+        image, scale: tuple[float, float], max_size: int = 1024
+    ) -> tuple[np.ndarray, tuple[float, float]]:
+        """Process thumbnail image."""
+        from image2image_io.utils.utilities import get_shape_of_image, resize
+
+        _, _, shape = get_shape_of_image(image.shape)
+        if max(shape) > max_size:
+            scale_factor = max_size / max(shape)
+            new_shape = (int(shape[0] * scale_factor), int(shape[1] * scale_factor))
+            image = resize(image, new_shape).astype(image.dtype)
+            scale = (scale[0] / (shape[1] / new_shape[1]), scale[1] / (shape[0] / new_shape[0]))
+        return image, scale
 
     def crop_region(
         self, bbox_or_yx: np.ndarray | tuple[int, int, int, int]

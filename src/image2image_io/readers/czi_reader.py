@@ -123,12 +123,12 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         self._zstore = TempStore()
         return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
 
-    def get_thumbnail(self) -> tuple[np.ndarray, tuple[float, float]]:
+    def get_thumbnail(self, max_size: int = 1024) -> tuple[np.ndarray, tuple[float, float]]:
         """Get thumbnail."""
         thumbnail, scale = get_czi_thumbnail(self.fh, self.scale)
         if thumbnail is None:
-            return self.pyramid[-1], self.scale_for_pyramid(-1)
-        return thumbnail, scale
+            thumbnail, scale = self.pyramid[-1], self.scale_for_pyramid(-1)
+        return self._process_thumbnail(thumbnail, scale, max_size)
 
 
 class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]

@@ -1,10 +1,59 @@
 """Test utilities."""
 
 import dask.array as da
+import numpy as np
 import pandas as pd
 import pytest
 
-from image2image_io.utils.utilities import check_df_columns, ensure_dask_array, sort_pyramid
+from image2image_io.utils.utilities import (
+    check_df_columns,
+    ensure_dask_array,
+    format_mz,
+    get_shape_of_image,
+    resize,
+    sort_pyramid,
+)
+
+
+def test_resize():
+    array_2d = np.random.random((10, 15))
+    resized_2d = resize(array_2d, (20, 30))
+    assert resized_2d.shape == (20, 30), f"Expected shape (20, 20), got {resized_2d.shape}"
+
+    array_3d = np.random.random((10, 10, 3))
+    resized_3d = resize(array_3d, (20, 20))
+    assert resized_3d.shape == (20, 20, 3), f"Expected shape (20, 20, 3), got {resized_3d.shape}"
+
+    array_multichannel = np.random.random((5, 10, 10))
+    resized_multichannel = resize(array_multichannel, (20, 20))
+    assert resized_multichannel.shape == (5, 20, 20), f"Expected shape (5, 20, 20), got {resized_multichannel.shape}"
+
+
+def test_get_shape_of_image():
+    array_2d = np.random.random((10, 15))
+    n_channels, channel_axis, shape = get_shape_of_image(array_2d)
+    assert n_channels == 1, f"Expected 1 channel, got {n_channels}"
+    assert channel_axis is None, f"Expected channel_axis None, got {channel_axis}"
+    assert shape == (10, 15), f"Expected shape (10, 15), got {shape}"
+
+    array_3d = np.random.random((10, 15, 3))
+    n_channels, channel_axis, shape = get_shape_of_image(array_3d)
+    assert n_channels == 3, f"Expected 3 channels, got {n_channels}"
+    assert channel_axis == 2, f"Expected channel_axis 2, got {channel_axis}"
+    assert shape == (10, 15), f"Expected shape (10, 15), got {shape}"
+
+    array_multichannel = np.random.random((5, 10, 10))
+    n_channels, channel_axis, shape = get_shape_of_image(array_multichannel)
+    assert n_channels == 5, f"Expected 5 channels, got {n_channels}"
+    assert channel_axis == 0, f"Expected channel_axis 0, got {channel_axis}"
+    assert shape == (10, 10), f"Expected shape (10, 10), got {shape}"
+
+
+def test_format_mz():
+    assert format_mz(100) == "m/z 100.000"
+    assert format_mz(100.123456) == "m/z 100.123"
+    assert format_mz(100.1) == "m/z 100.100"
+    assert format_mz(100.9999) == "m/z 101.000"
 
 
 @pytest.mark.parametrize("columns", [["x", "y"], ["x_location", "y_location"], ["x", "y_location"]])
