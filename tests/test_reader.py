@@ -91,6 +91,19 @@ def test_get_simple_reader_geojson(path):
     assert reader.reader_type == "shapes", "Reader should be shapes"
 
 
+def test_thumbnail(tmp_path):
+    array = np.random.randint(0, 255, (1000, 1000, 3), dtype=np.uint8)
+    reader = ArrayImageReader(tmp_path, array, resolution=1.0)
+    assert reader.is_rgb, "Array should be rgb"
+    thumbnail, scale = reader.get_thumbnail(100)
+    assert thumbnail.shape == (100, 100, 3), "Thumbnail shape should be (100, 100, 3)"
+    assert all(s == 10.0 for s in scale), f"Scale should be (10.0, 10.0) not {scale}"
+
+    thumbnail, scale = reader.get_thumbnail(2000)
+    assert thumbnail.shape == (1000, 1000, 3), "Thumbnail shape should be (1000, 1000, 3)"
+    assert all(s == 1.0 for s in scale), f"Scale should be (1.0, 1.0) not {scale}"
+
+
 def test_crop_bbox_rgb(tmp_path):
     array = np.random.randint(0, 255, (1024, 1024, 3), dtype=np.uint8)
     reader = ArrayImageReader(tmp_path, array)

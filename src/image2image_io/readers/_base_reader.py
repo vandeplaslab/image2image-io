@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typing as ty
 import warnings
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -356,6 +357,7 @@ class BaseReader:
         """Get dask representation of the pyramid."""
         raise NotImplementedError("Must implement method")
 
+    @lru_cache(maxsize=1)
     def get_thumbnail(self, max_size: int = 1024) -> tuple[np.ndarray, tuple[float, float]]:
         """Return thumbnail."""
         image, scale = self.pyramid[-1], self.scale_for_pyramid(-1)
@@ -373,7 +375,7 @@ class BaseReader:
             scale_factor = max_size / max(shape)
             new_shape = (int(shape[0] * scale_factor), int(shape[1] * scale_factor))
             image = resize(image, new_shape).astype(image.dtype)
-            scale = (scale[0] / (shape[1] / new_shape[1]), scale[1] / (shape[0] / new_shape[0]))
+            scale = (scale[0] * (shape[0] / new_shape[0]), scale[1] * (shape[1] / new_shape[1]))
         return image, scale
 
     def crop_region(
