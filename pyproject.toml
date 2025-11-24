@@ -45,7 +45,7 @@ dependencies = [
     "imzy",
     "czifile>=2019.7.2.1",
     "dask[array,distributed]",
-    "tifffile",
+    "tifffile<2025.5.10",  # required until we fix zarr-v3 issues
     "imagecodecs",
 #    "aicsimageio",
     "ome_types",
@@ -63,6 +63,7 @@ dependencies = [
     "fastparquet",
     "numcodecs<0.16.0; python_version < '3.13'",
     "numcodecs>=0.16.0; python_version >= '3.13'",
+    "zarr<3",
 ]
 
 [dependency-groups]
