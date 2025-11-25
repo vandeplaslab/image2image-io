@@ -109,7 +109,44 @@ merge_images(
         }
     }
 )
-``` 
+```
+
+## Command-line interface
+
+A command-line interface (CLI) is provided to perform common tasks without writing code. You can access the CLI using the
+`image2image-io` command after installing the package.
+
+```bash
+❯ i2io --help
+Usage: i2io [OPTIONS] COMMAND [ARGS]...
+
+  Convert, merge, and manipulate image files.
+
+Options:
+  --dev          Flat to indicate that CLI should run in development mode and catch all errors.
+  --no_color     Flag to enable colored while doing tasks.
+  --version      Show the version and exit.
+  -v, --verbose  Verbose output. This is additive flag so `-vvv` will print `INFO` messages and -vvvv will print
+                 `DEBUG` information.
+  -q, --quiet    Minimal output
+  --debug        Maximum output
+  -h, --help     Show this message and exit.
+
+OME-TIFF:
+  convert  Convert images to pyramidal OME-TIFF.
+  merge    Export images.
+
+CZI:
+  cziinfo   Print information about the CZI file.
+  czi2tiff  Convert CZI to OME-TIFF.
+
+Utility:
+  thumbnail  Create a thumbnail for image(s).
+  transform  Transform command.
+```
+
+For instance, the `i2io convert` command let's you convert between a few file formats (e.g. CZI to OME-TIFF) or create
+a different representation of the image, for instance with different tiling or data type.
 
 ## Contributing
 
