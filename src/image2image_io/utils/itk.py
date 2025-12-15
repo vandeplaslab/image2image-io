@@ -1,5 +1,7 @@
 """ITK utilities."""
 
+from __future__ import annotations
+
 from copy import deepcopy
 
 import numpy as np
@@ -88,7 +90,7 @@ def affine_to_itk_affine(
     tform = deepcopy(AFFINE_TRANSFORM)
     tform["Spacing"] = [str(spacing), str(spacing)]
     # compute new image shape
-    (bound_w, bound_h), (origin_x, origin_y) = compute_affine_bound(image_shape, affine, spacing)  # width, height
+    (bound_w, bound_h), (_origin_x, _origin_y) = compute_affine_bound(image_shape, affine, spacing)  # width, height
 
     # calculate rotation center point
     # center_of_rot = calculate_center_of_rotation(affine, image_shape, (spacing, spacing))

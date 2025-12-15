@@ -148,7 +148,7 @@ def zarr_get_base_pyr_layer(zarr_store):
 def read_preprocess_array(array, preprocessing, force_rgb=None):
     """Read np.array, zarr.Array, or dask.array image into memory with preprocessing for registration."""
     is_interleaved = guess_rgb(array.shape)
-    is_rgb = is_interleaved if not force_rgb else force_rgb
+    is_rgb = force_rgb if force_rgb else is_interleaved
 
     if is_rgb:
         if preprocessing:
@@ -164,10 +164,9 @@ def read_preprocess_array(array, preprocessing, force_rgb=None):
         image_out = sitk.GetImageFromArray(np.asarray(array))
 
     else:
-        if preprocessing:
-            if preprocessing.ch_indices and len(array.shape) > 2:
-                chs = list(preprocessing.ch_indices)
-                array = array[chs, :, :]
+        if preprocessing and preprocessing.ch_indices and len(array.shape) > 2:
+            chs = list(preprocessing.ch_indices)
+            array = array[chs, :, :]
 
         image_out = sitk.GetImageFromArray(np.squeeze(np.asarray(array)))
 
@@ -247,8 +246,7 @@ def compute_sub_res(zarray, ds_factor, tile_size, is_rgb, im_dtype) -> da.Array:
 
     resampled_zarray_subres = da.coarsen(np.mean, zarray, resampling_axis, trim_excess=True)
     resampled_zarray_subres = resampled_zarray_subres.astype(im_dtype)
-    resampled_zarray_subres = resampled_zarray_subres.rechunk(tiling)
-    return resampled_zarray_subres
+    return resampled_zarray_subres.rechunk(tiling)
 
 
 def prepare_ome_xml_str(

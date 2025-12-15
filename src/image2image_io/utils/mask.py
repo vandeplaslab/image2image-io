@@ -32,8 +32,7 @@ def mask_to_polygon(mask: np.ndarray, epsilon: float = 1) -> np.ndarray:
 
     # Approximate contours to polygons and get the coordinates
     polygons = [cv2.approxPolyDP(contour, epsilon=epsilon, closed=True) for contour in contours]
-    polygons = np.asarray(polygons)
-    return polygons
+    return np.asarray(polygons)
 
 
 def shapes_to_polygons(
@@ -275,7 +274,7 @@ def transform_masks_to_ims(
     overwrite: bool = False,
 ) -> None:
     """Transform and export masks."""
-    from image2image_io.readers import ShapesReader, get_simple_reader
+    from image2image_io.readers import ShapesReader
     from image2image_io.utils.warp import get_affine_from_config
 
     affine, fixed_shape, _, moving_shape, _ = get_affine_from_config(config_path, yx=True, px=True, inv=False)
@@ -411,8 +410,7 @@ def _prepare_polygon_mask(image_shape: np.ndarray, xy: np.ndarray) -> np.ndarray
 
     mask = np.zeros(image_shape, dtype=np.uint8)
     mask = cv2.fillPoly(mask, pts=[xy], color=np.iinfo(np.uint8).max)
-    mask = mask.astype(bool)
-    return mask
+    return mask.astype(bool)
 
 
 def _apply_mask(array: np.ndarray, mask: np.ndarray, channel_axis: int) -> np.ndarray:

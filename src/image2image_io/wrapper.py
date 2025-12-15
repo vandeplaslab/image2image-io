@@ -59,9 +59,7 @@ class ImageWrapper:
         path = Path(path)
         keys = []
         for reader in self.reader_iter():
-            if reader.path == path:
-                keys.append(reader.key)
-            elif reader.key == path.name:
+            if reader.path == path or reader.key == path.name:
                 keys.append(reader.key)
         return keys
 
@@ -153,9 +151,7 @@ class ImageWrapper:
         self, reader_name: str, reader: BaseReader
     ) -> ty.Generator[tuple[str, BaseReader, int], None, None]:
         """Iterator to add channels."""
-        if reader.reader_type == "shapes":
-            yield reader_name, reader, 0
-        elif reader.reader_type == "points":
+        if reader.reader_type == "shapes" or reader.reader_type == "points":
             yield reader_name, reader, 0
         else:
             # spetial case for RGB images
@@ -184,9 +180,7 @@ class ImageWrapper:
     ) -> ty.Generator[tuple[str, BaseReader, list[np.ndarray] | None, int], None, None]:
         """Iterator to add channels."""
         for reader_name, reader_or_array in self.data.items():
-            if reader_or_array.reader_type == "shapes":
-                yield reader_name, reader_or_array, None, 0
-            elif reader_or_array.reader_type == "points":
+            if reader_or_array.reader_type == "shapes" or reader_or_array.reader_type == "points":
                 yield reader_name, reader_or_array, None, 0
             else:
                 yield from self._reader_image_iter(reader_name, reader_or_array)
@@ -259,14 +253,10 @@ class ImageWrapper:
     def get_channel_names_for_reader(key: str, reader: BaseReader, index: int) -> list[str]:
         """Retrieve channel names for specified reader."""
         try:
-            if reader.is_rgb and not CONFIG.split_rgb:
-                channel_names = ["RGB"]
-            else:
-                channel_names = [reader.channel_names[index]]
+            channel_names = ["RGB"] if reader.is_rgb and not CONFIG.split_rgb else [reader.channel_names[index]]
         except (IndexError, NotImplementedError):
             channel_names = [f"C{index}"]
-        channel_names = [f"{name} | {key}" for name in channel_names]
-        return channel_names
+        return [f"{name} | {key}" for name in channel_names]
 
     @property
     def min_resolution(self) -> float:

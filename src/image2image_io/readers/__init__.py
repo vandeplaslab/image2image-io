@@ -71,11 +71,8 @@ SUPPORTED_IMAGE_FORMATS = [
 def sanitize_path(path: PathLike) -> Path:
     """Sanitize a path, so it has a unified format across models."""
     path = Path(path).resolve()
-    if path.is_file():
-        if path.suffix in [".tsf", ".tdf"]:
-            path = path.parent
-        elif path.name == "dataset.metadata.h5":
-            path = path.parent
+    if path.is_file() and (path.suffix in [".tsf", ".tdf"] or path.name == "dataset.metadata.h5"):
+        path = path.parent
     return path
 
 
@@ -112,10 +109,7 @@ def sanitize_read_path(path: PathLike, raise_on_error: bool = True) -> Path | No
         return None
     if suffix in BRUKER_EXTENSIONS:
         if path.suffix == ".d":
-            if (path / "analysis.tsf").exists():
-                path = path / "analysis.tsf"
-            else:
-                path = path / "analysis.tdf"
+            path = path / "analysis.tsf" if (path / "analysis.tsf").exists() else path / "analysis.tdf"
     elif suffix in IMSPY_EXTENSIONS:
         path = path / "dataset.metadata.h5"
     return path
@@ -636,10 +630,7 @@ def _read_tsf_tdf_coordinates(
     assert path.suffix in BRUKER_EXTENSIONS, "Only .tsf and .tdf files are supported"
 
     if path.suffix == ".d":
-        if (path / "analysis.tsf").exists():
-            path = path / "analysis.tsf"
-        else:
-            path = path / "analysis.tdf"
+        path = path / "analysis.tsf" if (path / "analysis.tsf").exists() else path / "analysis.tdf"
 
     # get wrapper
     conn = sqlite3.connect(path)
@@ -724,10 +715,7 @@ def _read_tsf_tdf_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImag
     assert path.suffix in BRUKER_EXTENSIONS, "Only .tsf and .tdf files are supported"
 
     if path.suffix == ".d":
-        if (path / "analysis.tsf").exists():
-            path = path / "analysis.tsf"
-        else:
-            path = path / "analysis.tdf"
+        path = path / "analysis.tsf" if (path / "analysis.tsf").exists() else path / "analysis.tdf"
 
     conn = sqlite3.connect(path)
     try:

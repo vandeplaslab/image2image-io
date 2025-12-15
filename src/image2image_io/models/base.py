@@ -1,6 +1,7 @@
 """Base model."""
 
-import typing as ty
+from __future__ import annotations
+
 from pathlib import Path
 
 from koyo.typing import PathLike
@@ -13,13 +14,13 @@ class BaseModel(_BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def update(self, **kwargs: ty.Dict) -> None:
+    def update(self, **kwargs: dict) -> None:
         """Update transformation."""
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
 
-    def to_dict(self) -> ty.Dict:
+    def to_dict(self) -> dict:
         """Convert to dict."""
         raise NotImplementedError("Must implement method")
 
@@ -31,7 +32,7 @@ class BaseModel(_BaseModel):
         write_json_data(path, self.to_dict())
 
     @classmethod
-    def from_json(cls, path: PathLike) -> "BaseModel":
+    def from_json(cls, path: PathLike) -> BaseModel:
         """Create from JSON."""
         from koyo.json import read_json_data
 
@@ -46,7 +47,7 @@ class BaseModel(_BaseModel):
         write_toml_data(path, self.to_dict())
 
     @classmethod
-    def from_toml(cls, path: PathLike) -> "BaseModel":
+    def from_toml(cls, path: PathLike) -> BaseModel:
         """Create from TOML."""
         from koyo.toml import read_toml_data
 
@@ -54,16 +55,16 @@ class BaseModel(_BaseModel):
         return cls.from_dict(read_toml_data(path))
 
     @classmethod
-    def from_dict(cls, data: dict) -> "BaseModel":
+    def from_dict(cls, data: dict) -> BaseModel:
         """Create from dict."""
         raise NotImplementedError("Must implement method")
 
     @classmethod
-    def from_file(cls, path: PathLike) -> "BaseModel":
+    def from_file(cls, path: PathLike) -> BaseModel:
         """Create from file."""
         path = Path(path)
         if path.suffix == ".json":
             return cls.from_json(path)
-        elif path.suffix == ".toml":
+        if path.suffix == ".toml":
             return cls.from_toml(path)
         raise ValueError(f"Unknown file format: '{path.suffix}'")

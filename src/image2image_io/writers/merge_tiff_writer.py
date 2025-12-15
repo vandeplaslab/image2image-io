@@ -108,10 +108,7 @@ class MergeOmeTiffWriter:
             x = 0
         if y < 0:
             y = 0
-        if transformer is not None:
-            image_shape = transformer.output_size
-        else:
-            image_shape = reader.image_shape
+        image_shape = transformer.output_size if transformer is not None else reader.image_shape
         if x + width > image_shape[1]:
             width = image_shape[1] - x
         if y + height > image_shape[0]:
@@ -174,11 +171,11 @@ class MergeOmeTiffWriter:
         channel_ids_ret = []
         for reader_index, channel_ids_ in enumerate(channel_ids):
             if channel_ids_ is None:
-                channel_ids_ = list(range(0, self.merge.readers[reader_index].n_channels))
+                channel_ids_ = list(range(self.merge.readers[reader_index].n_channels))
             if channel_ids_ is not None:
                 if len(channel_ids_) == 0:
                     raise ValueError("Channel ids cannot be empty")
-                elif max(channel_ids_) > self.merge.readers[reader_index].n_channels - 1:
+                if max(channel_ids_) > self.merge.readers[reader_index].n_channels - 1:
                     raise ValueError("Channel ids cannot be larger than the number of channels in the image")
                 channel_ids_ret.append(channel_ids_)
         return channel_ids_ret
@@ -262,9 +259,8 @@ class MergeOmeTiffWriter:
         merge_dtype_np = np.uint8 if as_uint8 else merge_dtype_np  # type: ignore[assignment]
         merge_dtype_sitk = 0
         for k, v in SITK_TO_NP_DTYPE.items():
-            if k < 12:
-                if v == merge_dtype_np:
-                    merge_dtype_sitk = k
+            if k < 12 and v == merge_dtype_np:
+                merge_dtype_sitk = k
         return merge_dtype_sitk, merge_dtype_np
 
     def merge_write_image_by_plane(
@@ -354,7 +350,7 @@ class MergeOmeTiffWriter:
             for reader_index, reader in enumerate(tqdm(self.merge.readers, desc="Writing modality...")):
                 channel_ids_ = channel_ids_fixed[reader_index]
                 if channel_ids_ is None:
-                    channel_ids_ = list(range(0, reader.n_channels))
+                    channel_ids_ = list(range(reader.n_channels))
                 for channel_index in tqdm(
                     channel_ids_, leave=False, desc=f"Exporting images for '{reader_names[reader_index]}'"
                 ):

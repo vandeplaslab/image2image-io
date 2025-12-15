@@ -22,9 +22,7 @@ def resize(array: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
 
     n_channels, channel_axis, _ = get_shape_of_image(array)
     array = ensure_numpy_array(array)
-    if channel_axis is None:
-        array = cv2.resize(array, shape[::-1], interpolation=cv2.INTER_LINEAR)
-    elif channel_axis == 2:
+    if channel_axis is None or channel_axis == 2:
         array = cv2.resize(array, shape[::-1], interpolation=cv2.INTER_LINEAR)
     else:
         array_ = np.empty((n_channels, *shape), dtype=array.dtype)
@@ -36,11 +34,11 @@ def resize(array: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
 
 def write_thumbnail(path: PathLike, output_dir: PathLike, with_title: bool, first_only: bool = False) -> None:
     """Write thumbnail."""
-    import matplotlib
+    import matplotlib as mpl
 
     from image2image_io.readers import get_simple_reader
 
-    matplotlib.use("agg")
+    mpl.use("agg")
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -63,7 +61,7 @@ def make_thumbnail(filename: Path, image: np.ndarray, title: str, with_title: bo
     """Create thumbnail of an image."""
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(12, 12))
+    _fig, ax = plt.subplots(figsize=(12, 12))
     if image.ndim == 2:
         vmax = np.percentile(np.ravel(image), 99.0)
         ax.imshow(image, cmap="turbo", aspect="equal", vmax=vmax)
@@ -215,19 +213,18 @@ def get_dtype_for_array(array: np.ndarray) -> np.dtype:
     if np.issubdtype(array.dtype, np.integer):
         if n < np.iinfo(np.uint8).max:
             return np.uint8
-        elif n < np.iinfo(np.uint16).max:
+        if n < np.iinfo(np.uint16).max:
             return np.uint16
-        elif n < np.iinfo(np.uint32).max:
+        if n < np.iinfo(np.uint32).max:
             return np.uint32
-        elif n < np.iinfo(np.uint64).max:
+        if n < np.iinfo(np.uint64).max:
             return np.uint64
         return array.dtype
-    else:
-        if n < np.finfo(np.float32).max:
-            return np.float32
-        elif n < np.finfo(np.float64).max:
-            return np.float64
-        return array.dtype
+    if n < np.finfo(np.float32).max:
+        return np.float32
+    if n < np.finfo(np.float64).max:
+        return np.float64
+    return array.dtype
 
 
 def reshape_fortran(x: np.ndarray, shape: tuple[int, int]) -> np.ndarray:

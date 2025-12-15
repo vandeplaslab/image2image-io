@@ -1,5 +1,7 @@
 """Configuration to override few parameters."""
 
+from __future__ import annotations
+
 import typing as ty
 from contextlib import contextmanager
 
@@ -134,7 +136,7 @@ class Config(BaseConfig):
 
     @field_validator("view_type", mode="before")
     @classmethod
-    def _validate_view_type(cls, value: ty.Union[str, ViewType]) -> ViewType:  # type: ignore[misc]
+    def _validate_view_type(cls, value: str | ViewType) -> ViewType:  # type: ignore[misc]
         """Validate view_type."""
         return ViewType(value)
 

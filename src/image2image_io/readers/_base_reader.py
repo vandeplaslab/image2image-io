@@ -316,17 +316,11 @@ class BaseReader:
 
         # sub-select channels
         if array.ndim == 3:
-            if self.is_rgb:
-                array = array[:, :, channel_indices]
-            else:
-                array = array[channel_indices, :, :]
+            array = array[:, :, channel_indices] if self.is_rgb else array[channel_indices, :, :]
 
         # reshape array
         n_channels, _, shape = get_shape_of_image(array)
-        if array.ndim == 3:
-            array = array.reshape(-1, n_channels)
-        else:
-            array = array.reshape(-1, 1)
+        array = array.reshape(-1, n_channels) if array.ndim == 3 else array.reshape(-1, 1)
         return array, shape
 
     def close(self) -> None:
@@ -590,7 +584,7 @@ class BaseReader:
         """Mask the image."""
         array = self.pyramid[0]
         # Prepare polygon coordinates
-        xy, (left, right, top, bottom) = _prepare_polygon(yx, self.inv_resolution, self.image_shape, multiply=True)
+        xy, (_left, _right, _top, _bottom) = _prepare_polygon(yx, self.inv_resolution, self.image_shape, multiply=True)
         hash_str = _hash_bbox_or_polygon(yx=yx)
         # Create a mask only for the cropped region
         mask = _prepare_polygon_mask(self.image_shape, xy)
@@ -660,14 +654,14 @@ class BaseReader:
         """Return shape of an image for a given shape."""
         if shape is None:
             shape = self.shape
-        channel_axis, n_channels = self.get_channel_axis_and_n_channels(shape)
+        channel_axis, _n_channels = self.get_channel_axis_and_n_channels(shape)
         if channel_axis is None or (self.is_rgb and not CONFIG.split_rgb):
             return shape[:2]
         if channel_axis == 0:
             return shape[1:]
-        elif channel_axis == 1:
+        if channel_axis == 1:
             return shape[0], shape[2]
-        elif channel_axis == 2:
+        if channel_axis == 2:
             return shape[:2]
         raise ValueError(f"Array has unsupported shape: {shape}")
 
@@ -676,16 +670,16 @@ class BaseReader:
         split_rgb = split_rgb if split_rgb is not None else CONFIG.split_rgb
 
         array: np.ndarray = self.pyramid[pyramid]
-        channel_axis, n_channels = self.get_channel_axis_and_n_channels()
+        channel_axis, _n_channels = self.get_channel_axis_and_n_channels()
         # if channel_axis in [None, 2] or (self.is_rgb and (not CONFIG.split_rgb and not split_rgb)):
         #     return self.preprocessor("rgb", array)
         if channel_axis is None:
             return self.preprocessor("gray", array)
         if channel_axis == 0:
             return self.preprocessor(self.channel_names[index], array[index])
-        elif channel_axis == 1:
+        if channel_axis == 1:
             return self.preprocessor(self.channel_names[index], array[:, index])
-        elif channel_axis == 2:
+        if channel_axis == 2:
             if self.is_rgb:
                 if CONFIG.split_rgb or split_rgb:
                     return self.preprocessor("RGB"[index], array[:, :, index])
@@ -696,17 +690,16 @@ class BaseReader:
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
         """Return channel pyramid."""
         array = self.pyramid
-        channel_axis, n_channels = self.get_channel_axis_and_n_channels()
+        channel_axis, _n_channels = self.get_channel_axis_and_n_channels()
         if channel_axis is None or (self.is_rgb and not CONFIG.split_rgb):
             return array
         if channel_axis == 0:
             return [a[index] for a in array]
-        elif channel_axis == 1:
+        if channel_axis == 1:
             return [a[:, index] for a in array]
-        elif channel_axis == 2:
+        if channel_axis == 2:
             return [a[:, :, index] for a in array]
-        else:
-            raise ValueError("Could not retrieve channel pyramid.")
+        raise ValueError("Could not retrieve channel pyramid.")
 
     @property
     def n_in_pyramid(self) -> int:
@@ -756,8 +749,7 @@ class BaseReader:
         """Get instance of writer."""
         from image2image_io.writers.tiff_writer import OmeTiffWriter
 
-        writer = OmeTiffWriter(self, transformer=None)
-        return writer
+        return OmeTiffWriter(self, transformer=None)
 
 
 class DummyReader(BaseReader):

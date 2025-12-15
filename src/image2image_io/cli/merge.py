@@ -90,9 +90,8 @@ def merge_runner(
         Parameter("Overwrite", "-W/--overwrite", overwrite),
     )
 
-    if channel_ids:
-        if len(channel_ids) != len(paths):
-            raise ValueError("Number of channel ids must match number of images.")
+    if channel_ids and len(channel_ids) != len(paths):
+        raise ValueError("Number of channel ids must match number of images.")
 
     with MeasureTimer() as timer:
         merge_images(name, list(paths), output_dir, fmt, as_uint8, channel_ids=channel_ids, overwrite=overwrite)

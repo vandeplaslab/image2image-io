@@ -111,7 +111,7 @@ def merge_images(
 
         scene_metadata: dict[str, list[int | str]]
         if reader_metadata:
-            scene_metadata = reader_metadata.get(0, None)
+            scene_metadata = reader_metadata.get(0)
             if not scene_metadata:
                 scene_metadata = {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
                 logger.warning("Metadata not found for 0. Using default metadata.")
@@ -358,7 +358,7 @@ def czi_to_ome_tiff(
 
         scene_metadata: dict[str, list[int | str]]
         if metadata:
-            scene_metadata = metadata.get(scene_index, None)
+            scene_metadata = metadata.get(scene_index)
             if not scene_metadata:
                 scene_metadata = {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
                 logger.warning(
@@ -409,7 +409,7 @@ def write_ome_tiff_from_array(
     path = Path(path)
     filename = path.name.replace(".ome.tiff", "")
     writer = OmeTiffWriter(array_reader)
-    output_path = writer.write_image_by_plane(
+    return writer.write_image_by_plane(
         filename,
         path.parent,
         write_pyramid=True,
@@ -418,7 +418,6 @@ def write_ome_tiff_from_array(
         as_uint8=as_uint8,
         ome_name=ome_name,
     )
-    return output_path
 
 
 def write_ome_tiff_alt(
@@ -440,7 +439,7 @@ def write_ome_tiff_alt(
     filename = path.name.replace(".ome.tiff", "")
     writer = OmeTiffWriter(reader, transformer=transformer)
     if write:
-        output_path = writer.write_image_by_plane(
+        return writer.write_image_by_plane(
             filename,
             path.parent,
             write_pyramid=tile_size > 0,
@@ -451,7 +450,6 @@ def write_ome_tiff_alt(
             overwrite=overwrite,
             ome_name=ome_name,
         )
-        return output_path
     return writer
 
 
@@ -622,9 +620,6 @@ def _write_txt(
                 f.write(str_func(row))
                 if i % update_freq == 0 and i != 0:
                     d = pbar.format_dict
-                    if d["rate"]:
-                        eta = pbar.format_interval((d["total"] - d["n"]) / d["rate"])
-                    else:
-                        eta = ""
+                    eta = pbar.format_interval((d["total"] - d["n"]) / d["rate"]) if d["rate"] else ""
                     yield key, i, n, eta
         yield key, n, n, ""

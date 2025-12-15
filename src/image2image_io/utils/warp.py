@@ -50,10 +50,7 @@ def get_affine_from_config(
         config_or_path = Path(config_or_path)
         if not config_or_path.exists():
             raise FileNotFoundError(f"Config file not found: {config_or_path}")
-        if config_or_path.suffix == ".toml":
-            config = read_toml_data(config_or_path)
-        else:
-            config = read_json_data(config_or_path)
+        config = read_toml_data(config_or_path) if config_or_path.suffix == ".toml" else read_json_data(config_or_path)
     else:
         config = config_or_path
 
@@ -102,7 +99,7 @@ def warp_path(config_path: PathLike, from_transform: PathLike, order: int = 1) -
     from image2image_io.readers import get_simple_reader
 
     # load affine matrix
-    affine_inv, fixed_image_shape, fixed_pixel_size_um, _, _ = get_affine_from_config(config_path)
+    affine_inv, fixed_image_shape, _fixed_pixel_size_um, _, _ = get_affine_from_config(config_path)
 
     if not Path(from_transform).exists():
         raise FileNotFoundError(f"File not found: {from_transform}")
@@ -132,7 +129,7 @@ def warp(affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarra
 
     if image.ndim == 2:
         return warp_channel(affine_inv, output_shape, image, order=order)
-    elif image.ndim == 3:
+    if image.ndim == 3:
         warped = []
         is_rgb = guess_rgb(image.shape)
         if is_rgb:
@@ -142,8 +139,7 @@ def warp(affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarra
             for c in range(image.shape[0]):
                 warped.append(warp_channel(affine_inv, output_shape, image[c], order=order))
         return arrange_warped(warped, is_rgb=is_rgb)
-    else:
-        raise ValueError(f"Unsupported image dimension: {image.ndim}")
+    raise ValueError(f"Unsupported image dimension: {image.ndim}")
 
 
 def warp_channel(

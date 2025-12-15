@@ -50,8 +50,7 @@ def get_int_dtype(value: int) -> np.dtype:
         return np.uint16
     if value <= np.iinfo(np.uint32).max:
         return np.int32
-    else:
-        raise ValueError("Too many shapes")
+    raise ValueError("Too many shapes")
 
 
 def geojson_to_numpy(gj: dict) -> tuple[list[dict], bool]:
@@ -123,14 +122,13 @@ def geojson_to_numpy(gj: dict) -> tuple[list[dict], bool]:
     #             "shape_name": shape_name,
     #         }
     #     ]
-    else:
-        return [
-            {
-                "array": pts.astype(np.float32),
-                "shape_type": gj["geometry"].get("type"),
-                "shape_name": shape_name,
-            }
-        ], is_points
+    return [
+        {
+            "array": pts.astype(np.float32),
+            "shape_type": gj["geometry"].get("type"),
+            "shape_name": shape_name,
+        }
+    ], is_points
 
 
 def add_unnamed(gj: dict) -> dict:
@@ -175,10 +173,7 @@ def read_geojson(json_file: PathLike) -> tuple[list, list, bool]:
 def _parse_geojson_data(gj_data: dict | list) -> tuple[list, list, bool]:
     if isinstance(gj_data, dict):
         # handle GeoPandas GeoJSON
-        if "type" in gj_data and "features" in gj_data:
-            gj_data = gj_data["features"]
-        else:
-            gj_data = [gj_data]
+        gj_data = gj_data["features"] if "type" in gj_data and "features" in gj_data else [gj_data]
 
     shapes_np, is_points = [], False
     for gj in gj_data:
@@ -349,16 +344,15 @@ def invert_nonrigid_transforms(itk_transforms: list):
 
     if all(tform_linear):
         return itk_transforms
-    else:
-        nl_idxs = np.where(np.array(tform_linear) == 0)[0]
-        for nl_idx in nl_idxs:
-            if not itk_transforms[nl_idx].inverse_transform:
-                print(
-                    f"transform at index {nl_idx} is non-linear and the inverse has not been computed\n"
-                    "inverting displacement field(s)...\n"
-                    "this can take some time"
-                )
-                itk_transforms[nl_idx].compute_inverse_nonlinear()
+    nl_idxs = np.where(np.array(tform_linear) == 0)[0]
+    for nl_idx in nl_idxs:
+        if not itk_transforms[nl_idx].inverse_transform:
+            print(
+                f"transform at index {nl_idx} is non-linear and the inverse has not been computed\n"
+                "inverting displacement field(s)...\n"
+                "this can take some time"
+            )
+            itk_transforms[nl_idx].compute_inverse_nonlinear()
 
     return itk_transforms
 
@@ -473,7 +467,7 @@ def approx_polygon_contour(mask: np.ndarray, percent_arc_length=0.01):
         returns an 2d array of vertices, rows: points, columns: y,x
 
     """
-    contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    contours, _hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
     if len(contours) > 1:
         contours = [contours[np.argmax([cnt.shape[0] for cnt in contours])]]

@@ -3,7 +3,6 @@
 import os
 
 import pytest
-from koyo.utilities import is_installed
 
 from image2image_io.utils._test import get_test_file, get_test_files
 

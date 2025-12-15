@@ -65,10 +65,7 @@ class CziMixin:
 
     def _get_image_info(self) -> tuple:
         # if RGB need to get 0
-        if self.fh.shape[-1] > 1:
-            ch_dim_idx = self.fh.axes.index("0")
-        else:
-            ch_dim_idx = self.fh.axes.index("C")
+        ch_dim_idx = self.fh.axes.index("0") if self.fh.shape[-1] > 1 else self.fh.axes.index("C")
         y_dim_idx = self.fh.axes.index("Y")
         x_dim_idx = self.fh.axes.index("X")
         shape = np.array(self.fh.shape)

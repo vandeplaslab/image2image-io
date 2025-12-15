@@ -1,6 +1,7 @@
 """Transform."""
 
-import typing as ty
+from __future__ import annotations
+
 from copy import deepcopy
 from pathlib import Path
 
@@ -19,22 +20,22 @@ class TransformData(BaseModel):
 
     # Transformation object
     name: str = DEFAULT_TRANSFORM_NAME
-    _transform: ty.Optional[ProjectiveTransform] = PrivateAttr(None)
+    _transform: ProjectiveTransform | None = PrivateAttr(None)
     # this value should never change
     fixed_resolution: float = 1.0
     # this value can change
     moving_resolution: float = 1.0
     # Arrays of fixed and moving points
-    fixed_points: ty.Optional[np.ndarray] = None
-    moving_points: ty.Optional[np.ndarray] = None
+    fixed_points: np.ndarray | None = None
+    moving_points: np.ndarray | None = None
     # affine transformation matrix
-    affine: ty.Optional[np.ndarray] = None
+    affine: np.ndarray | None = None
     # Type of transformation
     transformation_type: str = "affine"
     # Inverse
     is_inverse: bool = False
 
-    def to_dict(self) -> ty.Dict:
+    def to_dict(self) -> dict:
         """Serialize data."""
         return {
             "fixed_points": self.fixed_points.tolist() if self.fixed_points is not None else [],
@@ -76,9 +77,7 @@ class TransformData(BaseModel):
             raise ValueError("No transformation found.")
         return self.transform.params  # type: ignore[no-any-return]
 
-    def compute(
-        self, moving_resolution: ty.Optional[float] = None, yx: bool = True, px: bool = False
-    ) -> ProjectiveTransform:
+    def compute(self, moving_resolution: float | None = None, yx: bool = True, px: bool = False) -> ProjectiveTransform:
         """Compute transformation matrix."""
         from image2image_io.utils.utilities import compute_transform
 
@@ -115,7 +114,7 @@ class TransformData(BaseModel):
         return transform
 
     @classmethod
-    def from_array(cls, matrix: np.ndarray) -> "TransformData":
+    def from_array(cls, matrix: np.ndarray) -> TransformData:
         """Load from array."""
         matrix = np.asarray(matrix)
         assert matrix.shape == (3, 3), "Expected (3, 3) matrix"
@@ -127,15 +126,15 @@ class TransformModel(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    transforms: ty.Optional[ty.Dict[Path, TransformData]] = None
+    transforms: dict[Path, TransformData] | None = None
 
     @property
-    def name_to_path_map(self) -> ty.Dict[ty.Union[str, Path], Path]:
+    def name_to_path_map(self) -> dict[str | Path, Path]:
         """Returns dictionary that maps transform name to path."""
         if self.transforms is None:
             return {}
 
-        mapping: ty.Dict[PathLike, Path] = {}
+        mapping: dict[PathLike, Path] = {}
         for name in self.transforms:
             if isinstance(name, str):
                 name = Path(name)
@@ -145,7 +144,7 @@ class TransformModel(BaseModel):
         return mapping
 
     @property
-    def transform_names(self) -> ty.List[str]:
+    def transform_names(self) -> list[str]:
         """Return list of transform names."""
         return [Path(t).name for t in self.transforms] if self.transforms else []
 
@@ -189,7 +188,7 @@ class TransformModel(BaseModel):
         inv_name_or_path = name_or_path.parent / (name_or_path.name + " (inverse)")
         _remove_transform(inv_name_or_path)
 
-    def get_matrix(self, name_or_path: PathLike) -> ty.Optional[TransformData]:
+    def get_matrix(self, name_or_path: PathLike) -> TransformData | None:
         """Get transformation matrix."""
         if self.transforms is None:
             return None

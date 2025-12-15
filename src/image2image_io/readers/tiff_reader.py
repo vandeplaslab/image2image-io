@@ -88,30 +88,29 @@ class TiffImageReader(BaseReader):
                 self.largest_series,
                 0,
             )[0]
-        elif Path(self.path).suffix.lower() in [".svs"]:
+        if Path(self.path).suffix.lower() in [".svs"]:
             return svs_xy_pixel_sizes(
                 self.fh,
                 self.largest_series,
                 0,
             )[0]
-        elif self.fh.ome_metadata:
+        if self.fh.ome_metadata:
             return ometiff_xy_pixel_sizes(
                 from_xml(self.fh.ome_metadata, parser="lxml"),
                 self.largest_series,
             )[0]
-        else:
-            try:
-                return tifftag_xy_pixel_sizes(
-                    self.fh,
-                    self.largest_series,
-                    0,
-                )[0]
-            except KeyError:
-                warnings.warn(
-                    "Unable to parse pixel resolution information from file defaulting to 1",
-                    stacklevel=2,
-                )
-                return 1.0
+        try:
+            return tifftag_xy_pixel_sizes(
+                self.fh,
+                self.largest_series,
+                0,
+            )[0]
+        except KeyError:
+            warnings.warn(
+                "Unable to parse pixel resolution information from file defaulting to 1",
+                stacklevel=2,
+            )
+            return 1.0
 
     def _get_channel_names(self) -> list[str]:
         channel_names = []
@@ -154,6 +153,5 @@ class TiffImageReader(BaseReader):
                 return 2, 3
             # elif np.argmin(shape) == 2:
             #     return 2, shape[2]
-            else:
-                return 0, shape[0]
+            return 0, shape[0]
         return None, 1

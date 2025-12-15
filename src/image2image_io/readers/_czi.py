@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import cached_property
 from multiprocessing import cpu_count
 from pathlib import Path
-from xml.etree import ElementTree
+from xml.etree import ElementTree as ET
 
 import dask.array as da
 import numpy as np
@@ -72,9 +72,8 @@ class CziFile(_CziFile):
             self._fh.lock = True
             with tqdm(
                 total=len(self.filtered_subblock_directory), desc="Reading subblocks", mininterval=0.5, unit="block"
-            ) as pbar:
-                with ThreadPoolExecutor(max_workers) as executor:
-                    executor.map(func, self.filtered_subblock_directory)
+            ) as pbar, ThreadPoolExecutor(max_workers) as executor:
+                executor.map(func, self.filtered_subblock_directory)
             self._fh.lock = None
         else:
             with tqdm(
@@ -138,7 +137,7 @@ class CziFile(_CziFile):
             with MeasureTimer() as timer:
                 zres = TempStore()
                 rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
-                is_rgb = True if rgb_chunk > 1 else False
+                is_rgb = rgb_chunk > 1
                 z_array_ds = compute_sub_res(z_array, ds_factor, tile_size, is_rgb, self.dtype)
                 da.to_zarr(z_array_ds, zres, component="0")
                 dask_pyr.append(da.squeeze(da.from_zarr(zres, component="0")))
@@ -244,8 +243,8 @@ class CziFile(_CziFile):
         return 1.0
 
     @cached_property
-    def _metadata_xml(self) -> ElementTree.Element:
-        return ElementTree.fromstring(self.metadata())
+    def _metadata_xml(self) -> ET.Element:
+        return ET.fromstring(self.metadata())
 
     def _iter_dim_entries(self, dimension: str) -> ty.Iterable[DimensionEntryDV1]:
         for dir_entry in self.filtered_subblock_directory:
@@ -313,10 +312,7 @@ def get_level_blocks(czi: CziFile) -> dict:
     """Get level blocks."""
     level_blocks: dict = {}
     for idx, sb in enumerate(czi.subblocks()):
-        if sb.pyramid_type != 0:
-            level = sb.shape[3] // sb.stored_shape[3]
-        else:
-            level = 0
+        level = sb.shape[3] // sb.stored_shape[3] if sb.pyramid_type != 0 else 0
 
         if level not in level_blocks:
             level_blocks[level] = []
@@ -331,10 +327,7 @@ def get_czi_thumbnail(
     ch_idx = czi.axes.index("C")
     l_blocks = get_level_blocks(czi)
     lowest_im = np.max(list(l_blocks.keys()))
-    if lowest_im == 0:
-        calc_thumbnail_spacing = np.asarray(pixel_spacing) * 1
-    else:
-        calc_thumbnail_spacing = np.asarray(pixel_spacing) * lowest_im
+    calc_thumbnail_spacing = np.asarray(pixel_spacing) * 1 if lowest_im == 0 else np.asarray(pixel_spacing) * lowest_im
 
     thumbnail_spacing = (float(calc_thumbnail_spacing[0]), float(calc_thumbnail_spacing[1]))
 
@@ -345,7 +338,7 @@ def get_czi_thumbnail(
         thumbnail_array = np.squeeze(image_data.data(resize=False))
         return thumbnail_array, thumbnail_spacing
 
-    elif len(block_indices) == czi.shape[czi.axes.index("C")]:
+    if len(block_indices) == czi.shape[czi.axes.index("C")]:
         thumbnail_shape = list(czi.subblock_directory[block_indices[0]].data_segment().stored_shape)
         thumbnail_shape[ch_idx] = czi.shape[ch_idx]
 

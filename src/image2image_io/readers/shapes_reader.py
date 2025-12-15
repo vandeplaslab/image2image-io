@@ -171,8 +171,7 @@ class ShapesReader(BaseReader):
         polygons = shapes_to_polygons(
             self.shape_data, with_index=with_index, inv_pixel_size=inv_pixel_size, silent=silent
         )
-        mask = polygons_to_mask(polygons, output_shape)
-        return mask
+        return polygons_to_mask(polygons, output_shape)
 
     def to_mask_alt(
         self, output_size: tuple[int, int], with_index: bool = False, inv_pixel_size: float = 1.0, silent: bool = True
@@ -314,8 +313,7 @@ class ShapesReader(BaseReader):
         data = np.concatenate(data)
         # create DataFrame
         df = pd.DataFrame(data, columns=["x", "y", "shape"])
-        df = df.astype({"x": np.float32, "y": np.float32})
-        return df
+        return df.astype({"x": np.float32, "y": np.float32})
 
     def to_csv(self, path: PathLike, as_px: bool = False) -> Path:
         """Export data as CSV file."""
@@ -339,5 +337,4 @@ def _convert_geojson_to_df(shape_data: list[dict]) -> pd.DataFrame:
         data.append(feature["array"])
     if data:
         data = np.concatenate(data)
-    df = pd.DataFrame(data, columns=["x", "y"])
-    return df
+    return pd.DataFrame(data, columns=["x", "y"])

@@ -105,10 +105,7 @@ class OmeTiffWriter:
             x = 0
         if y < 0:
             y = 0
-        if self.transformer is not None:
-            image_shape = self.transformer.output_size[::-1]
-        else:
-            image_shape = self.reader.image_shape
+        image_shape = self.transformer.output_size[::-1] if self.transformer is not None else self.reader.image_shape
         if x + width > image_shape[1]:
             width = image_shape[1] - x
         if y + height > image_shape[0]:
@@ -192,9 +189,8 @@ class OmeTiffWriter:
         if channel_names and len(channel_names) > n_channels and not is_merging:
             channel_names = self.reader.channel_names
             logger.warning(f"Channel names were too long - using {channel_names}")
-        if channel_ids is not None and not is_merging:
-            if len(channel_ids) != len(channel_names):
-                channel_names = [channel_names[i] for i in channel_ids]
+        if channel_ids is not None and not is_merging and len(channel_ids) != len(channel_names):
+            channel_names = [channel_names[i] for i in channel_ids]
         if len(channel_names) != len(channel_ids):  # type: ignore[arg-type]
             raise ValueError("The number of channel ids and channel names does not match.")
 
@@ -255,9 +251,8 @@ class OmeTiffWriter:
             except (PermissionError, FileNotFoundError, Exception) as e:
                 raise PermissionError(f"Could not remove file {output_file_name} - {e}")
 
-        if channel_ids and channel_names:
-            if len(channel_ids) != len(channel_names):
-                raise ValueError("The number of channel ids and channel names must match when being specified.")
+        if channel_ids and channel_names and len(channel_ids) != len(channel_names):
+            raise ValueError("The number of channel ids and channel names must match when being specified.")
 
         if channel_ids is None:
             channel_ids = list(range(self.reader.n_channels))
@@ -618,19 +613,18 @@ class OmeTiffWriter:
                 overwrite=overwrite,
                 ome_name=ome_name,
             )
-        else:
-            return self._write_image_multichannel(
-                name,
-                output_dir,
-                write_pyramid=write_pyramid,
-                tile_size=tile_size,
-                compression=compression,
-                as_uint8=as_uint8,
-                channel_ids=channel_ids,
-                channel_names=channel_names,
-                overwrite=overwrite,
-                ome_name=ome_name,
-            )
+        return self._write_image_multichannel(
+            name,
+            output_dir,
+            write_pyramid=write_pyramid,
+            tile_size=tile_size,
+            compression=compression,
+            as_uint8=as_uint8,
+            channel_ids=channel_ids,
+            channel_names=channel_names,
+            overwrite=overwrite,
+            ome_name=ome_name,
+        )
 
 
 class OmeTiffWrapper:

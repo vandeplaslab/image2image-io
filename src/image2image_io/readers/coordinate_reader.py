@@ -139,8 +139,7 @@ class CoordinateImageReader(BaseReader, CoordinateImagerMixin):  # type: ignore[
 
     def get_channel(self, index: int, pyramid: int = 0, split_rgb: bool | None = None) -> np.ndarray:
         """Return channel."""
-        image = self.get_channel_pyramid(index)[pyramid]
-        return image
+        return self.get_channel_pyramid(index)[pyramid]
 
     def get_channel_pyramid(self, index: int) -> list[np.ndarray]:
         """Return channel pyramid."""

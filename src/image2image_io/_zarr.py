@@ -3,7 +3,7 @@
 There are some differences between zarr version 2 and version 3, so this module handles the imports.
 """
 
-from zarr import Array
+import contextlib
 
 try:
     # version 2
@@ -17,10 +17,8 @@ except (AttributeError, ModuleNotFoundError):
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    try:
-        from zarr.core.group import Group
-    except (AttributeError, ModuleNotFoundError):
-        from zarr.group import Group
+    with contextlib.suppress(AttributeError, ModuleNotFoundError):
+        pass
 
     from zarr.storage import LocalStore
 

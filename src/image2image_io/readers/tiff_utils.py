@@ -95,8 +95,7 @@ def ometiff_xy_pixel_sizes(ome_metadata: OME, series_idx: int):
         out_um = cur_size.to("micrometer")
         ps_x_out = out_um.magnitude
         return (ps_x_out, ps_x_out)
-    else:
-        return (ps_x, ps_y)
+    return (ps_x, ps_y)
 
 
 def ometiff_ch_names(ome_metadata: OME, series_idx: int):

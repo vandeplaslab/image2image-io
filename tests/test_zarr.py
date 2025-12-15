@@ -1,9 +1,5 @@
 """Test _zarr.py"""
 
-from pathlib import Path
-
-import zarr
-
 from image2image_io._zarr import atexit_rmglob
 
 

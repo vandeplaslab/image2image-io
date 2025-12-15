@@ -54,7 +54,7 @@ class MergeImages:
                 reader._channel_ids = channel_ids_
             reader.resolution = pixel_size
             if reader.channel_names is None:  # or len(reader.channel_names) != reader.n_channels:
-                reader._channel_names = [f"C{idx}" for idx in range(0, reader.n_channels)]
+                reader._channel_names = [f"C{idx}" for idx in range(reader.n_channels)]
                 logger.trace(
                     f"Channel names not provided for {reader.path}, using {reader.channel_names} ({channel_names_})"
                 )
