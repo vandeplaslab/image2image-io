@@ -41,7 +41,7 @@ from image2image_io.cli._common import as_uint8_, tile_size_
     help="Specify the scene to be processed. If not specified, all scenes will be processed.",
     default=None,
     show_default=True,
-    required=True,
+    required=False,
 )
 @click.option(
     "-o",
@@ -85,7 +85,12 @@ def czi2tiff(
         metadata = {scene_index: {"channel_ids": channel_ids, "channel_names": channel_names}}
 
     for key, scene_index, total, _, _ in czi_to_ome_tiff(
-        input_, output_dir, as_uint8=as_uint8, tile_size=int(tile_size), metadata=metadata, scenes=[scene_index]
+        input_,
+        output_dir,
+        as_uint8=as_uint8,
+        tile_size=int(tile_size),
+        metadata=metadata,
+        scenes=[scene_index] if scene_index is not None else None,
     ):
         logger.info(f"Converted {key} scene {scene_index}/{total}")
 

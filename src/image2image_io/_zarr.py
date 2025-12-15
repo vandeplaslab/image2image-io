@@ -3,7 +3,7 @@
 There are some differences between zarr version 2 and version 3, so this module handles the imports.
 """
 
-import contextlib
+from zarr import Array
 
 try:
     # version 2
@@ -17,8 +17,10 @@ except (AttributeError, ModuleNotFoundError):
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    with contextlib.suppress(AttributeError, ModuleNotFoundError):
-        pass
+    try:
+        from zarr.core.group import Group
+    except (AttributeError, ModuleNotFoundError):
+        from zarr.group import Group
 
     from zarr.storage import LocalStore
 
@@ -52,3 +54,12 @@ except (AttributeError, ModuleNotFoundError):
         def path(self) -> Path:
             """Return the path to the temporary directory."""
             return self.root
+
+
+__all__ = [
+    "Group",
+    "Array",
+    "TempStore",
+    "atexit_rmglob",
+    "atexit_rmtree",
+]
