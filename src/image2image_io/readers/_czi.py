@@ -256,7 +256,7 @@ class CziFile(_CziFile):
 class CziSceneFile(CziFile):
     @staticmethod
     def get_num_scenes(path: str | Path, *args, **kwargs) -> int:
-        """Get number of scenes."""
+        """Get the number of scenes."""
         with _CziFile(path, *args, **kwargs) as czi_file:
             if "S" in czi_file.axes:
                 return czi_file.shape[czi_file.axes.index("S")]
