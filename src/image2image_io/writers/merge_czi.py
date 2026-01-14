@@ -143,7 +143,7 @@ def stitch_czi_scenes_czifile(
         n_scenes = data.shape[si]
 
     # Which scenes to export
-    if scenes is None:
+    if not scenes:
         scene_ids = list(range(n_scenes))
     else:
         # de-duplicate while preserving order
@@ -229,30 +229,40 @@ def stitch_czi_scenes_czifile(
     return stitched, infos
 
 
-def merge_czi(path: PathLike) -> Path:
+def merge_czi(
+    path: PathLike,
+    output_dir: PathLike | None = None,
+    scenes: list[int] | None = None,
+    as_uint8: bool | None = None,
+    tile_size: int = 512,
+) -> Path:
     """Merge CZI scenes into a single image, preserving channels."""
     from image2image_io.readers import get_simple_reader
     from image2image_io.writers import write_ome_tiff_from_array
 
     path = Path(path)
+    output_dir = Path(output_dir if output_dir is not None else path.parent)
+
     czi = get_simple_reader(path, init_pyramid=False, auto_pyramid=False)
     is_rgb = czi.is_rgb
     channel_names = czi.channel_names
     resolution = czi.resolution
     czi.close()
 
-    stitched_array, _ = stitch_czi_scenes_czifile(str(path), take_max_on_overlap=not is_rgb)
+    stitched_array, _ = stitch_czi_scenes_czifile(str(path), take_max_on_overlap=not is_rgb, scenes=scenes)
     # this ensures that aces are correctly ordered for writing
     if stitched_array.ndim == 3 and np.argmin(stitched_array.shape) == 2 and is_rgb:
         stitched_array = np.moveaxis(stitched_array, 0, -1)  # (Y,X,C) from (C,Y,X)
 
-    out_path = path.with_name(path.stem + "_merged.ome.tiff")
+    out_path = output_dir / path.with_name(path.stem + "_merged.ome.tiff").name
     write_ome_tiff_from_array(
         out_path,
         reader=None,
         array=stitched_array,
         resolution=resolution,
         channel_names=channel_names,
+        tile_size=tile_size,
+        as_uint8=as_uint8,
     )
 
     return out_path
