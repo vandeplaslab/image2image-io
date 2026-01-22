@@ -351,3 +351,8 @@ def get_czi_thumbnail(
             thumbnail_array[data_ch_index, :, :] = data
         return thumbnail_array, thumbnail_spacing
     return None, None
+
+
+def get_n_scenes(path: str | Path) -> int:
+    """Get the number of scenes in CZI file."""
+    return CziSceneFile.get_num_scenes(path)

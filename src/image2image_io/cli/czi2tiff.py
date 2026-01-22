@@ -10,6 +10,35 @@ from image2image_io.cli._common import as_uint8_, tile_size_
 
 
 @click.option(
+    "-i",
+    "--input",
+    "input_",
+    help="Path to the CZI file that should be converted.",
+    type=click.Path(exists=False, resolve_path=False, file_okay=True, dir_okay=False),
+    show_default=True,
+    required=True,
+)
+@click.command()
+def cziinfo(input_: str) -> None:
+    """Print information about the CZI file."""
+    from image2image_io.config import CONFIG
+    from image2image_io.readers import get_reader
+
+    with CONFIG.temporary_overwrite(init_pyramid=False, auto_pyramid=False):
+        path, readers = get_reader(input_, split_czi=True)
+        print(f"File: {path!r}")
+        print(f"Number of scenes: {len(readers)}")
+        for index, reader in enumerate(readers.values()):
+            print(f"Scene {index}")
+            print(f"Image shape: {reader.image_shape}")
+            print(f"Pixel size: {reader.resolution}")
+            print(f"  Number of channels: {reader.n_channels}")
+            for channel_index, channel_name in enumerate(reader.channel_names):
+                print(f"    Channel {channel_index}: {channel_name}")
+            print("-" * 80)
+
+
+@click.option(
     "-N",
     "--channel_names",
     type=click.STRING,
@@ -96,6 +125,48 @@ def czi2tiff(
 
 
 @click.option(
+    "-y",
+    "--y_offset",
+    type=click.INT,
+    help="Specify the scene to be processed. If not specified, all scenes will be processed.",
+    default=None,
+    show_default=True,
+    required=False,
+    multiple=True,
+)
+@click.option(
+    "-x",
+    "--x_offset",
+    type=click.INT,
+    help="Specify the scene to be processed. If not specified, all scenes will be processed.",
+    default=None,
+    show_default=True,
+    required=False,
+    multiple=True,
+)
+@as_uint8_
+@tile_size_
+@click.option(
+    "-s",
+    "--scene",
+    "scene_index",
+    type=click.INT,
+    help="Specify the scene to be processed. If not specified, all scenes will be processed.",
+    default=None,
+    show_default=True,
+    required=False,
+    multiple=True,
+)
+@click.option(
+    "-o",
+    "--output_dir",
+    help="Path to directory where OME-TIFF files will be saved.",
+    default=".",  # cwd
+    type=click.Path(exists=False, resolve_path=True, file_okay=False, dir_okay=True),
+    show_default=True,
+    required=True,
+)
+@click.option(
     "-i",
     "--input",
     "input_",
@@ -105,20 +176,25 @@ def czi2tiff(
     required=True,
 )
 @click.command()
-def cziinfo(input_: str) -> None:
-    """Print information about the CZI file."""
-    from image2image_io.config import CONFIG
-    from image2image_io.readers import get_reader
+def czimerge(
+    input_: str,
+    output_dir: str,
+    scene_index: tuple[int, ...],
+    tile_size: str,
+    as_uint8: bool,
+    x_offset: tuple[int, ...],
+    y_offset: tuple[int, ...],
+) -> None:
+    """Merge CZI scenes into a single image."""
+    from image2image_io.writers.merge_czi_alt import merge_czi
 
-    with CONFIG.temporary_overwrite(init_pyramid=False, auto_pyramid=False):
-        path, readers = get_reader(input_, split_czi=True)
-        print(f"File: {path!r}")
-        print(f"Number of scenes: {len(readers)}")
-        for index, reader in enumerate(readers.values()):
-            print(f"Scene {index}")
-            print(f"Image shape: {reader.image_shape}")
-            print(f"Pixel size: {reader.resolution}")
-            print(f"  Number of channels: {reader.n_channels}")
-            for channel_index, channel_name in enumerate(reader.channel_names):
-                print(f"    Channel {channel_index}: {channel_name}")
-            print("-" * 80)
+    path = merge_czi(
+        input_,
+        output_dir=output_dir,
+        scenes=scene_index,
+        as_uint8=as_uint8,
+        tile_size=int(tile_size),
+        x_offset=x_offset,
+        y_offset=y_offset,
+    )
+    logger.info(f"Merged CZI {path} with scenes {scene_index}")
