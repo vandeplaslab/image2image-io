@@ -105,7 +105,8 @@ def arrange_warped(warped: list[np.ndarray], is_rgb: bool) -> np.ndarray:
     # stack image
     warped = np.dstack(warped)
     # ensure that RGB remains RGB but AF remain AF
-    if warped.ndim == 3 and np.argmin(warped.shape) == 2 and not is_rgb:
+    if warped.ndim == 3 and not is_rgb:
+    # if warped.ndim == 3 and np.argmin(warped.shape) == 2 and not is_rgb:
         warped = np.moveaxis(warped, 2, 0)
     return warped
 
