@@ -38,7 +38,8 @@ class Transformer:
         """Apply transformation to the image."""
         return self._resample(image)
 
-    def _convert_image(self, image: np.ndarray | sitk.Image, resolution: float) -> sitk.Image:
+    @staticmethod
+    def _convert_image(image: np.ndarray | sitk.Image, resolution: float) -> sitk.Image:
         """Convert numpy array to SimpleITK image if necessary."""
         if not isinstance(image, sitk.Image):
             image = sitk.GetImageFromArray(image)
@@ -53,7 +54,7 @@ class Transformer:
         resampler = sitk.ResampleImageFilter()  # type: ignore[no-untyped-call]
         resampler.SetOutputOrigin(image.GetOrigin())  # type: ignore[no-untyped-call]
         # resampler.SetOutputDirection(self.output_direction)  # type: ignore[no-untyped-call]
-        resampler.SetSize(image.GetSize())  # type: ignore[no-untyped-call]
+        resampler.SetSize(self.output_size)  # type: ignore[no-untyped-call]
         resampler.SetOutputSpacing(image.GetSpacing())  # type: ignore[no-untyped-call]
         resampler.SetInterpolator(interpolator)  # type: ignore[no-untyped-call]
         resampler.SetTransform(transform)  # type: ignore[no-untyped-call]
