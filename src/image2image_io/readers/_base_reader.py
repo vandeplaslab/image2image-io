@@ -29,6 +29,7 @@ from image2image_io.utils.utilities import guess_rgb, sort_pyramid
 
 if ty.TYPE_CHECKING:
     from image2image_io.writers.tiff_writer import Transformer
+    from image2image_io.writers.tiff_writer import OmeTiffWriter
 
 logger = logger.bind(src="Reader")
 
@@ -745,11 +746,11 @@ class BaseReader:
             transformer=transformer,
         )
 
-    def to_writer(self):
+    def to_writer(self, transformer: Transformer | None = None) -> "OmeTiffWriter":
         """Get instance of writer."""
         from image2image_io.writers.tiff_writer import OmeTiffWriter
 
-        return OmeTiffWriter(self, transformer=None)
+        return OmeTiffWriter(self, transformer=transformer)
 
 
 class DummyReader(BaseReader):
