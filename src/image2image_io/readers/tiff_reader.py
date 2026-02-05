@@ -65,13 +65,15 @@ class TiffImageReader(BaseReader):
             return self.shape[2]
         _, n_channels = self.get_channel_axis_and_n_channels()
         return n_channels
-    
+
     def close(self) -> None:
-        """Close resources per the base reader and delete lazy dask pyramids where file references may be held."""
-        super().close()
+        """Release resources held by the current class and parent."""
+        # Depending on the source (e.g. lazy dask array) the pyramid may hold unreachable file handles.
+        # Delete pyramid entries to ensure files are released.  The base class then nulls the pyramid.
         for p in self.pyramid:
             if p is not None:
                 del p
+        super().close()
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
