@@ -665,7 +665,7 @@ class OmeTiffWrapper:
         as_uint8: bool | None = None,
         overwrite: bool = False,
         transformer: Transformer | None = None,
-    ) -> ty.Generator[OmeTiffWrapper, None, None]:
+    ) -> ty.Generator[OmeTiffWrapper]:
         """Write."""
         from image2image_io.readers._base_reader import DummyReader
 
