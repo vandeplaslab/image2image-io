@@ -174,16 +174,17 @@ def read_preprocess_array(array, preprocessing, force_rgb=None):
     return image_out
 
 
-def get_tifffile_info(image_filepath):
+def get_tifffile_info(image_filepath, series_index: int | None = None):
     """Get tiff file information."""
-    largest_series = get_largest_pyramid_series_tiff(image_filepath)
-    with imread(image_filepath, aszarr=True, series=largest_series) as store:
+    if series_index is None:
+        series_index = get_largest_pyramid_series_tiff(image_filepath)
+    with imread(image_filepath, aszarr=True, series=series_index) as store:
         zarr_im = zarr.open(store)
         zarr_im = zarr_get_base_pyr_layer(zarr_im)
         image_shape = image_shape_ = np.squeeze(zarr_im.shape)
         if len(image_shape_) == 2:
             image_shape_ = np.concatenate([[1], image_shape_])
-    return image_shape, image_shape_, zarr_im.dtype, largest_series
+    return image_shape, image_shape_, zarr_im.dtype, series_index
 
 
 def tf_zarr_read_single_ch(image_filepath, channel_idx, is_rgb, is_rgb_interleaved=True):

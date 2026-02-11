@@ -41,11 +41,12 @@ class TiffImageReader(BaseReader):
         key: str | None = None,
         init_pyramid: bool | None = None,
         auto_pyramid: bool | None = None,
+        series_index: int | None = None,
     ):
         super().__init__(path, key, auto_pyramid=auto_pyramid)
         self.fh = TiffFile(self.path)
 
-        self.shape, self._array_dtype, self.largest_series = self._get_image_info()
+        self.shape, self._array_dtype, self.series_index = self._get_image_info()
         self._image_shape = self.shape[0:2] if self.is_rgb else (self.shape[1::] if len(self.shape) > 2 else self.shape)
 
         self.resolution = self._get_im_res()
@@ -77,7 +78,7 @@ class TiffImageReader(BaseReader):
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
-        d_pyr = tifffile_to_dask(self.path, self.largest_series)
+        d_pyr = tifffile_to_dask(self.path, self.series_index)
         channel_axis, _ = self.get_channel_axis_and_n_channels(shape=d_pyr[0].shape)
         if self.is_rgb and guess_rgb(d_pyr[0].shape):
             d_pyr[0] = d_pyr[0].rechunk((2048, 2048, 1))
@@ -94,24 +95,24 @@ class TiffImageReader(BaseReader):
         if Path(self.path).suffix.lower() in [".scn", ".ndpi"]:
             return tifftag_xy_pixel_sizes(
                 self.fh,
-                self.largest_series,
+                self.series_index,
                 0,
             )[0]
         if Path(self.path).suffix.lower() in [".svs"]:
             return svs_xy_pixel_sizes(
                 self.fh,
-                self.largest_series,
+                self.series_index,
                 0,
             )[0]
         if self.fh.ome_metadata:
             return ometiff_xy_pixel_sizes(
                 from_xml(self.fh.ome_metadata, parser="lxml"),
-                self.largest_series,
+                self.series_index,
             )[0]
         try:
             return tifftag_xy_pixel_sizes(
                 self.fh,
-                self.largest_series,
+                self.series_index,
                 0,
             )[0]
         except KeyError:
@@ -126,7 +127,7 @@ class TiffImageReader(BaseReader):
         if any(suffix in self.path.name for suffix in [".qptiff", ".qptiff.intermediate", ".qptiff.raw"]):
             channel_names = qptiff_channel_names(self.fh)
         if self.fh.ome_metadata and not channel_names:
-            channel_names = ometiff_ch_names(from_xml(self.fh.ome_metadata, parser="lxml"), self.largest_series)
+            channel_names = ometiff_ch_names(from_xml(self.fh.ome_metadata, parser="lxml"), self.series_index)
             if self.n_channels > len(channel_names):
                 channel_names = []
 
@@ -139,17 +140,17 @@ class TiffImageReader(BaseReader):
                     channel_names.append(f"C{str(idx + 1).zfill(2)}")
         return channel_names
 
-    def _get_image_info(self) -> tuple:
-        if len(self.fh.series) > 1:
+    def _get_image_info(self, series_index: int | None = None) -> tuple:
+        if len(self.fh.series) > 1 and series_index is None:
             warnings.warn(
                 "The tiff contains multiple series, the largest series will be read by default",
                 stacklevel=2,
             )
 
-        array_shape, _, array_dtype, largest_series = get_tifffile_info(self.path)
-        if not CONFIG.auto_pyramid:
-            largest_series = 0
-        return array_shape, array_dtype, largest_series
+        array_shape, _, array_dtype, series_index = get_tifffile_info(self.path, series_index)
+        # if not CONFIG.auto_pyramid:
+        #     largest_series = 0
+        return array_shape, array_dtype, series_index
 
     def get_channel_axis_and_n_channels(self, shape: tuple | None = None) -> tuple[int | None, int]:
         """Return channel axis and number of channels."""

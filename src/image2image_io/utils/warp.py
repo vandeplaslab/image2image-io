@@ -84,12 +84,29 @@ def get_affine_from_config(
     return affine_matrix, fixed_image_shape, fixed_pixel_size_um, moving_image_shape, moving_pixel_size_um
 
 
+def rescale_affine(affine: np.ndarray, scale: float) -> np.ndarray:
+    """Rescale affine transformation matrix by a given scale factor.
+    
+    This assumes that the following affine matrix is in the form:
+        [ a11 a12 tx ]
+        [ a21 a22 ty ]
+        [  0   0   1 ]
+    where the top-left 2x2 submatrix represents scaling, rotation, and shearing,
+    and the last column represents translation.
+    """
+    scaled_affine = np.copy(affine)
+    scaled_affine[:2, :2] *= scale
+    # Note: Translation components are not scaled here; adjust if needed.
+    return scaled_affine
+
+
 def arrange_warped(warped: list[np.ndarray], is_rgb: bool) -> np.ndarray:
     """Arrange warped images into a single array."""
     # stack image
     warped = np.dstack(warped)
     # ensure that RGB remains RGB but AF remain AF
-    if warped.ndim == 3 and np.argmin(warped.shape) == 2 and not is_rgb:
+    if warped.ndim == 3 and not is_rgb:
+    # if warped.ndim == 3 and np.argmin(warped.shape) == 2 and not is_rgb:
         warped = np.moveaxis(warped, 2, 0)
     return warped
 
