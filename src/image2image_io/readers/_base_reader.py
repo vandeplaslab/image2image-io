@@ -28,8 +28,7 @@ from image2image_io.utils.mask import (
 from image2image_io.utils.utilities import guess_rgb, sort_pyramid
 
 if ty.TYPE_CHECKING:
-    from image2image_io.writers.tiff_writer import Transformer
-    from image2image_io.writers.tiff_writer import OmeTiffWriter
+    from image2image_io.writers.tiff_writer import OmeTiffWriter, Transformer
 
 logger = logger.bind(src="Reader")
 
@@ -722,6 +721,15 @@ class BaseReader:
         resolution = self.resolution * 2**pyramid
         return resolution, resolution
 
+    def scale_for_shape(self, shape: tuple[int, int]) -> tuple[float, float]:
+        """Return scale for shape."""
+        from image2image_io.utils.utilities import get_shape_of_image
+
+        _, _, img_shape = get_shape_of_image(shape)
+        scale_x = img_shape[0] / self.image_shape[0]
+        scale_y = img_shape[1] / self.image_shape[1]
+        return self.resolution * scale_x, self.resolution * scale_y
+
     def to_ome_tiff(
         self,
         path: PathLike,
@@ -746,7 +754,7 @@ class BaseReader:
             transformer=transformer,
         )
 
-    def to_writer(self, transformer: Transformer | None = None) -> "OmeTiffWriter":
+    def to_writer(self, transformer: Transformer | None = None) -> OmeTiffWriter:
         """Get instance of writer."""
         from image2image_io.writers.tiff_writer import OmeTiffWriter
 

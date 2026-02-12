@@ -191,6 +191,23 @@ def get_shape_of_image(array_or_shape: np.ndarray | tuple[int, ...]) -> tuple[in
     return n_channels, channel_axis, tuple(shape)
 
 
+def clip_shape(shape: tuple[int, int], max_size: int = 1000) -> tuple[int, int]:
+    """Clip shape to maximum size.
+
+    Ensure that the aspect ratio is preserved.
+    """
+    y, x = shape
+    if max(y, x) <= max_size:
+        return shape
+    if y > x:
+        y = int(max_size * y / x)
+        x = max_size
+    else:
+        x = int(max_size * x / y)
+        y = max_size
+    return y, x
+
+
 def get_flat_shape_of_image(array_or_shape: np.ndarray | tuple[int, ...]) -> tuple[int, int]:
     """Return shape of an image."""
     n_channels, _, shape = get_shape_of_image(array_or_shape)
