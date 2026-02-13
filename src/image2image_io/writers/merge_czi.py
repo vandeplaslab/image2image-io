@@ -234,7 +234,7 @@ def merge_czi(
     output_dir: PathLike | None = None,
     scenes: list[int] | None = None,
     as_uint8: bool | None = None,
-    tile_size: int = 512,
+    tile_size: int = 1024,
 ) -> Path:
     """Merge CZI scenes into a single image, preserving channels."""
     from image2image_io.readers import get_simple_reader

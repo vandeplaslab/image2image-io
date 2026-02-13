@@ -60,7 +60,7 @@ class MergeOmeTiffWriter:
 
     x_size: int | None = None
     y_size: int | None = None
-    tile_size: int = 512
+    tile_size: int = 1024
     pyr_levels: list[tuple[int, int]]
     n_pyr_levels: int
     PhysicalSizeY: int | float
@@ -188,7 +188,7 @@ class MergeOmeTiffWriter:
         channel_ids: list[list[int]] | None = None,
         transformer: Transformer | None = None,
         write_pyramid: bool = True,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         compression: str = "default",
     ) -> None:
         """Prepare OME-XML and other data needed for saving."""
@@ -269,7 +269,7 @@ class MergeOmeTiffWriter:
         reader_names: list[str],
         output_dir: Path | str = "",
         write_pyramid: bool = True,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         compression: str = "default",
         as_uint8: bool | None = False,
         channel_ids: list[list[int | tuple[int, ...]] | None] | None = None,
@@ -431,7 +431,7 @@ class MergeOmeTiffWriter:
         name: str,
         reader_names: list[str],
         output_dir: Path,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         as_uint8: bool = False,
         channel_ids: list[list[int] | None] | None = None,
     ) -> Path:

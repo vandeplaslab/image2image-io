@@ -58,7 +58,7 @@ def write_thumbnail(path: PathLike, output_dir: PathLike, with_title: bool, firs
 
 
 def make_thumbnail(filename: Path, image: np.ndarray, title: str, with_title: bool):
-    """Create thumbnail of an image."""
+    """Create a thumbnail of an image."""
     import matplotlib.pyplot as plt
 
     _fig, ax = plt.subplots(figsize=(12, 12))
@@ -196,16 +196,13 @@ def clip_shape(shape: tuple[int, int], max_size: int = 1000) -> tuple[int, int]:
 
     Ensure that the aspect ratio is preserved.
     """
-    y, x = shape
-    if max(y, x) <= max_size:
-        return shape
-    if y > x:
-        y = int(max_size * y / x)
-        x = max_size
-    else:
-        x = int(max_size * x / y)
-        y = max_size
-    return y, x
+    h, w = shape
+    if max(h, w) <= max_size:
+        return h, w
+    scale = max_size / max(h, w)
+    new_h = int(h * scale)
+    new_w = int(w * scale)
+    return new_h, new_w
 
 
 def get_flat_shape_of_image(array_or_shape: np.ndarray | tuple[int, ...]) -> tuple[int, int]:

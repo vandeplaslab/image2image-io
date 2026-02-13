@@ -40,7 +40,7 @@ def convert_runner(
     paths: list[str],
     output_dir: str,
     fmt: str = "ome-tiff",
-    tile_size: int | str = 512,
+    tile_size: int | str = 1024,
     as_uint8: bool | None = None,
     overwrite: bool = False,
 ) -> None:

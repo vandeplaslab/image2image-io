@@ -352,14 +352,14 @@ class BaseReader:
         raise NotImplementedError("Must implement method")
 
     @lru_cache(maxsize=1)
-    def get_thumbnail(self, max_size: int = 1024) -> tuple[np.ndarray, tuple[float, float]]:
+    def get_thumbnail(self, max_size: int = 2048) -> tuple[np.ndarray, tuple[float, float]]:
         """Return thumbnail."""
         image, scale = self.pyramid[-1], self.scale_for_pyramid(-1)
         return self._process_thumbnail(image, scale, max_size)
 
     @staticmethod
     def _process_thumbnail(
-        image, scale: tuple[float, float], max_size: int = 1024
+        image, scale: tuple[float, float], max_size: int = 2048
     ) -> tuple[np.ndarray, tuple[float, float]]:
         """Process thumbnail image."""
         from image2image_io.utils.utilities import get_shape_of_image, resize
@@ -728,13 +728,13 @@ class BaseReader:
         _, _, img_shape = get_shape_of_image(shape)
         scale_x = img_shape[0] / self.image_shape[0]
         scale_y = img_shape[1] / self.image_shape[1]
-        return self.resolution * scale_x, self.resolution * scale_y
+        return self.resolution / scale_x, self.resolution / scale_y
 
     def to_ome_tiff(
         self,
         path: PathLike,
         as_uint8: bool = False,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         channel_ids: list[int] | None = None,
         channel_names: list[str] | None = None,
         transformer: Transformer | None = None,

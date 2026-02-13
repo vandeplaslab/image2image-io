@@ -61,7 +61,7 @@ class OmeTiffWriter:
 
     x_size: int | None = None
     y_size: int | None = None
-    tile_size: int = 512
+    tile_size: int = 1024
     pyr_levels: list[tuple[int, int]]
     n_pyr_levels: int
     PhysicalSizeY: int | float
@@ -116,7 +116,7 @@ class OmeTiffWriter:
         self,
         image_name: str,
         write_pyramid: bool = True,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         compression: str | None = "default",
         as_uint8: bool | None = None,
         channel_ids: list[int | tuple[int, ...]] | None = None,
@@ -221,7 +221,7 @@ class OmeTiffWriter:
         name: str,
         output_dir: Path | str = "",
         write_pyramid: bool = True,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         compression: str | None = "default",
         as_uint8: bool | None = None,
         channel_ids: list[int | tuple[int, ...]] | None = None,
@@ -310,7 +310,7 @@ class OmeTiffWriter:
         self,
         name: str,
         output_dir: Path,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         as_uint8: bool | None = None,
         channel_ids: list[int | tuple[int, ...]] | None = None,
         channel_names: list[str] | None = None,
@@ -409,7 +409,7 @@ class OmeTiffWriter:
         name: str,
         output_dir: Path | str = "",
         write_pyramid: bool = True,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         compression: str | None = "default",
         as_uint8: bool | None = None,
         channel_ids: list[int | tuple[int, ...]] | None = None,
@@ -485,7 +485,7 @@ class OmeTiffWriter:
         name: str,
         output_dir: Path | str = "",
         write_pyramid: bool = True,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         compression: str | None = "default",
         as_uint8: bool | None = None,
         channel_ids: list[int | tuple[int, ...]] | None = None,
@@ -550,7 +550,7 @@ class OmeTiffWriter:
         name: str,
         output_dir: Path | str = "",
         write_pyramid: bool = True,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         compression: str | None = "default",
         as_uint8: bool | None = None,
         channel_ids: list[int | tuple[int, ...]] | None = None,
@@ -660,7 +660,7 @@ class OmeTiffWrapper:
         name: str,
         output_dir: Path | str = "",
         write_pyramid: bool = True,
-        tile_size: int = 512,
+        tile_size: int = 1024,
         compression: str | None = "default",
         as_uint8: bool | None = None,
         overwrite: bool = False,
