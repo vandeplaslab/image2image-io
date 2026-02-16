@@ -223,7 +223,6 @@ def image_to_ome_tiff(
     from image2image_io.readers import get_key, get_simple_reader
 
     path = Path(path)
-
     if output_dir is None:
         output_dir = path.parent
     output_dir = Path(output_dir)
@@ -320,6 +319,7 @@ def czi_to_ome_tiff(
     if output_dir is None:
         output_dir = path.parent
     output_dir = Path(output_dir)
+
     try:
         n = CziSceneFile.get_num_scenes(path)
         has_scenes = n != 1
