@@ -34,7 +34,7 @@ tile_size_ = click.option(
     "--tile_size",
     help="Tile size.",
     type=click.Choice(["256", "512", "1024", "2048"], case_sensitive=False),
-    default="512",
+    default="1024",
     show_default=True,
     required=False,
 )
