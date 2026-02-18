@@ -96,6 +96,8 @@ class OmeTiffWriter:
         if self.crop_mask is not None and self.crop_bbox is not None:
             raise ValueError("Cannot supply both crop_mask and crop_bbox")
 
+        self._write_metadata: dict = {}
+
     def _check_bbox(self, crop_bbox: tuple[int, int, int, int] | None) -> tuple[int, int, int, int] | None:
         """Check bbox."""
         if crop_bbox is None:
@@ -326,6 +328,122 @@ class OmeTiffWriter:
             channel_names=channel_names,
             overwrite=overwrite,
         )
+
+    @contextmanager
+    def exporter(
+        self,
+        name: str,
+        output_dir: Path,
+        write_pyramid: bool = True,
+        tile_size: int = 1024,
+        compression: str | None = "default",
+        as_uint8: bool | None = None,
+        channel_ids: list[int | tuple[int, ...]] | None = None,
+        channel_names: list[str] | None = None,
+        overwrite: bool = False,
+        ome_name: str | None = None,
+    ) -> ty.Generator[TiffWriter, None, None]:
+        """Initialize the writer by preparing image info and OME-XML."""
+        (
+            tmp_output_file_name,
+            output_file_name,
+            options,
+            channel_ids,
+            channel_names,
+            as_uint8,
+            write_pyramid,
+        ) = self._prepare_tiff(
+            name=name,
+            output_dir=output_dir,
+            write_pyramid=write_pyramid,
+            tile_size=tile_size,
+            compression=compression,
+            as_uint8=as_uint8,
+            channel_ids=channel_ids,
+            channel_names=channel_names,
+            overwrite=overwrite,
+            ome_name=ome_name,
+        )
+        # no output file name means we are skipping
+        if tmp_output_file_name is None:
+            return None
+
+        assert channel_names is not None, "Channel names must be defined"
+        assert channel_ids is not None, "Channel ids must be defined"
+        with TiffWriter(tmp_output_file_name, bigtiff=True) as tif, MeasureTimer():
+            self._write_metadata = {
+                "tmp_output_file_name": tmp_output_file_name,
+                "output_file_name": output_file_name,
+                "options": options,
+                "channel_ids": channel_ids,
+                "channel_names": channel_names,
+                "as_uint8": as_uint8,
+                "write_pyramid": write_pyramid,
+                "description": self.omexml,
+                "writer": tif,
+            }
+            yield self
+        self._write_metadata = None
+        # rename tmp file to the output file
+        retry(lambda: tmp_output_file_name.rename(output_file_name), PermissionError)()  # type: ignore[arg-type]
+        logger.trace(f"Renamed tmp file to output file ({output_file_name})")
+        return Path(output_file_name)
+
+    def append_channel(self, channel_index: int, channel_name: str, image: np.ndarray) -> None:
+        """Append channel."""
+        if not self._write_metadata:
+            raise ValueError(
+                "Writer not initialized. Please use the exporter context manager to initialize the writer."
+            )
+
+        tif = self._write_metadata["writer"]
+        options = self._write_metadata["options"]
+        description = self._write_metadata["description"]
+        write_pyramid = self._write_metadata["write_pyramid"]
+
+        msg = f"Writing image for channel={channel_name} ({channel_index})"
+        past_msg = msg.replace("Writing", "Wrote")
+        # write channel data
+        logger.trace(f"{msg} - {image.shape}...")
+        with MeasureTimer() as write_timer:
+            tif.write(image, subifds=self.subifds, description=description, **options)
+            logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
+            if write_pyramid:
+                for pyramid_index, pyr_image in self._convert_image_to_pyramid(image):
+                    logger.trace(f"{msg} pyramid index {pyramid_index} - {pyr_image.shape}...")
+                    tif.write(pyr_image, **options, subfiletype=1)
+                    logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
+                    del pyr_image
+            del image
+
+    def append_rgb(self, rgb_image: np.ndarray) -> None:
+        """Append RGB image."""
+        if not self._write_metadata:
+            raise ValueError(
+                "Writer not initialized. Please use the exporter context manager to initialize the writer."
+            )
+
+        tif = self._write_metadata["writer"]
+        options = self._write_metadata["options"]
+        description = self._write_metadata["description"]
+        write_pyramid = self._write_metadata["write_pyramid"]
+        # write channel data
+        msg = "Writing RGB image"
+        past_msg = msg.replace("Writing", "Wrote")
+        # write channel data
+        logger.trace(f"{msg} - {image.shape}...")  # type: ignore[attr-defined]
+
+        with MeasureTimer() as write_timer:
+            tif.write(rgb_image, subifds=self.subifds, description=description, **options)
+            logger.trace(f"{past_msg} pyramid index 0 in {write_timer()}")
+            if write_pyramid:
+                logger.info("Writing pyramid...")
+                for pyramid_index, pyr_image in self._convert_image_to_pyramid(rgb_image):
+                    logger.trace(f"{msg} pyramid index {pyramid_index} - {pyr_image.shape}...")
+                    tif.write(pyr_image, **options, subfiletype=1)
+                    logger.trace(f"{past_msg} pyramid index {pyramid_index} in {write_timer(since_last=True)}")
+                    del pyr_image
+            del rgb_image
 
     def _processed_image_yield(
         self, channel_ids: list[int | tuple[int, ...]], channel_names: list[str], as_uint8: bool | None = None

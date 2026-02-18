@@ -15,6 +15,70 @@ from image2image_io.enums import WriterMode
 
 @overwrite_
 @as_uint8_
+@click.option(
+    "-o",
+    "--output_dir",
+    help="Path to images to be merged.",
+    type=click.Path(file_okay=False, dir_okay=True, resolve_path=True),
+    show_default=True,
+    required=True,
+)
+@click.option(
+    "-p",
+    "--path",
+    help="Path to images to be merged.",
+    type=click.UNPROCESSED,
+    show_default=True,
+    required=True,
+    multiple=True,
+    callback=cli_parse_paths_sort,
+)
+@click.option(
+    "-n",
+    "--name",
+    help="Name of the merged image.",
+    type=click.STRING,
+    show_default=True,
+    required=True,
+)
+@click.command("combine")
+def combine(
+    name: str,
+    path: ty.Sequence[str],
+    output_dir: str,
+    as_uint8: bool | None,
+    overwrite: bool,
+) -> None:
+    """Combine multiple images into one, merging channels together."""
+    combine_runner(name, path, output_dir, as_uint8=as_uint8, overwrite=overwrite)
+
+
+def combine_runner(
+    name: str,
+    paths: ty.Sequence[str],
+    output_dir: str,
+    reduce_func: ty.Literal["sum", "mean", "max"] = "sum",
+    as_uint8: bool | None = False,
+    overwrite: bool = False,
+) -> None:
+    """Register images."""
+    from image2image_io.combine import combine as combine_images
+
+    print_parameters(
+        Parameter("Name", "-n/--name", name),
+        Parameter("Image paths", "-p/--path", paths),
+        Parameter("Output directory", "-o/--output_dir", output_dir),
+        Parameter("Write images as uint8", "--as_uint8/--no_as_uint8", as_uint8),
+        Parameter("Overwrite", "-W/--overwrite", overwrite),
+    )
+
+    with MeasureTimer() as timer:
+        combine_images(name, list(paths), output_dir, as_uint8=as_uint8, overwrite=overwrite, reduce_func=reduce_func)
+    logger.info(f"Finished processing project in {timer()}.")
+
+
+@overwrite_
+@as_uint8_
 @fmt_
 @click.option(
     "-C",
@@ -64,7 +128,7 @@ def merge(
     as_uint8: bool | None,
     overwrite: bool,
 ) -> None:
-    """Export images."""
+    """Combine multiple images into one, append channels."""
     merge_runner(name, path, output_dir, channel_ids, fmt, as_uint8, overwrite)
 
 
