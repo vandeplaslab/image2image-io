@@ -681,7 +681,7 @@ class BaseReader:
             return self.preprocessor(self.channel_names[index], array[:, index])
         if channel_axis == 2:
             if self.is_rgb:
-                if CONFIG.split_rgb or split_rgb:
+                if split_rgb:
                     return self.preprocessor("RGB"[index], array[:, :, index])
                 return self.preprocessor("RGB", array)
             return self.preprocessor(self.channel_names[index], array[:, :, index])

@@ -15,14 +15,15 @@ from koyo.typing import PathLike
 from loguru import logger
 
 
-def reduce(arrays: np.ndarray, reduce_func: ty.Literal["sum", "mean", "max"] = "sum") -> np.ndarray:
+def reduce(arrays: list[np.ndarray], reduce_func: ty.Literal["sum", "mean", "max"] = "sum") -> np.ndarray:
     """Reduce arrays."""
+    print(arrays)
     if reduce_func == "sum":
-        return np.sum(arrays, axis=0)
+        return np.sum(arrays, axis=0, dtype=arrays[0].dtype)
     if reduce_func == "mean":
-        return np.mean(arrays, axis=0)
+        return np.mean(arrays, axis=0, dtype=arrays[0].dtype)
     if reduce_func == "max":
-        return np.max(arrays, axis=0)
+        return np.max(arrays, axis=0)  # , dtype=arrays[0].dtype)
     raise ValueError(f"Invalid reduce function: {reduce_func}")
 
 
@@ -32,7 +33,7 @@ def combine(
     output_dir: PathLike,
     as_uint8: bool | None = None,
     overwrite: bool = False,
-    reduce_func: ty.Literal["sum", "mean", "max"] = "sum",
+    reduce_func: ty.Literal["sum", "mean", "max"] = "max",
 ) -> Path:
     """Combine multiple images."""
     from image2image_io.readers import get_simple_reader
@@ -51,30 +52,30 @@ def combine(
             path = Path(path_)
             reader = get_simple_reader(path, init_pyramid=False, auto_pyramid=False)
             readers.append(reader)
-            pixel_sizes.append(reader.resolution)
-            channel_names.append(reader.channel_names)
+            pixel_sizes.append(round(reader.resolution, 3))
+            channel_names.append(tuple(reader.channel_names))
             image_shapes.append(reader.image_shape)
             is_rgb.append(reader.is_rgb)
 
     # check that all images have the same shape
     if len(set(image_shapes)) > 1:
-        logger.error("All images must have the same shape to be combined.")
-        raise ValueError("All images must have the same shape to be combined.")
+        logger.error(f"All images must have the same shape to be combined. ({image_shapes})")
+        raise ValueError(f"All images must have the same shape to be combined. ({image_shapes})")
     if len(set(pixel_sizes)) > 1:
-        logger.error("All images must have the same pixel size to be combined.")
-        raise ValueError("All images must have the same pixel size to be combined.")
+        logger.error(f"All images must have the same pixel size to be combined. ({pixel_sizes})")
+        raise ValueError(f"All images must have the same pixel size to be combined. ({pixel_sizes})")
     if len(set(channel_names)) > 1:
-        logger.error("All images must have the same channel names to be combined.")
-        raise ValueError("All images must have the same channel names to be combined.")
+        logger.error(f"All images must have the same channel names to be combined. ({channel_names})")
+        raise ValueError(f"All images must have the same channel names to be combined. ({channel_names})")
     logger.info(f"Loaded {len(channel_names)} images in {timer()}.")
 
     # if the image is RGB, we need to export it slightly differently than if it's a multi-channel image
     is_rgb = is_rgb[0]
 
-    output_filename = output_dir / f"{name}_combined.ome.tiff"
+    output_filename = output_dir / f"{name}-{reduce_func}.ome.tiff"
     writer = OmeTiffWriter(reader=readers[0])
     with writer.exporter(
-        name=f"{name}_combined",
+        name=f"{name}-{reduce_func}",
         output_dir=output_dir,
         as_uint8=as_uint8,
         write_pyramid=True,

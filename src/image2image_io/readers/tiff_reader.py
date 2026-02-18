@@ -115,7 +115,9 @@ class TiffImageReader(BaseReader):
 
     def _get_channel_names(self) -> list[str]:
         channel_names = []
-        if any(suffix in self.path.name for suffix in [".qptiff", ".qptiff.intermediate", ".qptiff.raw"]):
+        if any(
+            suffix in self.path.name for suffix in [".qptiff", ".qptiff.intermediate", ".qptiff.raw"]
+        ) and not self.path.name.endswith(".ome.tiff"):
             channel_names = qptiff_channel_names(self.fh)
         if self.fh.ome_metadata and not channel_names:
             channel_names = ometiff_ch_names(from_xml(self.fh.ome_metadata, parser="lxml"), self.series_index)

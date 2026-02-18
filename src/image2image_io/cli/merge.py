@@ -57,7 +57,7 @@ def combine_runner(
     name: str,
     paths: ty.Sequence[str],
     output_dir: str,
-    reduce_func: ty.Literal["sum", "mean", "max"] = "sum",
+    reduce_func: ty.Literal["sum", "mean", "max"] = "max",
     as_uint8: bool | None = False,
     overwrite: bool = False,
 ) -> None:

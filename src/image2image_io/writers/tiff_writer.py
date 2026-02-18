@@ -431,7 +431,7 @@ class OmeTiffWriter:
         msg = "Writing RGB image"
         past_msg = msg.replace("Writing", "Wrote")
         # write channel data
-        logger.trace(f"{msg} - {image.shape}...")  # type: ignore[attr-defined]
+        logger.trace(f"{msg} - {rgb_image.shape}...")  # type: ignore[attr-defined]
 
         with MeasureTimer() as write_timer:
             tif.write(rgb_image, subifds=self.subifds, description=description, **options)
