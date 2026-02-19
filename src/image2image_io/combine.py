@@ -14,6 +14,7 @@ import numpy as np
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
+from skimage.exposure import match_histograms
 
 
 def match_histograms_cv2(
@@ -109,34 +110,76 @@ def match_histograms_cv2(
     return out_u.astype(src.dtype, copy=False)
 
 
+def match_histograms_nan_safe(img, ref, *, channel_axis=-1, fill="min"):
+    """Like skimage's match_histograms but handles NaNs by filling them with a specified value."""
+    img = np.asarray(img)
+    ref = np.asarray(ref)
+
+    def _fill(x):
+        x = x.astype(np.float32, copy=False)
+        finite = np.isfinite(x)
+        if not finite.any():
+            return np.zeros_like(x, dtype=np.float32)
+        if fill == "min":
+            v = np.nanmin(x)
+        elif fill == "median":
+            v = np.nanmedian(x)
+        elif isinstance(fill, (int, float)):
+            v = float(fill)
+        else:
+            raise ValueError("fill must be 'min', 'median', or a number")
+        return np.where(finite, x, v)
+
+    img_f = _fill(img)
+    ref_f = _fill(ref)
+
+    out = match_histograms(img_f, ref_f, channel_axis=channel_axis)
+
+    # If you want to preserve NaN locations from the original:
+    out = out.astype(np.float32, copy=False)
+    out[~np.isfinite(img.astype(np.float32, copy=False))] = np.nan
+    return out
+
+
+def match_histograms_auto(img: np.ndarray, ref: np.ndarray) -> np.ndarray:
+    """Match histogram."""
+    dtype = img.dtype
+    is_rgb = img.ndim == 3 and img.shape[2] == 3
+    if dtype.kind == "u":
+        img = img.astype(np.float32)
+    # match histogram for each channel individually
+    if img.ndim == 2:
+        img = match_histograms(np.asarray(img), np.asarray(ref), channel_axis=None)
+    for i in range(img.shape[-1]):
+        img[..., i] = match_histograms(np.asarray(img[..., i]), np.asarray(ref[..., i]), channel_axis=None)
+    # now ensure that the data type is correct
+    if is_rgb:
+        img = np.clip(img, 0, 255).astype(dtype)
+    return img
+
+
 def reduce(
     arrays: np.ndarray,
     reduce_func: ty.Literal["sum", "mean", "max"] = "sum",
     *,
     match_histogram: bool = True,
     reference: np.ndarray | None = None,
-    mask: np.ndarray | None = None,
 ) -> np.ndarray:
-    arrays = np.asarray(arrays)
-    if arrays.ndim != 3:
-        raise ValueError("Expected shape (n_images, H, W)")
-
+    """Reduction method."""
     if match_histogram:
         ref = arrays[0] if reference is None else reference
-        arrays = np.stack(
-            [
-                ref if i == 0 and reference is None else match_histograms_cv2(arrays[i], ref, mask=mask)
-                for i in range(arrays.shape[0])
-            ],
-            axis=0,
-        )
 
+        for i in range(len(arrays)):
+            if ref is not arrays[i]:
+                arrays[i] = match_histograms_auto(arrays[i], ref)
+
+    arrays = np.stack(arrays, axis=0)
     if reduce_func == "sum":
-        return arrays.sum(axis=0, dtype=arrays[0].dtype)
+        return np.asarray(arrays.sum(axis=0, dtype=arrays.dtype))
     if reduce_func == "mean":
-        return arrays.mean(axis=0, dtype=arrays[0].dtype)
+        return np.asarray(arrays.mean(axis=0, dtype=arrays.dtype))
     if reduce_func == "max":
-        return arrays.max(axis=0)
+        return np.asarray(arrays.max(axis=0))
     raise ValueError(f"Invalid reduce function: {reduce_func}")
 
 
@@ -147,6 +190,7 @@ def combine(
     as_uint8: bool | None = None,
     overwrite: bool = False,
     reduce_func: ty.Literal["sum", "mean", "max"] = "max",
+    match_histogram: bool = True,
 ) -> Path:
     """Combine multiple images."""
     from image2image_io.readers import get_simple_reader
@@ -198,17 +242,23 @@ def combine(
             logger.error("Failed to create writer.")
             return None
 
-        if not is_rgb:
+        if is_rgb:
+            writer.append_rgb(
+                reduce(
+                    [reader.get_channel(0, pyramid=0, split_rgb=False) for reader in readers],
+                    reduce_func=reduce_func,
+                    match_histogram=match_histogram,
+                )
+            )
+        else:
             for channel_id, channel_name in enumerate(channel_names):
                 writer.append_channel(
                     channel_id,
                     channel_name,
-                    reduce([reader.get_channel(channel_id, pyramid=0) for reader in readers], reduce_func=reduce_func),
+                    reduce(
+                        [reader.get_channel(channel_id, pyramid=0) for reader in readers],
+                        reduce_func=reduce_func,
+                        match_histogram=match_histogram,
+                    ),
                 )
-        else:
-            writer.append_rgb(
-                reduce(
-                    [reader.get_channel(0, pyramid=0, split_rgb=False) for reader in readers], reduce_func=reduce_func
-                )
-            )
     return output_filename
