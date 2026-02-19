@@ -158,6 +158,76 @@ def match_histograms_auto(img: np.ndarray, ref: np.ndarray) -> np.ndarray:
     return img
 
 
+def _match_channel(source, reference):
+    """Internal helper for single channel matching."""
+    orig_shape = source.shape
+    orig_dtype = source.dtype
+
+    # Flatten for histogram processing
+    source_flat = source.ravel()
+    ref_flat = reference.ravel()
+
+    # For performance on 20k x 20k, we compute the histogram
+    # using a fixed number of bins based on bit-depth.
+    if orig_dtype == np.uint8:
+        bins = 256
+        hist_range = [0, 256]
+    elif orig_dtype == np.uint16:
+        bins = 65536
+        hist_range = [0, 65536]
+    else:  # float32
+        bins = 1024  # Sufficient for most microscopy dynamic ranges
+        hist_range = [source_flat.min(), source_flat.max()]
+
+    # Compute histograms and CDFs
+    s_hist, s_bins = np.histogram(source_flat, bins, range=hist_range)
+    r_hist, r_bins = np.histogram(ref_flat, bins, range=hist_range)
+
+    s_cdf = s_hist.cumsum()
+    s_cdf = (s_cdf - s_cdf.min()) / (s_cdf.max() - s_cdf.min())
+
+    r_cdf = r_hist.cumsum()
+    r_cdf = (r_cdf - r_cdf.min()) / (r_cdf.max() - r_cdf.min())
+
+    # Create the mapping (Interpolate source CDF to reference values)
+    # This finds where the source CDF values would fall on the reference CDF
+    bin_centers = (s_bins[:-1] + s_bins[1:]) / 2
+    ref_bin_centers = (r_bins[:-1] + r_bins[1:]) / 2
+
+    # Use numpy's fast interpolation as a Look-Up Table
+    lookup_table = np.interp(s_cdf, r_cdf, ref_bin_centers)
+
+    # Apply the mapping
+    # For uint8/uint16, we can use a literal LUT. For float, we interpolate.
+    matched = np.interp(source_flat, bin_centers, lookup_table)
+
+    return matched.reshape(orig_shape).astype(orig_dtype)
+
+
+def match_histograms_cv2_alt(image, reference):
+    """
+    Adjust the pixel values of 'image' to match the histogram of 'reference'.
+
+    Args:
+        image (np.ndarray): Source image (uint8, uint16, or float32).
+        reference (np.ndarray): Reference image to match.
+
+    Returns:
+        np.ndarray: The matched image in the original input dtype.
+    """
+    # Determine if image is RGB or Grayscale
+    is_rgb = len(image.shape) == 3 and image.shape[2] == 3
+
+    if is_rgb:
+        # For RGB (H&E or PAS), process channels independently
+        # Alternatively, convert to LAB and match only the 'L' channel
+        matched = np.empty_like(image)
+        for i in range(3):
+            matched[..., i] = _match_channel(image[..., i], reference[..., i])
+        return matched
+    return _match_channel(image, reference)
+
+
 def reduce(
     arrays: np.ndarray,
     reduce_func: ty.Literal["sum", "mean", "max"] = "sum",
@@ -171,7 +241,7 @@ def reduce(
 
         for i in range(len(arrays)):
             if ref is not arrays[i]:
-                arrays[i] = match_histograms_auto(arrays[i], ref)
+                arrays[i] = match_histograms_cv2_alt(arrays[i], ref)
 
     arrays = np.stack(arrays, axis=0)
     if reduce_func == "sum":
