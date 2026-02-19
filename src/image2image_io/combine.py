@@ -11,6 +11,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import dask.array as da
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
@@ -158,74 +159,68 @@ def match_histograms_auto(img: np.ndarray, ref: np.ndarray) -> np.ndarray:
     return img
 
 
-def _match_channel(source, reference):
-    """Internal helper for single channel matching."""
-    orig_shape = source.shape
-    orig_dtype = source.dtype
-
-    # Flatten for histogram processing
-    source_flat = source.ravel()
-    ref_flat = reference.ravel()
-
-    # For performance on 20k x 20k, we compute the histogram
-    # using a fixed number of bins based on bit-depth.
-    if orig_dtype == np.uint8:
-        bins = 256
-        hist_range = [0, 256]
-    elif orig_dtype == np.uint16:
-        bins = 65536
-        hist_range = [0, 65536]
-    else:  # float32
-        bins = 1024  # Sufficient for most microscopy dynamic ranges
-        hist_range = [source_flat.min(), source_flat.max()]
-
-    # Compute histograms and CDFs
-    s_hist, s_bins = np.histogram(source_flat, bins, range=hist_range)
-    r_hist, r_bins = np.histogram(ref_flat, bins, range=hist_range)
-
-    s_cdf = s_hist.cumsum()
-    s_cdf = (s_cdf - s_cdf.min()) / (s_cdf.max() - s_cdf.min())
-
-    r_cdf = r_hist.cumsum()
-    r_cdf = (r_cdf - r_cdf.min()) / (r_cdf.max() - r_cdf.min())
-
-    # Create the mapping (Interpolate source CDF to reference values)
-    # This finds where the source CDF values would fall on the reference CDF
-    bin_centers = (s_bins[:-1] + s_bins[1:]) / 2
-    ref_bin_centers = (r_bins[:-1] + r_bins[1:]) / 2
-
-    # Use numpy's fast interpolation as a Look-Up Table
-    lookup_table = np.interp(s_cdf, r_cdf, ref_bin_centers)
-
-    # Apply the mapping
-    # For uint8/uint16, we can use a literal LUT. For float, we interpolate.
-    matched = np.interp(source_flat, bin_centers, lookup_table)
-
-    return matched.reshape(orig_shape).astype(orig_dtype)
-
-
 def match_histograms_cv2_alt(image, reference):
-    """
-    Adjust the pixel values of 'image' to match the histogram of 'reference'.
-
-    Args:
-        image (np.ndarray): Source image (uint8, uint16, or float32).
-        reference (np.ndarray): Reference image to match.
-
-    Returns:
-        np.ndarray: The matched image in the original input dtype.
-    """
-    # Determine if image is RGB or Grayscale
     is_rgb = len(image.shape) == 3 and image.shape[2] == 3
 
     if is_rgb:
-        # For RGB (H&E or PAS), process channels independently
-        # Alternatively, convert to LAB and match only the 'L' channel
-        matched = np.empty_like(image)
-        for i in range(3):
-            matched[..., i] = _match_channel(image[..., i], reference[..., i])
-        return matched
-    return _match_channel(image, reference)
+        # Process channels independently
+        # Using dask.stack if input is dask to keep it lazy
+        results = [_match_channel(image[..., i], reference[..., i]) for i in range(3)]
+
+        if isinstance(image, da.Array):
+            return da.stack(results, axis=-1)
+        return np.stack(results, axis=-1)
+    else:
+        return _match_channel(image, reference)
+
+
+def _match_channel(source, reference):
+    orig_shape = source.shape
+    orig_dtype = source.dtype
+
+    # Determine if we are using Dask or Numpy
+    is_dask = isinstance(source, da.Array)
+    xp = da if is_dask else np
+
+    # 1. Define bins based on dtype
+    if orig_dtype == np.uint8:
+        bins, h_range = 256, (0, 256)
+    elif orig_dtype == np.uint16:
+        bins, h_range = 65536, (0, 65536)
+    else:  # float32
+        bins, h_range = 1024, (float(source.min()), float(source.max()))
+
+    # 2. Compute Histogram
+    # Dask has its own histogram method to avoid loading the whole image
+    if is_dask:
+        s_hist, s_bins = da.histogram(source, bins=bins, range=h_range)
+        r_hist, r_bins = da.histogram(reference, bins=bins, range=h_range)
+        # Compute the histogram immediately to get the small LUT
+        s_hist, r_hist = da.compute(s_hist, r_hist)
+    else:
+        s_hist, s_bins = np.histogram(source, bins=bins, range=h_range)
+        r_hist, r_bins = np.histogram(reference, bins=bins, range=h_range)
+
+    # 3. Compute CDF (Explicitly set axis=0 to satisfy Dask/consistency)
+    s_cdf = s_hist.cumsum(axis=0).astype(np.float32)
+    s_cdf /= s_cdf[-1]  # Normalize
+
+    r_cdf = r_hist.cumsum(axis=0).astype(np.float32)
+    r_cdf /= r_cdf[-1]  # Normalize
+
+    # 4. Create Lookup Table (LUT)
+    bin_centers = (s_bins[:-1] + s_bins[1:]) / 2
+    ref_bin_centers = (r_bins[:-1] + r_bins[1:]) / 2
+    lookup_table = np.interp(s_cdf, r_cdf, ref_bin_centers)
+
+    # 5. Apply the LUT to the large image
+    # For Dask, we use map_blocks to apply the interpolation chunk-by-chunk
+    if is_dask:
+        matched = source.map_blocks(lambda x: np.interp(x, bin_centers, lookup_table).astype(orig_dtype))
+    else:
+        matched = np.interp(source.ravel(), bin_centers, lookup_table)
+        matched = matched.reshape(orig_shape).astype(orig_dtype)
+    return matched
 
 
 def reduce(
@@ -239,9 +234,11 @@ def reduce(
     if match_histogram:
         ref = arrays[0] if reference is None else reference
 
+        # ref = np.asarray(ref.astype(np.float32))
         for i in range(len(arrays)):
             if ref is not arrays[i]:
-                arrays[i] = match_histograms_cv2_alt(arrays[i], ref)
+                arrays[i] = match_histograms_nan_safe(arrays[i], ref)
+                # arrays[i] = match_histograms(np.asarray(arrays[i]).astype(np.float32), ref)
 
     arrays = np.stack(arrays, axis=0)
     if reduce_func == "sum":
@@ -274,15 +271,14 @@ def combine(
     image_shapes = []
     is_rgb = []
     readers = []
-    with MeasureTimer() as timer:
-        for path_ in paths:
-            path = Path(path_)
-            reader = get_simple_reader(path, init_pyramid=False, auto_pyramid=False)
-            readers.append(reader)
-            pixel_sizes.append(round(reader.resolution, 3))
-            channel_names.append(tuple(reader.channel_names))
-            image_shapes.append(reader.image_shape)
-            is_rgb.append(reader.is_rgb)
+    for path_ in paths:
+        path = Path(path_)
+        reader = get_simple_reader(path, init_pyramid=False, auto_pyramid=False)
+        readers.append(reader)
+        pixel_sizes.append(round(reader.resolution, 3))
+        channel_names.append(tuple(reader.channel_names))
+        image_shapes.append(reader.image_shape)
+        is_rgb.append(reader.is_rgb)
 
     # check that all images have the same shape
     if len(set(image_shapes)) > 1:
@@ -294,10 +290,11 @@ def combine(
     if len(set(channel_names)) > 1:
         logger.error(f"All images must have the same channel names to be combined. ({channel_names})")
         raise ValueError(f"All images must have the same channel names to be combined. ({channel_names})")
-    logger.info(f"Loaded {len(channel_names)} images in {timer()}.")
+    logger.info(f"Loaded {len(channel_names)} images.")
 
     # if the image is RGB, we need to export it slightly differently than if it's a multi-channel image
     is_rgb = is_rgb[0]
+    channel_names = channel_names[0]
 
     output_filename = output_dir / f"{name}-{reduce_func}.ome.tiff"
     writer = OmeTiffWriter(reader=readers[0])
@@ -307,28 +304,26 @@ def combine(
         as_uint8=as_uint8,
         write_pyramid=True,
         overwrite=overwrite,
-    ) as writer:
+    ) as writer, MeasureTimer() as timer:
         if not writer:
             logger.error("Failed to create writer.")
             return None
 
         if is_rgb:
-            writer.append_rgb(
-                reduce(
-                    [reader.get_channel(0, pyramid=0, split_rgb=False) for reader in readers],
+            image = reduce(
+                [reader.get_channel(0, pyramid=0, split_rgb=False) for reader in readers],
+                reduce_func=reduce_func,
+                match_histogram=False,
+            )
+            logger.trace(f"Combined RGB image in {timer()}.")
+            writer.append_rgb(image)
+        else:
+            for channel_id, channel_name in enumerate(channel_names):
+                image = reduce(
+                    [reader.get_channel(channel_id, pyramid=0) for reader in readers],
                     reduce_func=reduce_func,
                     match_histogram=match_histogram,
                 )
-            )
-        else:
-            for channel_id, channel_name in enumerate(channel_names):
-                writer.append_channel(
-                    channel_id,
-                    channel_name,
-                    reduce(
-                        [reader.get_channel(channel_id, pyramid=0) for reader in readers],
-                        reduce_func=reduce_func,
-                        match_histogram=match_histogram,
-                    ),
-                )
+                logger.trace(f"Combined channel '{channel_name} ({channel_id}) in {timer(since_last=True)}")
+                writer.append_channel(channel_id, channel_name, image)
     return output_filename

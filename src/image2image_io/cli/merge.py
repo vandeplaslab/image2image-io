@@ -16,6 +16,15 @@ from image2image_io.enums import WriterMode
 @overwrite_
 @as_uint8_
 @click.option(
+    "-m/-M",
+    "--match/--no_match",
+    "match_histogram",
+    help="Match histogram between images using the first image. It is not applied to RGB images.",
+    is_flag=True,
+    default=True,
+    show_default=True,
+)
+@click.option(
     "-o",
     "--output_dir",
     help="Path to images to be merged.",
@@ -46,11 +55,12 @@ def combine(
     name: str,
     path: ty.Sequence[str],
     output_dir: str,
+    match_histogram: bool,
     as_uint8: bool | None,
     overwrite: bool,
 ) -> None:
     """Combine multiple images into one, merging channels together."""
-    combine_runner(name, path, output_dir, as_uint8=as_uint8, overwrite=overwrite)
+    combine_runner(name, path, output_dir, match_histogram=match_histogram, as_uint8=as_uint8, overwrite=overwrite)
 
 
 def combine_runner(
@@ -58,6 +68,7 @@ def combine_runner(
     paths: ty.Sequence[str],
     output_dir: str,
     reduce_func: ty.Literal["sum", "mean", "max"] = "max",
+    match_histogram: bool = True,
     as_uint8: bool | None = False,
     overwrite: bool = False,
 ) -> None:
@@ -73,7 +84,15 @@ def combine_runner(
     )
 
     with MeasureTimer() as timer:
-        combine_images(name, list(paths), output_dir, as_uint8=as_uint8, overwrite=overwrite, reduce_func=reduce_func)
+        combine_images(
+            name,
+            list(paths),
+            output_dir,
+            as_uint8=as_uint8,
+            overwrite=overwrite,
+            reduce_func=reduce_func,
+            match_histogram=match_histogram,
+        )
     logger.info(f"Finished processing project in {timer()}.")
 
 
