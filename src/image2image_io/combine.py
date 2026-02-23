@@ -10,8 +10,8 @@ import typing as ty
 from pathlib import Path
 
 import cv2
-import numpy as np
 import dask.array as da
+import numpy as np
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
 from loguru import logger
@@ -170,8 +170,7 @@ def match_histograms_cv2_alt(image, reference):
         if isinstance(image, da.Array):
             return da.stack(results, axis=-1)
         return np.stack(results, axis=-1)
-    else:
-        return _match_channel(image, reference)
+    return _match_channel(image, reference)
 
 
 def _match_channel(source, reference):
@@ -180,7 +179,6 @@ def _match_channel(source, reference):
 
     # Determine if we are using Dask or Numpy
     is_dask = isinstance(source, da.Array)
-    xp = da if is_dask else np
 
     # 1. Define bins based on dtype
     if orig_dtype == np.uint8:
