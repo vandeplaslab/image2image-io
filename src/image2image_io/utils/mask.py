@@ -81,7 +81,7 @@ def transform_shapes(shapes: dict[str, np.ndarray], transform: np.ndarray) -> di
     assert "shape_data" in shapes, "Expected 'shape_data' key in shapes data."
     transformed_shapes = {"shape_types": [], "shape_data": []}
     for shape_type, shape_data in zip(shapes["shape_types"], shapes["shape_data"]):
-        shape_data = transform_xy_coordinates(shape_type, yx_affine=transform)
+        shape_data = transform_xy_coordinates(shape_data, yx_affine=transform)
         transformed_shapes["shape_types"].append(shape_type)
         transformed_shapes["shape_data"].append(shape_data)
     return transformed_shapes
