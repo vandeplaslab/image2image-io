@@ -205,6 +205,38 @@ def clip_shape(shape: tuple[int, int], max_size: int = 1000) -> tuple[int, int]:
     return new_h, new_w
 
 
+def get_pyramid_for_min_size(reader, min_size: int = 1024, max_size: int = 2024, pyramid: int | None = None) -> int:
+    """
+    Get the pyramid level closest to min_size while being smaller than max_size.
+    """
+    # If a specific level is suggested, check it first against constraints
+    if pyramid is not None:
+        shape = reader.shape_for_pyramid(pyramid)
+        if max(shape) < max_size:
+            # We still might want to check others to see if they are 'closer'
+            # but if you want to 'force' this one if valid, return here.
+            pass
+
+    best_level = -1
+    min_diff = float("inf")
+
+    # Iterate through all available levels (usually 0 to N-1)
+    for level in range(reader.n_in_pyramid):
+        shape = reader.shape_for_pyramid(level)
+        max_dim = max(shape)
+
+        # Constraint: Must be smaller than max_size
+        if max_dim < max_size:
+            # Objective: Smallest absolute distance to min_size
+            diff = abs(max_dim - min_size)
+
+            if diff < min_diff:
+                min_diff = diff
+                best_level = level
+
+    return best_level
+
+
 def get_flat_shape_of_image(array_or_shape: np.ndarray | tuple[int, ...]) -> tuple[int, int]:
     """Return shape of an image."""
     n_channels, _, shape = get_shape_of_image(array_or_shape)

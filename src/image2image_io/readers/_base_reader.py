@@ -721,6 +721,14 @@ class BaseReader:
         resolution = self.resolution * 2**pyramid
         return resolution, resolution
 
+    def shape_for_pyramid(self, pyramid: int) -> tuple[int, int]:
+        """Get shape for pyramid level."""
+        image_shape = self.image_shape
+        scale_x, scale_y = self.scale_for_pyramid(pyramid)
+        shape_x = int(image_shape[0] * self.resolution / scale_x)
+        shape_y = int(image_shape[1] * self.resolution / scale_y)
+        return shape_x, shape_y
+
     def scale_for_shape(self, shape: tuple[int, int]) -> tuple[float, float]:
         """Return scale for shape."""
         from image2image_io.utils.utilities import get_shape_of_image
