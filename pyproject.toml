@@ -39,7 +39,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "koyo>=0.3.2",
+    "koyo>=0.3.4",
     "zarr",
     "h5py",
     "imzy",
