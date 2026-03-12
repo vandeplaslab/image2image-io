@@ -5,7 +5,7 @@ from __future__ import annotations
 import typing as ty
 
 import click
-from koyo.click import Parameter, arg_parse_framelist_multi, cli_parse_paths_sort, print_parameters
+from koyo.click import Parameter, arg_parse_int_with_range_multi, cli_parse_paths_sort, print_parameters
 from koyo.timer import MeasureTimer
 from loguru import logger
 
@@ -106,7 +106,7 @@ def combine_runner(
     default=None,
     help="Specify channel ids in the format: 1,2,4-6. You can provide multiple. If you are providing any, make sure to"
     " provide one for each file you are trying to merge.",
-    callback=arg_parse_framelist_multi,
+    callback=arg_parse_int_with_range_multi,
     show_default=True,
     multiple=True,
     required=False,
