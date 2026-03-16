@@ -84,9 +84,9 @@ def get_affine_from_config(
     return affine_matrix, fixed_image_shape, fixed_pixel_size_um, moving_image_shape, moving_pixel_size_um
 
 
-def rescale_affine(affine: np.ndarray, scale: float) -> np.ndarray:
+def rescale_affine(affine: np.ndarray, scale: float, with_translation: bool = False) -> np.ndarray:
     """Rescale affine transformation matrix by a given scale factor.
-    
+
     This assumes that the following affine matrix is in the form:
         [ a11 a12 tx ]
         [ a21 a22 ty ]
@@ -95,9 +95,37 @@ def rescale_affine(affine: np.ndarray, scale: float) -> np.ndarray:
     and the last column represents translation.
     """
     scaled_affine = np.copy(affine)
-    scaled_affine[:2, :2] *= scale
-    # Note: Translation components are not scaled here; adjust if needed.
+    if with_translation:
+        scaled_affine[:2, :] *= scale
+    else:
+        scaled_affine[:2, :2] *= scale
     return scaled_affine
+
+
+def affine_physical_to_pixel(
+    affine_inv_micron: np.ndarray,
+    input_pixel_size: float,
+    output_pixel_size: float,
+) -> np.ndarray:
+    """Convert an inverse affine matrix from micron space to pixel index space.
+
+    Applies:  T_pixel = S_out_inv · T_micron · S_in
+    where S converts pixels → microns (diagonal scale matrix).
+    """
+
+    def _scale_matrix(px_size: float) -> np.ndarray:
+        return np.array(
+            [
+                [px_size, 0, 0],
+                [0, px_size, 0],
+                [0, 0, 1],
+            ],
+            dtype=np.float64,
+        )
+
+    s_in = _scale_matrix(input_pixel_size)
+    s_out_inv = _scale_matrix(1.0 / output_pixel_size)
+    return s_out_inv @ affine_inv_micron @ s_in
 
 
 def arrange_warped(warped: list[np.ndarray], is_rgb: bool) -> np.ndarray:
@@ -106,7 +134,7 @@ def arrange_warped(warped: list[np.ndarray], is_rgb: bool) -> np.ndarray:
     warped = np.dstack(warped)
     # ensure that RGB remains RGB but AF remain AF
     if warped.ndim == 3 and not is_rgb:
-    # if warped.ndim == 3 and np.argmin(warped.shape) == 2 and not is_rgb:
+        # if warped.ndim == 3 and np.argmin(warped.shape) == 2 and not is_rgb:
         warped = np.moveaxis(warped, 2, 0)
     return warped
 

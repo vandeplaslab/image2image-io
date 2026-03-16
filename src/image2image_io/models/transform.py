@@ -202,6 +202,7 @@ class TransformModel(BaseModel):
         return None
 
     def get_info(self) -> str:
+        """Get information about the transformation."""
         info = ""
         transform = self.compute()
         if hasattr(transform, "scale"):
