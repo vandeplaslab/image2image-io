@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import dask.array
 import numpy as np
 import SimpleITK as sitk
 from koyo.timer import MeasureTimer
 from koyo.typing import PathLike
+from koyo.transform import warp_channel, arrange_warped
 from loguru import logger
 from tqdm import trange
 
@@ -128,17 +128,6 @@ def affine_physical_to_pixel(
     return s_out_inv @ affine_inv_micron @ s_in
 
 
-def arrange_warped(warped: list[np.ndarray], is_rgb: bool) -> np.ndarray:
-    """Arrange warped images into a single array."""
-    # stack image
-    warped = np.dstack(warped)
-    # ensure that RGB remains RGB but AF remain AF
-    if warped.ndim == 3 and not is_rgb:
-        # if warped.ndim == 3 and np.argmin(warped.shape) == 2 and not is_rgb:
-        warped = np.moveaxis(warped, 2, 0)
-    return warped
-
-
 def warp_path(config_path: PathLike, from_transform: PathLike, order: int = 1) -> np.ndarray:
     """Warp image with image2image transformation matrix."""
     from image2image_io.readers import get_simple_reader
@@ -155,7 +144,7 @@ def warp_path(config_path: PathLike, from_transform: PathLike, order: int = 1) -
     # due to a limitation in the opencv implementation, we need to use scipy if the image is too large
     warped = []
     for channel in trange(from_reader.n_channels, desc="Warping images..."):
-        warped.append(warp_channel(affine_inv, fixed_image_shape, from_reader.get_channel(channel), order=order))
+        warped.append(warp_channel(from_reader.get_channel(channel), affine_inv, fixed_image_shape, order=order))
     return arrange_warped(warped, from_reader.is_rgb)
 
 
@@ -164,7 +153,7 @@ def warp_reader(affine_inv: np.ndarray, output_shape: tuple[int, int], reader, o
     # due to a limitation in the opencv implementation, we need to use scipy if the image is too large
     warped = []
     for channel in trange(reader.n_channels, desc="Warping images..."):
-        warped.append(warp_channel(affine_inv, output_shape, reader.get_channel(channel), order=order))
+        warped.append(warp_channel(reader.get_channel(channel), affine_inv, output_shape, order=order))
     return arrange_warped(warped, reader.is_rgb)
 
 
@@ -173,43 +162,42 @@ def warp(affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarra
     from image2image_io.utils.utilities import guess_rgb
 
     if image.ndim == 2:
-        return warp_channel(affine_inv, output_shape, image, order=order)
+        return warp_channel(image, affine_inv, output_shape, order=order)
     if image.ndim == 3:
         warped = []
         is_rgb = guess_rgb(image.shape)
         if is_rgb:
             for c in range(image.shape[2]):
-                warped.append(warp_channel(affine_inv, output_shape, image[:, :, c], order=order))
+                warped.append(warp_channel(image[:, :, c], affine_inv, output_shape, order=order))
         else:
             for c in range(image.shape[0]):
-                warped.append(warp_channel(affine_inv, output_shape, image[c], order=order))
+                warped.append(warp_channel(image[c], affine_inv, output_shape, order=order))
         return arrange_warped(warped, is_rgb=is_rgb)
     raise ValueError(f"Unsupported image dimension: {image.ndim}")
 
 
-def warp_channel(
-    affine_inv: np.ndarray, output_shape: tuple[int, int], image: np.ndarray, order: int = 1, silent: bool = False
-) -> np.ndarray:
-    """Warp image."""
-    import cv2
-    from scipy.ndimage import affine_transform
+def warp_points(yx: np.ndarray, fwd_affine: np.ndarray) -> np.ndarray:
+    """
+    Apply a 3x3 homogeneous affine matrix to yx pixel coordinates (forward mapping).
 
-    assert image.ndim == 2, "Only 2D images are supported for warping in this function."
-    use_cv2 = max(max(image.shape), max(output_shape)) < 32767
-    if not silent:
-        logger.trace(f"Using {'cv2' if use_cv2 else 'scipy'} for warping.")
-    if use_cv2:
-        if isinstance(image, dask.array.Array):
-            image = image.compute()
-        warped = cv2.warpAffine(
-            image.T,
-            np.linalg.inv(affine_inv)[:2, :],
-            output_shape,
-            flags=cv2.INTER_NEAREST if order == 0 else cv2.INTER_LINEAR,
-        ).T
-    else:
-        warped = affine_transform(image, affine_inv, order=order, output_shape=output_shape)
-    return warped
+    Parameters
+    ----------
+    yx : (N, 2) ndarray of float — [[y0, x0], [y1, x1], ...]
+    fwd_affine : (3, 3) homogeneous affine matrix in yx pixel space.
+
+    Returns
+    -------
+    coords_out : (N, 2) ndarray of float
+    """
+    if fwd_affine.shape != (3, 3):
+        raise ValueError(f"Expected (3, 3) matrix, got {fwd_affine.shape}")
+    if yx.ndim != 2 or yx.shape[1] != 2:
+        raise ValueError(f"Expected (N, 2) coords, got {yx.shape}")
+
+    ones = np.ones((len(yx), 1), dtype=yx.dtype)
+    coords_h = np.hstack([yx, ones])  # (N, 3)
+    result_h = (fwd_affine @ coords_h.T).T  # (N, 3)
+    return result_h[:, :2] / result_h[:, 2:3]  # dehomogenise
 
 
 class ImageWarper:
@@ -234,7 +222,7 @@ class ImageWarper:
             is_sitk = isinstance(image, sitk.Image)
             if is_sitk:
                 image = sitk.GetArrayFromImage(image)
-            image = warp_channel(self.affine_inv, self.output_size_yx, image)
+            image = warp_channel(image, self.affine_inv, self.output_size_yx)
             assert image.shape == self.output_size_yx, f"Image shape mismatch: {image.shape} != {self.output_size_yx}"
             if is_sitk:
                 image = sitk.GetImageFromArray(image)
