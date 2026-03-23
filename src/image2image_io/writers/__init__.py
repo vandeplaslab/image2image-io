@@ -392,6 +392,7 @@ def write_ome_tiff_from_array(
     as_uint8: bool | None = None,
     ome_name: str | None = None,
     write_pyramid: bool = True,
+    overwrite: bool = False,
 ) -> Path:
     """Write OME-TIFF by also specifying an array."""
     from image2image_io.readers.array_reader import ArrayImageReader
@@ -418,6 +419,7 @@ def write_ome_tiff_from_array(
         tile_size=tile_size,
         as_uint8=as_uint8,
         ome_name=ome_name,
+        overwrite=overwrite,
     )
 
 
