@@ -49,7 +49,7 @@ class CoordinateImagerMixin:
     def get_random_image(self) -> np.ndarray:
         """Return random ion image."""
         array = np.full(self.image_shape, np.nan)
-        array[self.y - self.ymin, self.x - self.xmin] = np.random.randint(128, 255, size=len(self.x)) / 255
+        array[self.y - self.ymin, self.x - self.xmin] = np.random.default_rng().integers(128, 255, size=len(self.x)) / 255
         return array
 
 

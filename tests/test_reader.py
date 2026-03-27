@@ -92,7 +92,7 @@ def test_get_simple_reader_geojson(path):
 
 
 def test_thumbnail(tmp_path):
-    array = np.random.randint(0, 255, (1000, 1000, 3), dtype=np.uint8)
+    array = np.random.default_rng().integers(0, 255, (1000, 1000, 3), dtype=np.uint8)
     reader = ArrayImageReader(tmp_path, array, resolution=1.0)
     assert reader.is_rgb, "Array should be rgb"
     thumbnail, scale = reader.get_thumbnail(100)
@@ -105,7 +105,7 @@ def test_thumbnail(tmp_path):
 
 
 def test_crop_bbox_rgb(tmp_path):
-    array = np.random.randint(0, 255, (1024, 1024, 3), dtype=np.uint8)
+    array = np.random.default_rng().integers(0, 255, (1024, 1024, 3), dtype=np.uint8)
     reader = ArrayImageReader(tmp_path, array)
     assert reader.is_rgb, "Array should be rgb"
 
@@ -134,7 +134,7 @@ def test_crop_bbox_multichannel(tmp_path, dtype):
 
 
 def test_crop_polygon_rgb(tmp_path):
-    array = np.random.randint(0, 255, (1024, 1024, 3), dtype=np.uint8)
+    array = np.random.default_rng().integers(0, 255, (1024, 1024, 3), dtype=np.uint8)
     reader = ArrayImageReader(tmp_path, array)
     assert reader.is_rgb, "Array should be rgb"
 

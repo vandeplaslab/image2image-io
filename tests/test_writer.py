@@ -9,7 +9,7 @@ from image2image_io.writers import MergeOmeTiffWriter, OmeTiffWrapper, OmeTiffWr
 
 
 def test_write_rgb_array(tmp_path):
-    array = np.random.randint(0, 255, (1024, 1024, 3), dtype=np.uint8)
+    array = np.random.default_rng().integers(0, 255, (1024, 1024, 3), dtype=np.uint8)
     reader = ArrayImageReader(tmp_path, array)
     assert reader.is_rgb, "Array should be rgb"
     writer = OmeTiffWriter(reader)
@@ -90,7 +90,7 @@ def test_write_lazy_multichannel(tmp_path):
 
 
 def test_write_lazy_rgb(tmp_path):
-    array = np.random.randint(0, 255, (1024, 1024, 3), dtype=np.uint8)
+    array = np.random.default_rng().integers(0, 255, (1024, 1024, 3), dtype=np.uint8)
 
     channel_names = ["R", "G", "B"]
     resolution = 0.5

@@ -10,7 +10,7 @@ from image2image_io.writers import OmeTiffWriter
 tmp = tempfile.TemporaryDirectory()
 tmp_path = tmp.name
 
-array = np.random.randint(0, 255, (1024, 1024, 3), dtype=np.uint8)
+array = np.random.default_rng().integers(0, 255, (1024, 1024, 3), dtype=np.uint8)
 reader = ArrayImageReader(tmp_path, array)
 assert reader.is_rgb, "Array should be rgb"
 writer = OmeTiffWriter(reader)

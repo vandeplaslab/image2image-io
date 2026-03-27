@@ -86,8 +86,7 @@ def read_shapes_from_df(df: pd.DataFrame) -> tuple:
     group_by = get_column_name(df, ["cell", "cell_id", "shape", "shape_name"])
     is_points = x_key == "x"
     shapes_geojson, shape_data = [], []
-    for group, indices in df.groupby(group_by).groups.items():
-        dff = df.iloc[indices]
+    for group, dff in df.groupby(group_by):
         shape_data.append(
             {
                 "array": np.c_[dff[x_key].values, dff[y_key].values].astype(np.float32),
@@ -222,7 +221,7 @@ class ShapesReader(BaseReader):
             n_subsample = int(CONFIG.subsample_ratio * n_shapes)
             logger.trace(f"Subsampling to {n_subsample:,} shapes.")
             with temporary_seed(CONFIG.subsample_random_seed, skip_if_negative_one=True):
-                indices = np.random.choice(n_shapes, n_subsample, replace=False)
+                indices = np.random.default_rng().choice(n_shapes, n_subsample, replace=False)
             shapes_geojson = [shapes_geojson[i] for i in indices]
             shape_data = [shape_data[i] for i in indices]
 

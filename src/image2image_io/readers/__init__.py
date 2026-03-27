@@ -578,7 +578,7 @@ def _read_centroids_h5_coordinates_without_metadata(path: Path) -> tuple[Path, d
             labels = f["Annotations/annotations/annotations"][:]
             labels = [label.decode() for label in labels]
         centroids = f["Array"]["array"][:]  # retrieve ion images
-        tic = np.random.randint(128, 255, len(x), dtype=np.uint8)
+        tic = np.random.default_rng().integers(128, 255, len(x), dtype=np.uint8)
     tic = reshape(x, y, tic)
     key = get_key(path)
     reader = CoordinateImageReader(path, x, y, resolution=resolution, array_or_reader=tic, key=key)

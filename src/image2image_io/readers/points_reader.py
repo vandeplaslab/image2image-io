@@ -86,7 +86,7 @@ class PointsReader(BaseReader):
             n_subsample = int(CONFIG.subsample_ratio * n_points)
             logger.trace(f"Subsampling to {n_subsample:,} points.")
             with temporary_seed(CONFIG.subsample_random_seed, skip_if_negative_one=True):
-                indices = np.random.choice(n_points, n_subsample, replace=False)
+                indices = np.random.default_rng().choice(n_points, n_subsample, replace=False)
             x = x[indices]
             y = y[indices]
             df = df.iloc[indices]
