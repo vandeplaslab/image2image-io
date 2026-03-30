@@ -160,7 +160,8 @@ def read_geojson(json_file: PathLike) -> tuple[list, list, bool]:
             "shape_name": str - name inherited from QuPath GeoJSON
     """
     if Path(json_file).suffix != ".zip":
-        gj_data = json.load(open(json_file))
+        with Path(json_file).open() as fh:
+            gj_data = json.load(fh)
     else:
         with zipfile.ZipFile(json_file, "r") as z:
             for filename in z.namelist():
@@ -177,7 +178,8 @@ def _parse_geojson_data(gj_data: dict | list) -> tuple[list, list, bool]:
 
     shapes_np, is_points = [], False
     for gj in gj_data:
-        data, is_points = geojson_to_numpy(gj)
+        data, shape_is_points = geojson_to_numpy(gj)
+        is_points = is_points or shape_is_points
         shapes_np.extend(data)
     gj_data = [add_unnamed(gj) for gj in gj_data]
     return gj_data, shapes_np, is_points

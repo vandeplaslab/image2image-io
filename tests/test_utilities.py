@@ -3,6 +3,7 @@
 import dask.array as da
 import numpy as np
 import pandas as pd
+import polars as pl
 import pytest
 
 from image2image_io.utils.utilities import (
@@ -78,6 +79,11 @@ def test_if_shapes(columns):
 
     df = pd.DataFrame({x_col: [1, 2, 3], y_col: [4, 5, 6], either[1]: ["a", "b", "c"]})
     assert check_df_columns(df, [x_col, y_col], [either]), "Expected columns to be valid."
+
+
+def test_if_shapes_polars_string_dtype():
+    df = pl.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6], "cell": ["a", "b", "c"]})
+    assert check_df_columns(df, ["x", "y"], [("cell", "cell_id")], (np.dtype("O"), np.dtype("S")))
 
 
 def test_sort_pyramid_ordered():

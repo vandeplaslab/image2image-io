@@ -9,6 +9,7 @@ from xml.etree import ElementTree as ET
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from dask import array as da
 from koyo.typing import PathLike
 
@@ -420,22 +421,32 @@ def grayscale(rgb_image: np.ndarray | da.Array, is_interleaved: bool = False) ->
 
 
 def check_df_columns(
-    df: pd.DataFrame,
+    df: pd.DataFrame | pl.DataFrame,
     required: list[str],
     either: list[tuple[str, ...]] | None = None,
     either_dtype: tuple[np.dtype, ...] | None = None,
 ) -> bool:
     """Check if a DataFrame has the required columns."""
+    def _dtype_matches(dtype: ty.Any) -> bool:
+        if dtype in either_dtype:
+            return True
+        if isinstance(df, pl.DataFrame):
+            if dtype == pl.String:
+                return np.dtype("O") in either_dtype or np.dtype("S") in either_dtype
+            if dtype == pl.Binary:
+                return np.dtype("S") in either_dtype
+        return False
+
     if not all(col in df.columns for col in required):
         return False
     if either is not None:
         if either_dtype is not None:
-            return all(any((col in df.columns) and (df[col].dtype in either_dtype) for col in cols) for cols in either)
+            return all(any((col in df.columns) and _dtype_matches(df[col].dtype) for col in cols) for cols in either)
         return all(any(col in df.columns for col in cols) for cols in either)
     return True
 
 
-def get_column_name(df: pd.DataFrame, options: list[str]) -> str:
+def get_column_name(df: pd.DataFrame | pl.DataFrame, options: list[str]) -> str:
     """Get columns from a DataFrame."""
     for key in options:
         if key in df.columns:
