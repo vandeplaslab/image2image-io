@@ -43,7 +43,7 @@ dependencies = [
     "zarr",
     "h5py",
     "imzy",
-    "czifile>=2019.7.2.1",
+    "czifile>=2019.7.2.1,<2026.3.12",
     "dask[array,distributed]",
     "tifffile<2025.5.10",  # required until we fix zarr-v3 issues
     "imagecodecs",
