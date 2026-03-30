@@ -6,7 +6,7 @@ import typing as ty
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from koyo.rand import temporary_seed
 from koyo.typing import PathLike
 from loguru import logger
@@ -24,21 +24,24 @@ if ty.TYPE_CHECKING:
 PATH_IF_COUNT = 1_000
 
 
+def _read_delimited_shapes(path: Path, n_rows: int | None = None) -> pl.DataFrame:
+    """Read a delimited shapes file."""
+    temp = pl.read_csv(path, separator="\t", n_rows=1)
+    sep = "\t" if len(temp.columns) > 1 else " "
+    return pl.read_csv(path, separator=sep, n_rows=n_rows)
+
+
 def is_txt_and_has_columns(
     path: PathLike, required: list[str], either: list[tuple[str, ...]], either_dtype: tuple[np.dtype, ...] | None = None
 ) -> bool:
     """Check if a text file has the required columns."""
-    import pandas as pd
-
     path = Path(path)
     if path.suffix == ".csv":
-        df = pd.read_csv(path, nrows=1)
+        df = pl.read_csv(path, n_rows=1)
     elif path.suffix in [".txt", ".tsv"]:
-        temp = pd.read_csv(path, delimiter="\t", nrows=1)
-        sep = "\t" if len(temp.columns) > 1 else " "
-        df = pd.read_csv(path, delimiter=sep, nrows=1)
+        df = _read_delimited_shapes(path, n_rows=1)
     elif path.suffix == ".parquet":
-        df = pd.read_parquet(path)
+        df = pl.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
     return check_df_columns(df, required, either, either_dtype)
@@ -48,13 +51,11 @@ def get_shape_columns(path: PathLike) -> tuple[str, str, str | None]:
     """Get columns."""
     path = Path(path)
     if path.suffix == ".csv":
-        df = pd.read_csv(path, nrows=1)
+        df = pl.read_csv(path, n_rows=1)
     elif path.suffix in [".txt", ".tsv"]:
-        temp = pd.read_csv(path, delimiter="\t", nrows=1)
-        sep = "\t" if len(temp.columns) > 1 else " "
-        df = pd.read_csv(path, delimiter=sep, nrows=1)
+        df = _read_delimited_shapes(path, n_rows=1)
     elif path.suffix == ".parquet":
-        df = pd.read_parquet(path)
+        df = pl.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
     x_key = get_column_name(df, ["vertex_x", "x", "x:x", "x_location", "x_centroid"])
@@ -67,29 +68,35 @@ def read_shapes(path: PathLike) -> tuple:
     """Read shapes."""
     path = Path(path)
     if path.suffix == ".csv":
-        df = pd.read_csv(path)
+        df = pl.read_csv(path)
     elif path.suffix in [".txt", ".tsv"]:
-        temp = pd.read_csv(path, delimiter="\t", nrows=1)
-        sep = "\t" if len(temp.columns) > 1 else " "
-        df = pd.read_csv(path, delimiter=sep)
+        df = _read_delimited_shapes(path)
     elif path.suffix == ".parquet":
-        df = pd.read_parquet(path)
+        df = pl.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
     return read_shapes_from_df(df)
 
 
-def read_shapes_from_df(df: pd.DataFrame) -> tuple:
+def _normalize_group_name(group: ty.Any) -> ty.Any:
+    """Normalize a polars group key to a scalar for single-column grouping."""
+    if isinstance(group, tuple) and len(group) == 1:
+        return group[0]
+    return group
+
+
+def read_shapes_from_df(df: pl.DataFrame) -> tuple:
     """Read shapes from DataFrame."""
     x_key = get_column_name(df, ["vertex_x", "x"])
     y_key = get_column_name(df, ["vertex_y", "y"])
     group_by = get_column_name(df, ["cell", "cell_id", "shape", "shape_name"])
     is_points = x_key == "x"
     shapes_geojson, shape_data = [], []
-    for group, dff in df.groupby(group_by):
+    for group, dff in df.group_by(group_by, maintain_order=True):
+        group = _normalize_group_name(group)
         shape_data.append(
             {
-                "array": np.c_[dff[x_key].values, dff[y_key].values].astype(np.float32),
+                "array": np.c_[dff[x_key].to_numpy(), dff[y_key].to_numpy()].astype(np.float32),
                 "shape_type": "polygon",
                 "shape_name": group,
             }
@@ -98,7 +105,7 @@ def read_shapes_from_df(df: pd.DataFrame) -> tuple:
     return shapes_geojson, shape_data, is_points
 
 
-def napari_to_shapes_data(name: str, data: list[np.ndarray], shapes: list[str]) -> dict:
+def napari_to_shapes_data(name: str, data: list[np.ndarray], shapes: list[str]) -> list[dict]:
     """Convert napari shapes to data."""
     shape_data = []
     for array, _shape_type in zip(data, shapes):
@@ -112,7 +119,7 @@ def napari_to_shapes_data(name: str, data: list[np.ndarray], shapes: list[str]) 
     return shape_data
 
 
-def read_data(path: Path) -> dict[str, dict[str, np.ndarray | str], bool]:
+def read_data(path: Path) -> tuple[list, dict[str, np.ndarray | str], bool]:
     """Read data."""
     if path.suffix.lower() in [".json", ".geojson"]:
         geojson_data, shape_data, is_points = read_geojson(path)
@@ -271,14 +278,14 @@ class ShapesReader(BaseReader):
     def to_points_kwargs(self, face_color: str, **kwargs: ty.Any) -> dict:
         """Return data so it's compatible with Shapes layer."""
         df = _convert_geojson_to_df(self.shape_data)
-        x = df["x"].values
-        y = df["y"].values
+        x = df["x"].to_numpy()
+        y = df["y"].to_numpy()
         n = len(x)
         size = 15
-        if n > 5_000:
-            size = 5
-        elif n > 50_000:
+        if n > 50_000:
             size = 1
+        elif n > 5_000:
+            size = 5
 
         kws = {
             "data": np.c_[y, x],
@@ -308,16 +315,20 @@ class ShapesReader(BaseReader):
             name = shape["shape_name"] + f"-{i}"
             # create numpy array with x, y, shape-name columns
             data.append(np.c_[shape["array"], np.full(shape["array"].shape[0], name)])
+        if not data:
+            return pl.DataFrame(schema={"x": pl.Float32, "y": pl.Float32, "shape": pl.String})
         # concatenate all arrays
         data = np.concatenate(data)
         # create DataFrame
-        df = pd.DataFrame(data, columns=["x", "y", "shape"])
-        return df.astype({"x": np.float32, "y": np.float32})
+        return pl.DataFrame(data, schema=["x", "y", "shape"], orient="row").with_columns(
+            pl.col("x").cast(pl.Float32),
+            pl.col("y").cast(pl.Float32),
+        )
 
     def to_csv(self, path: PathLike, as_px: bool = False) -> Path:
         """Export data as CSV file."""
         df = self.to_table()
-        df.to_csv(path, index=False)
+        df.write_csv(path)
         return Path(path)
 
     @property
@@ -328,7 +339,7 @@ class ShapesReader(BaseReader):
         return (0,)
 
 
-def _convert_geojson_to_df(shape_data: list[dict]) -> pd.DataFrame:
+def _convert_geojson_to_df(shape_data: list[dict]) -> pl.DataFrame:
     """Convert GeoJSON data so that it can be transformed back to GeoJSON."""
     # types: pt = Point; pg = Polygon; mp = MultiPolygon
     data = []  # columns: x, y, unique_index, inner, outer, type
@@ -336,4 +347,5 @@ def _convert_geojson_to_df(shape_data: list[dict]) -> pd.DataFrame:
         data.append(feature["array"])
     if data:
         data = np.concatenate(data)
-    return pd.DataFrame(data, columns=["x", "y"])
+        return pl.DataFrame(data, schema=["x", "y"], orient="row")
+    return pl.DataFrame(schema={"x": pl.Float32, "y": pl.Float32})

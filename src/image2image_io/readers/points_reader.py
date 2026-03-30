@@ -6,7 +6,7 @@ import typing as ty
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from koyo.rand import temporary_seed
 from koyo.typing import PathLike
 from loguru import logger
@@ -16,17 +16,27 @@ from image2image_io.readers._base_reader import BaseReader
 from image2image_io.utils.utilities import get_column_name
 
 
-def read_points(path: PathLike, return_df: bool = False) -> tuple[np.ndarray, np.ndarray, pd.DataFrame] | pd.DataFrame:
+def _read_delimited_points(path: Path) -> pl.DataFrame:
+    """Read delimited points file."""
+    temp = pl.read_csv(path, separator="\t", n_rows=1)
+    sep = "\t" if len(temp.columns) > 1 else " "
+    return pl.read_csv(path, separator=sep)
+
+
+def _frame_to_features(df: pl.DataFrame) -> dict[str, list[ty.Any]]:
+    """Convert a Polars DataFrame to a features-compatible mapping."""
+    return df.to_dict(as_series=False)
+
+
+def read_points(path: PathLike, return_df: bool = False) -> tuple[np.ndarray, np.ndarray, pl.DataFrame] | pl.DataFrame:
     """Read points from CSV/parquet file."""
     path = Path(path)
     if path.suffix == ".csv":
-        df = pd.read_csv(path)
+        df = pl.read_csv(path)
     elif path.suffix in [".txt", ".tsv"]:
-        temp = pd.read_csv(path, delimiter="\t", nrows=1)
-        sep = "\t" if len(temp.columns) > 1 else " "
-        df = pd.read_csv(path, delimiter=sep)
+        df = _read_delimited_points(path)
     elif path.suffix == ".parquet":
-        df = pd.read_parquet(path)
+        df = pl.read_parquet(path)
     else:
         raise ValueError(f"Invalid file extension: {path.suffix}")
     if return_df:
@@ -34,23 +44,24 @@ def read_points(path: PathLike, return_df: bool = False) -> tuple[np.ndarray, np
     return read_points_from_df(df)
 
 
-def read_points_from_df(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+def read_points_from_df(df: pl.DataFrame) -> tuple[np.ndarray, np.ndarray, pl.DataFrame]:
     """Read points from DataFrame."""
     x_key = get_column_name(df, ["x", "x_location", "x_centroid", "x:x"])
     y_key = get_column_name(df, ["y", "y_location", "y_centroid", "y:y"])
     if x_key not in df.columns or y_key not in df.columns:
         raise ValueError(f"Invalid columns: {df.columns}")
-    x = df[x_key].values
-    y = df[y_key].values
-    return x, y, df.drop(columns=[x_key, y_key])
+    x = df[x_key].to_numpy()
+    y = df[y_key].to_numpy()
+    return x, y, df.drop([x_key, y_key])
 
 
-def get_channel_names_from_df(df: pd.DataFrame) -> tuple[str, list[str]]:
+def get_channel_names_from_df(df: pl.DataFrame) -> tuple[str, list[str]]:
     """Return list of column names. This is very specific and might break under certain circumstances."""
-    filter_col = get_column_name(df, ["feature_name", "name"])
-    if not filter_col:
+    try:
+        filter_col = get_column_name(df, ["feature_name", "name"])
+    except ValueError:
         return "", list(df.columns)
-    return filter_col, list(df[filter_col].unique())
+    return filter_col, df[filter_col].unique().to_list()
 
 
 class PointsReader(BaseReader):
@@ -76,7 +87,7 @@ class PointsReader(BaseReader):
     def to_points(self) -> tuple[str, dict[str, np.ndarray | str]]:
         """Convert to shapes that can be exported to Shapes layer."""
         x, y, df = self.parse_data()
-        return "points", {"data": np.c_[y, x], "properties": df}
+        return "points", {"data": np.c_[y, x], "properties": _frame_to_features(df)}
 
     def parse_data(self) -> tuple:
         """Parse data."""
@@ -89,7 +100,7 @@ class PointsReader(BaseReader):
                 indices = np.random.default_rng().choice(n_points, n_subsample, replace=False)
             x = x[indices]
             y = y[indices]
-            df = df.iloc[indices]
+            df = df[indices]
         return x, y, df
 
     def to_points_kwargs(self, face_color: str, **kwargs: ty.Any) -> dict:
@@ -101,7 +112,7 @@ class PointsReader(BaseReader):
             "data": np.c_[y, x],
             "scale": self.scale,
             "affine": self.transform,
-            "features": df,
+            "features": _frame_to_features(df),
             "face_color": face_color,
             "size": 5 if n < 50_000 else 1,
         }

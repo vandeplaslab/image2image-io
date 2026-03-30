@@ -39,7 +39,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "koyo>=0.3.4",
+    "koyo>=0.3.5",
     "zarr",
     "h5py",
     "imzy",
@@ -59,8 +59,8 @@ dependencies = [
     "dicttoxml",
     "appdirs",
     "geojson",
+    "polars[pandas]",
     "pyarrow",
-    "fastparquet",
     "numcodecs<0.16.0; python_version < '3.14'",
 #    "numcodecs>=0.16.0; python_version >= '3.13'",  # as long as we don't allow zarr-v3
     "zarr<3",
