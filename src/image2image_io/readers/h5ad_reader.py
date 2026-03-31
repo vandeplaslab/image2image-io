@@ -16,18 +16,23 @@ from scipy import sparse
 
 from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
-from image2image_io.readers.points_reader import _frame_to_features
 
 if ty.TYPE_CHECKING:
     from scipy.sparse import spmatrix
 
 
+def _frame_to_features(df: pl.DataFrame) -> dict[str, list[ty.Any]]:
+    """Convert a Polars DataFrame to a features-compatible mapping."""
+    return df.to_dict(as_series=False)
+
+
 def _decode_array(values: np.ndarray) -> list[ty.Any]:
     """Decode an HDF5 string-like array."""
     array = np.asarray(values)
-    if array.dtype.kind == "S":
-        return [value.decode("utf-8") for value in array.tolist()]
-    return array.tolist()
+    decoded = array.tolist()
+    if not isinstance(decoded, list):
+        decoded = [decoded]
+    return [value.decode("utf-8") if isinstance(value, bytes) else value for value in decoded]
 
 
 def _read_dataframe_group(group: h5py.Group) -> pl.DataFrame:
