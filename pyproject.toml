@@ -66,6 +66,11 @@ dependencies = [
     "zarr<3",
 ]
 
+[optional-dependencies]
+bfio = [
+    "bffile>=0.1.1",
+]
+
 [dependency-groups]
 test = [
     "pytest>=8.3.5",
