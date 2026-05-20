@@ -718,7 +718,11 @@ class BaseReader:
         if pyramid < 0:
             pyramid = list(range(self.n_in_pyramid))[pyramid]
             # pyramid = range(self.n_in_pyramid)[pyramid] + 1
-        resolution = self.resolution * 2**pyramid
+        shapes = [self.get_image_shape_for_shape(pyr.shape) for pyr in self.pyramid]
+        shape_original = shapes[0]
+        shape_pyramid = shapes[pyramid]
+        scale = np.array(shape_original) / np.array(shape_pyramid)
+        resolution = self.resolution * np.mean(scale)  # 2**pyramid
         return resolution, resolution
 
     def shape_for_pyramid(self, pyramid: int) -> tuple[int, int]:
