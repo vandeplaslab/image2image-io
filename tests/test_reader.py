@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from image2image_io.readers import ArrayImageReader, get_simple_reader
+from image2image_io.readers.czi_reader import CziImageReader, CziSceneImageReader
 from image2image_io.utils._test import get_test_files
 
 
@@ -102,6 +103,31 @@ def test_thumbnail(tmp_path):
     thumbnail, scale = reader.get_thumbnail(2000)
     assert thumbnail.shape == (1000, 1000, 3), "Thumbnail shape should be (1000, 1000, 3)"
     assert all(s == 1.0 for s in scale), f"Scale should be (1.0, 1.0) not {scale}"
+
+
+@pytest.mark.parametrize("path", get_test_files("*.czi"))
+def test_czi_thumbnail_without_pyramid(path):
+    reader = get_simple_reader(path, init_pyramid=False, auto_pyramid=False)
+    thumbnail, scale = reader.get_thumbnail(128)
+    assert isinstance(thumbnail, np.ndarray), "thumbnail should be np.ndarray"
+    assert max(thumbnail.shape) <= 128, "thumbnail should fit within requested max size"
+    assert all(s > 0 for s in scale), "scale should be greater than 0"
+    assert reader._pyramid is None, "thumbnail should not initialize pyramid"
+    reader.close()
+
+
+def test_write_czi_thumbnail_without_pyramid(tmp_path, monkeypatch):
+    from image2image_io.utils.utilities import write_thumbnail
+
+    def fail_pyramid_init(self):
+        pytest.fail("CZI thumbnail export should not initialize pyramid")
+
+    monkeypatch.setattr(CziImageReader, "get_dask_pyr", fail_pyramid_init)
+    monkeypatch.setattr(CziSceneImageReader, "get_dask_pyr", fail_pyramid_init)
+
+    write_thumbnail(get_test_files("2d-image-small.czi")[0], tmp_path, with_title=False, first_only=True)
+    thumbnails = list(tmp_path.glob("*thumbnail.jpg"))
+    assert len(thumbnails) == 1, "Expected one thumbnail image"
 
 
 def test_crop_bbox_rgb(tmp_path):

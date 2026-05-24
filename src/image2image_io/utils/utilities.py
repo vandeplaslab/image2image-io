@@ -38,20 +38,29 @@ def write_thumbnail(path: PathLike, output_dir: PathLike, with_title: bool, firs
     import matplotlib as mpl
 
     from image2image_io.readers import get_simple_reader
+    from image2image_io.readers._czi import get_czi_channel_thumbnail
+    from image2image_io.readers.czi_reader import CziImageReader, CziSceneImageReader
 
     mpl.use("agg")
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    reader = get_simple_reader(path, auto_pyramid=False)
+    reader = get_simple_reader(path, init_pyramid=False, auto_pyramid=False)
     if reader.is_rgb:
-        image = reader.pyramid[-1]
+        image, _ = reader.get_thumbnail()
         filename = output_dir / f"{reader.name}_rgb_thumbnail.jpg"
         make_thumbnail(filename, image, f"{reader.name}", with_title)
     else:
+        is_czi_reader = isinstance(reader, (CziImageReader, CziSceneImageReader))
         for channel_id, channel_name in enumerate(reader._channel_names):
             filename = output_dir / f"{reader.name}_index={channel_id}_name={channel_name}_thumbnail.jpg"
-            image = reader.get_channel(channel_id, -1)
+            if is_czi_reader:
+                image, _ = get_czi_channel_thumbnail(reader.fh, reader.scale, channel_id)
+                if image is None:
+                    message = f"Could not create CZI thumbnail for channel {channel_id}."
+                    raise ValueError(message)
+            else:
+                image = reader.get_channel(channel_id, -1)
             make_thumbnail(filename, image, f"{reader.name}\n{channel_id} / {channel_name}", with_title)
             if first_only:
                 break
@@ -207,9 +216,7 @@ def clip_shape(shape: tuple[int, int], max_size: int = 1000) -> tuple[int, int]:
 
 
 def get_pyramid_for_min_size(reader, min_size: int = 1024, max_size: int = 2024, pyramid: int | None = None) -> int:
-    """
-    Get the pyramid level closest to min_size while being smaller than max_size.
-    """
+    """Get the pyramid level closest to min_size while being smaller than max_size."""
     # If a specific level is suggested, check it first against constraints
     if pyramid is not None:
         shape = reader.shape_for_pyramid(pyramid)
