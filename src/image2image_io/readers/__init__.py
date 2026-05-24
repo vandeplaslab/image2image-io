@@ -18,6 +18,7 @@ from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.array_reader import ArrayImageReader
 from image2image_io.readers.coordinate_reader import CoordinateImageReader, LazyCoordinateImageReader
 from image2image_io.readers.czi_reader import CziImageReader, CziSceneImageReader
+from image2image_io.readers.h5ad_reader import H5ADReader
 from image2image_io.readers.shapes_reader import ShapesReader, is_txt_and_has_columns
 from image2image_io.readers.tiff_reader import TiffImageReader
 from image2image_io.utils.utilities import get_yx_coordinates_from_shape, reshape, reshape_batch
@@ -29,6 +30,7 @@ __all__ = [
     "CoordinateImageReader",
     "CziImageReader",
     "CziSceneImageReader",
+    "H5ADReader",
     "LazyCoordinateImageReader",
     "ShapesReader",
     "TiffImageReader",
@@ -56,6 +58,7 @@ CZI_EXTENSIONS = [".czi"]
 BRUKER_EXTENSIONS = [".tsf", ".tdf", ".d"]
 IMZML_EXTENSIONS = [".imzml", ".ibd"]
 H5_EXTENSIONS = [".h5", ".hdf5"]
+H5AD_EXTENSIONS = [".h5ad"]
 IMSPY_EXTENSIONS = [".data"]
 NPY_EXTENSIONS = [".npy"]
 NPZ_EXTENSIONS = [".npz"]
@@ -99,6 +102,7 @@ def sanitize_read_path(path: PathLike, raise_on_error: bool = True) -> Path | No
         + BRUKER_EXTENSIONS
         + IMZML_EXTENSIONS
         + H5_EXTENSIONS
+        + H5AD_EXTENSIONS
         + IMSPY_EXTENSIONS
         + GEOJSON_EXTENSIONS
         + POINTS_EXTENSIONS
@@ -241,6 +245,9 @@ def get_reader(
             path, readers = _read_mask_h5(path)
         else:
             path, readers = _read_centroids_h5_coordinates_lazy(path)
+    elif suffix in H5AD_EXTENSIONS:
+        CONFIG.trace(f"Reading AnnData file: {path}")
+        path, readers = _read_h5ad(path)
     elif suffix in GEOJSON_EXTENSIONS + POINTS_EXTENSIONS:
         if (
             suffix in GEOJSON_EXTENSIONS
@@ -307,6 +314,16 @@ def _read_points(path: PathLike) -> tuple[Path, dict[str, ShapesReader]]:
     assert path.exists(), f"File does not exist: {path}"
     key = get_key(path)
     return path, {path.name: PointsReader(path, key=key)}
+
+
+def _read_h5ad(path: PathLike) -> tuple[Path, dict[str, H5ADReader]]:
+    """Read AnnData H5AD file."""
+    from image2image_io.readers.h5ad_reader import H5ADReader
+
+    path = Path(path)
+    assert path.exists(), f"File does not exist: {path}"
+    key = get_key(path)
+    return path, {path.name: H5ADReader(path, key=key)}
 
 
 def _read_single_scene_czi(path: PathLike, **kwargs: ty.Any) -> tuple[Path, dict[str, CziImageReader]]:
