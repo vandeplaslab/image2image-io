@@ -18,6 +18,7 @@ from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers.array_reader import ArrayImageReader
 from image2image_io.readers.coordinate_reader import CoordinateImageReader, LazyCoordinateImageReader
 from image2image_io.readers.czi_reader import CziImageReader, CziSceneImageReader
+from image2image_io.readers.ome_zarr_reader import OmeZarrImageReader
 from image2image_io.readers.shapes_reader import ShapesReader, is_txt_and_has_columns
 from image2image_io.readers.tiff_reader import TiffImageReader
 from image2image_io.utils.utilities import get_yx_coordinates_from_shape, reshape, reshape_batch
@@ -30,6 +31,7 @@ __all__ = [
     "CziImageReader",
     "CziSceneImageReader",
     "LazyCoordinateImageReader",
+    "OmeZarrImageReader",
     "ShapesReader",
     "TiffImageReader",
     "get_key",
@@ -53,6 +55,7 @@ TIFF_EXTENSIONS = [
     ".qptiff.intermediate",
 ]
 CZI_EXTENSIONS = [".czi"]
+OME_ZARR_EXTENSIONS = [".ome.zarr", ".zarr"]
 BRUKER_EXTENSIONS = [".tsf", ".tdf", ".d"]
 IMZML_EXTENSIONS = [".imzml", ".ibd"]
 H5_EXTENSIONS = [".h5", ".hdf5"]
@@ -64,6 +67,7 @@ POINTS_EXTENSIONS = [".csv", ".txt", ".parquet"]
 SUPPORTED_IMAGE_FORMATS = [
     *IMAGE_EXTENSIONS,
     *TIFF_EXTENSIONS,
+    *OME_ZARR_EXTENSIONS,
     *CZI_EXTENSIONS,
 ]
 
@@ -94,6 +98,7 @@ def sanitize_read_path(path: PathLike, raise_on_error: bool = True) -> Path | No
         TIFF_EXTENSIONS
         + IMAGE_EXTENSIONS
         + CZI_EXTENSIONS
+        + OME_ZARR_EXTENSIONS
         + NPY_EXTENSIONS
         + NPZ_EXTENSIONS
         + BRUKER_EXTENSIONS
@@ -206,6 +211,9 @@ def get_reader(
     if suffix in TIFF_EXTENSIONS:
         CONFIG.trace(f"Reading TIFF file: {path}")
         path, readers = _read_tiff(path)
+    elif suffix in OME_ZARR_EXTENSIONS:
+        CONFIG.trace(f"Reading OME-Zarr file: {path}")
+        path, readers = _read_ome_zarr(path)
     elif suffix in CZI_EXTENSIONS:
         if split_czi and _check_multi_scene_czi(path):
             logger.trace(f"Reading multi-scene CZI file: {path}")
@@ -349,6 +357,16 @@ def _read_tiff(path: PathLike) -> tuple[Path, dict[str, TiffImageReader]]:
     assert path.exists(), f"File does not exist: {path}"
     key = get_key(path)
     return path, {path.name: TiffImageReader(path, key=key)}
+
+
+def _read_ome_zarr(path: PathLike) -> tuple[Path, dict[str, OmeZarrImageReader]]:
+    """Read OME-Zarr store."""
+    from image2image_io.readers.ome_zarr_reader import OmeZarrImageReader
+
+    path = Path(path)
+    assert path.exists(), f"File does not exist: {path}"
+    key = get_key(path)
+    return path, {path.name: OmeZarrImageReader(path, key=key)}
 
 
 def _read_image(path: PathLike) -> tuple[Path, dict[str, ArrayImageReader]]:

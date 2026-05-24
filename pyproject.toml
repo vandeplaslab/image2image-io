@@ -41,6 +41,7 @@ dynamic = ["version"]
 dependencies = [
     "koyo>=0.3.5",
     "zarr",
+    "ome-zarr>=0.6.1,<0.7",
     "h5py",
     "imzy",
     "czifile>=2019.7.2.1,<2026.3.12",

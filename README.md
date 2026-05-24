@@ -16,6 +16,7 @@ interface to access the image data (e.g. for specific channel or pyramid level).
 Currently supported formats:
 - Standard image formats (.png, .jpg, .jpeg)
 - TIFF (.tif, .tiff, .ome.tiff, .scn, .svs, .ndpi, .qptiff, .qptiff.raw, .qptiff.intermediate)
+- OME-Zarr (.ome.zarr, .zarr)
 - CZI (.czi)
 - Bruker (.tsf, .tdf, .d)
 - ImzML (.imzML, .ibd)
@@ -78,6 +79,24 @@ write_ome_tiff_from_array(
 )
 ```
 
+Writing and reading OME-Zarr stores is supported through the same reader interface:
+
+```python
+from image2image_io.readers import get_simple_reader
+from image2image_io.writers import write_ome_zarr_from_array
+
+write_ome_zarr_from_array(
+    "path/to/output.ome.zarr",
+    None,
+    array,
+    channel_names=["C0", "C1", "C2"],
+    resolution=0.5,
+)
+
+reader = get_simple_reader("path/to/output.ome.zarr")
+channel_first = reader.get_channel(0, 0)
+```
+
 Merging multiple images is alsy fairly easy to do:
 
 ```python
@@ -132,8 +151,8 @@ Options:
   --debug        Maximum output
   -h, --help     Show this message and exit.
 
-OME-TIFF:
-  convert  Convert images to pyramidal OME-TIFF.
+OME:
+  convert  Convert images to pyramidal OME-TIFF or OME-Zarr.
   merge    Export images.
 
 CZI:

@@ -292,6 +292,7 @@ class BaseReader:
             ".tsf",
             ".tdf",
             ".qptiff",
+            ".zarr",
             ".raw",
             ".intermediate",
         ]:
@@ -764,6 +765,28 @@ class BaseReader:
             tile_size=tile_size,
             overwrite=overwrite,
             transformer=transformer,
+        )
+
+    def to_ome_zarr(
+        self,
+        path: PathLike,
+        as_uint8: bool = False,
+        tile_size: int = 1024,
+        channel_ids: list[int] | None = None,
+        channel_names: list[str] | None = None,
+        overwrite: bool = False,
+    ) -> Path:
+        """Write image as OME-Zarr."""
+        from image2image_io.writers import write_ome_zarr
+
+        return write_ome_zarr(
+            path,
+            self,
+            as_uint8=as_uint8,
+            channel_names=channel_names,
+            channel_ids=channel_ids,
+            tile_size=tile_size,
+            overwrite=overwrite,
         )
 
     def to_writer(self, transformer: Transformer | None = None) -> OmeTiffWriter:
