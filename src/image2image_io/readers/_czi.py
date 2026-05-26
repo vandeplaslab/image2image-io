@@ -6,6 +6,7 @@ import typing as ty
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 from functools import cached_property
+from math import ceil, floor
 from multiprocessing import cpu_count
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -22,7 +23,7 @@ from tqdm import tqdm
 
 from image2image_io._zarr import TempStore
 from image2image_io.config import CONFIG
-from image2image_io.readers.utilities import compute_sub_res, guess_rgb
+from image2image_io.readers.utilities import compute_sub_res
 
 logger = logger.bind(src="CZI")
 
@@ -320,37 +321,217 @@ def get_level_blocks(czi: CziFile) -> dict:
     return level_blocks
 
 
+def _get_dimension_entry(data_segment, dimension: str) -> DimensionEntryDV1 | None:
+    """Return the CZI dimension entry for a data segment."""
+    for dimension_entry in data_segment.dimension_entries:
+        if dimension_entry.dimension == dimension:
+            return dimension_entry
+    return None
+
+
+def _get_subblock_downsample(czi: CziFile, directory_entry: DirectoryEntryDV) -> int:
+    """Return the spatial downsampling factor represented by a CZI subblock."""
+    y_axis = czi.axes.index("Y")
+    x_axis = czi.axes.index("X")
+    data_segment = directory_entry.data_segment()
+
+    y_factor = data_segment.shape[y_axis] / data_segment.stored_shape[y_axis]
+    x_factor = data_segment.shape[x_axis] / data_segment.stored_shape[x_axis]
+    return max(1, round(max(y_factor, x_factor)))
+
+
+def _get_first_dimension_start(czi: CziFile, dimension: str) -> int:
+    """Return the first start index for a dimension in the filtered CZI subblocks."""
+    starts: list[int] = []
+    for directory_entry in czi.filtered_subblock_directory:
+        data_segment = directory_entry.data_segment()
+        dimension_entry = _get_dimension_entry(data_segment, dimension)
+        if dimension_entry is not None:
+            starts.append(int(dimension_entry.start))
+    if starts:
+        return min(starts)
+    return int(czi.start[czi.axes.index(dimension)])
+
+
+def _get_plane_indices(czi: CziFile, channel_index: int | None) -> dict[str, int]:
+    """Return representative non-spatial dimension indices for thumbnail extraction."""
+    plane_indices: dict[str, int] = {}
+    for dimension in czi.axes:
+        if dimension in {"Y", "X", "0"}:
+            continue
+        if dimension == "C":
+            if channel_index is None:
+                continue
+            plane_indices[dimension] = _get_first_dimension_start(czi, dimension) + channel_index
+        else:
+            plane_indices[dimension] = _get_first_dimension_start(czi, dimension)
+    return plane_indices
+
+
+def _entry_contains_plane(data_segment, plane_indices: dict[str, int]) -> bool:
+    """Return whether a CZI subblock intersects the requested non-spatial plane."""
+    for dimension, index in plane_indices.items():
+        dimension_entry = _get_dimension_entry(data_segment, dimension)
+        if dimension_entry is None:
+            continue
+        start = int(dimension_entry.start)
+        stop = start + int(dimension_entry.size)
+        if not start <= index < stop:
+            return False
+    return True
+
+
+def _get_spatial_preview_shape(czi: CziFile, max_size: int) -> tuple[tuple[int, int], tuple[float, float]]:
+    """Return thumbnail shape and spatial scale for a bounded CZI preview."""
+    y_size = int(czi.shape[czi.axes.index("Y")])
+    x_size = int(czi.shape[czi.axes.index("X")])
+    scale = max(y_size / max_size, x_size / max_size, 1.0)
+    preview_shape = (max(1, int(y_size / scale)), max(1, int(x_size / scale)))
+    preview_scale = (y_size / preview_shape[0], x_size / preview_shape[1])
+    return preview_shape, preview_scale
+
+
+def _get_czi_channel_count(czi: CziFile) -> int:
+    """Return the number of non-RGB channels in a CZI file."""
+    if "C" not in czi.axes:
+        return 1
+    return int(czi.shape[czi.axes.index("C")])
+
+
+def _extract_spatial_tile(czi: CziFile, data_segment, channel_index: int | None) -> np.ndarray:
+    """Read a spatial tile from a CZI subblock without expanding the full dataset."""
+    data = data_segment.data(resize=False)
+    is_rgb = czi.is_rgb
+    tile_index: list[int | slice] = []
+    for axis, dimension in enumerate(czi.axes):
+        if dimension in {"Y", "X"}:
+            tile_index.append(slice(None))
+            continue
+        if dimension == "0":
+            tile_index.append(slice(None) if is_rgb else 0)
+            continue
+        if dimension == "C" and channel_index is not None:
+            dimension_entry = _get_dimension_entry(data_segment, dimension)
+            if dimension_entry is None:
+                tile_index.append(0)
+            else:
+                channel_start = _get_first_dimension_start(czi, dimension)
+                tile_index.append(channel_start + channel_index - int(dimension_entry.start))
+            continue
+        if dimension == "C" and int(data_segment.stored_shape[axis]) > 1:
+            tile_index.append(slice(None))
+            continue
+        tile_index.append(0)
+
+    tile = np.asarray(data[tuple(tile_index)])
+    if not is_rgb and tile.ndim == 3 and tile.shape[-1] == 1:
+        return tile[:, :, 0]
+    return tile
+
+
+def _resize_tile(tile: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    """Resize a CZI tile to the requested YX shape."""
+    from image2image_io.utils.utilities import resize
+
+    if tile.shape[:2] == shape:
+        return tile
+    return resize(tile, shape).astype(tile.dtype)
+
+
+def _read_czi_thumbnail_plane(
+    czi: CziFile,
+    pixel_spacing: tuple[int, int] | tuple[float, float],
+    max_size: int,
+    channel_index: int | None,
+) -> tuple[np.ndarray | None, tuple[float, float] | None]:
+    """Read a single CZI thumbnail plane directly from subblocks."""
+    preview_shape, preview_scale = _get_spatial_preview_shape(czi, max_size)
+    scale_y, scale_x = preview_scale
+    thumbnail_spacing = (float(pixel_spacing[0] * scale_y), float(pixel_spacing[1] * scale_x))
+
+    plane_indices = _get_plane_indices(czi, channel_index)
+    level_entries: dict[int, list[DirectoryEntryDV]] = {}
+    for directory_entry in czi.filtered_subblock_directory:
+        data_segment = directory_entry.data_segment()
+        if not _entry_contains_plane(data_segment, plane_indices):
+            continue
+        level = _get_subblock_downsample(czi, directory_entry)
+        if level not in level_entries:
+            level_entries[level] = []
+        level_entries[level].append(directory_entry)
+
+    if not level_entries:
+        return None, None
+
+    directory_entries = level_entries[max(level_entries)]
+    is_rgb = czi.is_rgb
+    rgb_size = int(czi.shape[czi.axes.index("0")]) if is_rgb else 0
+    thumbnail_shape = (*preview_shape, rgb_size) if is_rgb else preview_shape
+    thumbnail_array = np.zeros(thumbnail_shape, dtype=czi.dtype)
+
+    y_origin = int(czi.start[czi.axes.index("Y")])
+    x_origin = int(czi.start[czi.axes.index("X")])
+    for directory_entry in directory_entries:
+        data_segment = directory_entry.data_segment()
+        y_entry = _get_dimension_entry(data_segment, "Y")
+        x_entry = _get_dimension_entry(data_segment, "X")
+        if y_entry is None or x_entry is None:
+            continue
+
+        y_start = int(y_entry.start) - y_origin
+        x_start = int(x_entry.start) - x_origin
+        y_stop = y_start + int(y_entry.size)
+        x_stop = x_start + int(x_entry.size)
+
+        out_y_start = max(0, floor(y_start / scale_y))
+        out_x_start = max(0, floor(x_start / scale_x))
+        out_y_stop = min(preview_shape[0], ceil(y_stop / scale_y))
+        out_x_stop = min(preview_shape[1], ceil(x_stop / scale_x))
+        if out_y_start >= out_y_stop or out_x_start >= out_x_stop:
+            continue
+
+        tile = _extract_spatial_tile(czi, data_segment, channel_index)
+        tile_shape = (out_y_stop - out_y_start, out_x_stop - out_x_start)
+        thumbnail_array[out_y_start:out_y_stop, out_x_start:out_x_stop] = _resize_tile(tile, tile_shape)
+
+    return thumbnail_array, thumbnail_spacing
+
+
 def get_czi_thumbnail(
-    czi: CziFile, pixel_spacing: tuple[int, int] | tuple[float, float]
-) -> tuple[tuple[np.ndarray] | None, tuple[float, float] | None]:
-    """Get CZI thumbnail."""
-    ch_idx = czi.axes.index("C")
-    l_blocks = get_level_blocks(czi)
-    lowest_im = np.max(list(l_blocks.keys()))
-    calc_thumbnail_spacing = np.asarray(pixel_spacing) * 1 if lowest_im == 0 else np.asarray(pixel_spacing) * lowest_im
+    czi: CziFile,
+    pixel_spacing: tuple[int, int] | tuple[float, float],
+    max_size: int = 1024,
+    channel_index: int | None = None,
+) -> tuple[np.ndarray | None, tuple[float, float] | None]:
+    """Get a thumbnail directly from CZI subblocks without building a full image pyramid."""
+    if max_size <= 0:
+        message = "max_size must be greater than zero."
+        raise ValueError(message)
 
-    thumbnail_spacing = (float(calc_thumbnail_spacing[0]), float(calc_thumbnail_spacing[1]))
+    if czi.is_rgb or channel_index is not None or _get_czi_channel_count(czi) == 1:
+        return _read_czi_thumbnail_plane(czi, pixel_spacing, max_size, channel_index)
 
-    block_indices = [b[0] for b in l_blocks[lowest_im]]
-    if guess_rgb(czi.shape) and len(block_indices) == 1:
-        data_idx = block_indices[0]
-        image_data = czi.subblock_directory[data_idx].data_segment()
-        thumbnail_array = np.squeeze(image_data.data(resize=False))
-        return thumbnail_array, thumbnail_spacing
+    channel_thumbnails: list[np.ndarray] = []
+    thumbnail_spacing = None
+    for channel_id in range(_get_czi_channel_count(czi)):
+        thumbnail, thumbnail_spacing = _read_czi_thumbnail_plane(czi, pixel_spacing, max_size, channel_id)
+        if thumbnail is None:
+            return None, None
+        channel_thumbnails.append(thumbnail)
+    return np.stack(channel_thumbnails), thumbnail_spacing
 
-    if len(block_indices) == czi.shape[czi.axes.index("C")]:
-        thumbnail_shape = list(czi.subblock_directory[block_indices[0]].data_segment().stored_shape)
-        thumbnail_shape[ch_idx] = czi.shape[ch_idx]
 
-        thumbnail_array = np.empty(thumbnail_shape, dtype=czi.dtype)
-        thumbnail_array = np.squeeze(thumbnail_array)
-        for b_index in block_indices:
-            image_data = czi.subblock_directory[b_index].data_segment()
-            data_ch_index = next(de.start for de in image_data.dimension_entries if de.dimension == "C")
-            data = np.squeeze(image_data.data(resize=False))
-            thumbnail_array[data_ch_index, :, :] = data
-        return thumbnail_array, thumbnail_spacing
-    return None, None
+def get_czi_channel_thumbnail(
+    czi: CziFile,
+    pixel_spacing: tuple[int, int] | tuple[float, float],
+    channel_index: int,
+    max_size: int = 1024,
+) -> tuple[np.ndarray | None, tuple[float, float] | None]:
+    """Get a single-channel thumbnail directly from CZI subblocks."""
+    if channel_index < 0 or channel_index >= _get_czi_channel_count(czi):
+        message = f"Channel index {channel_index} is out of range."
+        raise ValueError(message)
+    return get_czi_thumbnail(czi, pixel_spacing, max_size=max_size, channel_index=channel_index)
 
 
 def get_n_scenes(path: str | Path) -> int:
