@@ -19,6 +19,7 @@ from image2image_io.utils.utilities import (
     reshape_fortran,
 )
 from image2image_io.writers.merge_tiff_writer import MergeImages, MergeOmeTiffWriter
+from image2image_io.writers.ome_zarr_writer import write_ome_zarr, write_ome_zarr_from_array
 from image2image_io.writers.tiff_writer import OmeTiffWrapper, OmeTiffWriter, Transformer
 
 if ty.TYPE_CHECKING:
@@ -37,8 +38,12 @@ __all__ = [
     "czis_to_ome_tiff",
     "image_to_fusion",
     "image_to_ome_tiff",
+    "image_to_ome_zarr",
     "images_to_fusion",
     "images_to_ome_tiff",
+    "images_to_ome_zarr",
+    "write_ome_zarr",
+    "write_ome_zarr_from_array",
 ]
 
 
@@ -202,6 +207,41 @@ def images_to_ome_tiff(
                 continue
 
 
+def images_to_ome_zarr(
+    paths: ty.Iterable[PathLike],
+    output_dir: PathLike | None = None,
+    as_uint8: bool | None = None,
+    tile_size: int = 1024,
+    metadata: MetadataDict | None = None,
+    overwrite: bool = False,
+) -> ty.Generator[ExportProgress, None, None]:
+    """Convert multiple images to OME-Zarr."""
+    output_dir = Path(output_dir) if output_dir else None
+    if output_dir:
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    total_n_scenes, paths = get_total_n_scenes(paths)
+    current_total_scene = 0
+    for path_ in tqdm(paths, desc="Converting to OME-Zarr...", total=len(paths)):
+        path_ = Path(path_)
+        reader_metadata = metadata.get(path_, None) if metadata else None
+        try:
+            for key, current_file_scene, total_file_scenes, increment_by, is_exported in image_to_ome_zarr(
+                path_,
+                output_dir=output_dir,
+                as_uint8=as_uint8,
+                tile_size=tile_size,
+                metadata=reader_metadata,
+                overwrite=overwrite,
+            ):
+                yield key, current_file_scene, total_file_scenes, current_total_scene, total_n_scenes, is_exported
+                current_total_scene += increment_by
+        except (ValueError, TypeError, OSError) as err:
+            logger.error(f"Could not read {path_.suffix} file {path_} ({err})")
+            logger.exception(err)
+            continue
+
+
 def image_to_ome_tiff(
     path: PathLike,
     output_dir: PathLike | None = None,
@@ -269,6 +309,82 @@ def image_to_ome_tiff(
             tile_size=tile_size,
             transformer=transformer,
             **scene_metadata,
+            overwrite=overwrite,
+        )
+        yield key, 1, 1, 1, True
+
+
+def image_to_ome_zarr(
+    path: PathLike,
+    output_dir: PathLike | None = None,
+    as_uint8: bool | None = None,
+    tile_size: int = 1024,
+    suffix: str = "",
+    metadata: MetadataReader | None = None,
+    resolution: float | None = None,
+    overwrite: bool = False,
+) -> ty.Generator[ExportProgress, None, None]:
+    """Convert image of any type to OME-Zarr."""
+    from image2image_io.readers import get_key, get_simple_reader
+    from image2image_io.writers.ome_zarr_writer import normalize_ome_zarr_path
+
+    path = Path(path)
+    if output_dir is None:
+        output_dir = path.parent
+    output_dir = Path(output_dir)
+    output_dir.mkdir(exist_ok=True, parents=True)
+
+    key = get_key(path)
+    filename = path.name.replace(".ome.tiff", "").replace(path.suffix, "")
+    if suffix:
+        filename += suffix
+    output_path = normalize_ome_zarr_path(output_dir / filename)
+    yield key, 1, 1, 1, False
+
+    if output_path.exists() and not overwrite:
+        logger.info(f"Skipping {output_path} - already exists")
+        yield key, 1, 1, 1, True
+        return
+
+    reader = get_simple_reader(path, auto_pyramid=False, init_pyramid=False)
+    if resolution:
+        reader.resolution = resolution
+
+    scene_metadata: dict[str, list[int | str]]
+    if metadata:
+        scene_metadata = metadata.get(path, None)
+        if not scene_metadata:
+            scene_metadata = {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
+            logger.warning(f"Metadata not found for {path}. Using default metadata.")
+    else:
+        scene_metadata = {"channel_ids": reader.channel_ids, "channel_names": reader.channel_names}
+        logger.trace(f"Metadata not specified for {path}. Using default metadata.")
+
+    if scene_metadata:
+        assert "channel_ids" in scene_metadata, "Channel IDs must be specified in metadata."
+        assert "channel_names" in scene_metadata, "Channel names must be specified in metadata."
+    if not scene_metadata["channel_ids"]:
+        yield key, 1, 1, 1, True
+    else:
+        selected_channel_ids = scene_metadata["channel_ids"]
+        selected_channel_names = scene_metadata["channel_names"]
+        if not isinstance(selected_channel_ids, list) or not all(
+            isinstance(channel_id, int) for channel_id in selected_channel_ids
+        ):
+            msg = "OME-Zarr channel IDs must be a list of integers."
+            raise ValueError(msg)
+        if not isinstance(selected_channel_names, list) or not all(
+            isinstance(channel_name, str) for channel_name in selected_channel_names
+        ):
+            msg = "OME-Zarr channel names must be a list of strings."
+            raise ValueError(msg)
+        write_ome_zarr(
+            output_path,
+            reader,
+            as_uint8=as_uint8,
+            tile_size=tile_size,
+            channel_ids=selected_channel_ids,
+            channel_names=selected_channel_names,
             overwrite=overwrite,
         )
         yield key, 1, 1, 1, True

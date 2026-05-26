@@ -42,7 +42,7 @@ fmt_ = click.option(
     "-f",
     "--fmt",
     help="Output format.",
-    type=click.Choice(["ome-tiff"], case_sensitive=False),
+    type=click.Choice(["ome-tiff", "ome-zarr"], case_sensitive=False),
     default="ome-tiff",
     show_default=True,
     required=False,

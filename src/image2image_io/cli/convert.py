@@ -32,7 +32,7 @@ from image2image_io.cli._common import ALLOW_EXTRA_ARGS, as_uint8_, fmt_, overwr
 )
 @click.command("convert", context_settings=ALLOW_EXTRA_ARGS)
 def convert(image: list[str], output_dir: str, fmt: str, tile_size: str, as_uint8: bool, overwrite: bool) -> None:
-    """Convert images to pyramidal OME-TIFF."""
+    """Convert images to pyramidal OME-TIFF or OME-Zarr."""
     convert_runner(image, output_dir, fmt, tile_size, as_uint8, overwrite)
 
 
@@ -44,8 +44,8 @@ def convert_runner(
     as_uint8: bool | None = None,
     overwrite: bool = False,
 ) -> None:
-    """Convert images to pyramidal OME-TIFF."""
-    from image2image_io.writers import images_to_ome_tiff
+    """Convert images to pyramidal OME-TIFF or OME-Zarr."""
+    from image2image_io.writers import images_to_ome_tiff, images_to_ome_zarr
 
     print_parameters(
         Parameter("Images", "-i/--image", paths),
@@ -55,5 +55,7 @@ def convert_runner(
         Parameter("Downcast to uint8", "-u/--as_uint8", as_uint8),
         Parameter("Overwrite", "-W/--overwrite", overwrite),
     )
-    for _ in images_to_ome_tiff(paths, output_dir, tile_size=int(tile_size), as_uint8=as_uint8, overwrite=overwrite):
+    fmt = fmt.lower()
+    writer = images_to_ome_zarr if fmt == "ome-zarr" else images_to_ome_tiff
+    for _ in writer(paths, output_dir, tile_size=int(tile_size), as_uint8=as_uint8, overwrite=overwrite):
         pass
