@@ -161,7 +161,8 @@ def read_geojson(json_file: PathLike) -> tuple[list, list, bool]:
     """
     if Path(json_file).suffix != ".zip":
         with Path(json_file).open() as fh:
-            gj_data = json.load(fh)
+            gj_data = geojson.load(fh)
+            # gj_data = json.load(fh)
     else:
         with zipfile.ZipFile(json_file, "r") as z:
             for filename in z.namelist():
