@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 from czifile import CziFile
-from koyo.path import PathLike
+from koyo.typing import PathLike
 
 
 @dataclass
