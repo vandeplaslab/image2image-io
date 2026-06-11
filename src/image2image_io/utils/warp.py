@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 import SimpleITK as sitk
 from koyo.timer import MeasureTimer
+from koyo.transform import arrange_warped, warp_channel
 from koyo.typing import PathLike
-from koyo.transform import warp_channel, arrange_warped
 from loguru import logger
 from tqdm import trange
 

@@ -133,7 +133,14 @@ def test_shape_reader_supports_dicts_arrays_and_files(tmp_path):
     array = np.array([[0, 0], [1, 1]], dtype=np.float32)
     geojson_path = tmp_path / "shape.geojson"
     geojson_path.write_text(
-        json.dumps({"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [1, 2]}, "properties": {}}]})
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [1, 2]}, "properties": {}}
+                ],
+            }
+        )
     )
 
     shapes_gj, shapes_np, is_points = shape_reader(
@@ -161,7 +168,7 @@ def test_shape_reader_raises_for_missing_or_invalid_files(tmp_path):
 def test_get_all_shape_coords_stacks_polygon_coordinates():
     shapes = [
         {"geometry": {"coordinates": [[[0, 0], [1, 0], [0, 0]]]}},
-        {"geometry": {"coordinates": [[[2, 2], [3, 2], [2, 2]]]}}
+        {"geometry": {"coordinates": [[[2, 2], [3, 2], [2, 2]]]}},
     ]
 
     coords = get_all_shape_coords(shapes)

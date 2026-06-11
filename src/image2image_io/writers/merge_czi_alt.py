@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,9 +31,7 @@ def stitch_czi_scenes_czifile(
     z: int | None = 0,
     z_reduce: str = "max",
 ) -> tuple[np.ndarray, dict[int, ScenePlacement]]:
-    """
-    Stitches scenes with metadata and manual pixel offsets for fine-tuning.
-    """
+    """Stitches scenes with metadata and manual pixel offsets for fine-tuning."""
     with CziFile(path) as czi:
         data = czi.asarray()
         axes = getattr(czi, "axes", None).replace(" ", "")
@@ -91,7 +90,7 @@ def stitch_czi_scenes_czifile(
         img = _to_cyx(a, ax)
         scenes_cyx.append(img)
 
-        C, H, W = img.shape
+        _C, H, W = img.shape
         x0, y0 = final_positions[out_idx]
         infos[s] = ScenePlacement(scene=s, x0=x0, y0=y0, w=W, h=H)
         min_x, min_y = min(min_x, x0), min(min_y, y0)
@@ -166,7 +165,7 @@ def _to_cyx(scene: np.ndarray, axes: str) -> np.ndarray:
         scene2 = np.transpose(scene, perm)
         scene2 = scene2[None, ...]
         if scene2.ndim != 3:
-            scene2 = scene2.reshape((1,) + scene2.shape[-2:])
+            scene2 = scene2.reshape((1, *scene2.shape[-2:]))
         return scene2
 
     perm = [ci, yi, xi] + [i for i in range(scene.ndim) if i not in (ci, yi, xi)]

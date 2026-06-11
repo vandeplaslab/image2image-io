@@ -19,11 +19,8 @@ from image2image_io.utils.utilities import (
     reshape_fortran,
 )
 from image2image_io.writers.merge_tiff_writer import MergeImages, MergeOmeTiffWriter
+from image2image_io.writers.ome_zarr_writer import OmeZarrWrapper, write_ome_zarr, write_ome_zarr_from_array
 from image2image_io.writers.tiff_writer import OmeTiffWrapper, OmeTiffWriter, Transformer
-try:
-    from image2image_io.writers.ome_zarr_writer import write_ome_zarr, write_ome_zarr_from_array
-except ImportError as e:
-    pass
 
 if ty.TYPE_CHECKING:
     from image2image_io.readers._base_reader import BaseReader
@@ -36,7 +33,9 @@ ExportProgress = tuple[str, int, int, int, bool]
 
 __all__ = [
     "MergeOmeTiffWriter",
+    "OmeTiffWrapper",
     "OmeTiffWriter",
+    "OmeZarrWrapper",
     "czi_to_ome_tiff",
     "czis_to_ome_tiff",
     "image_to_fusion",
@@ -728,7 +727,8 @@ def _write_txt(
     from tqdm import tqdm
 
     path = Path(path)
-    assert path.suffix == ".txt", "Path must have .txt extension."
+    if not path.suffix == ".txt":
+        raise ValueError("Path must have .txt extension.")  # noqa: TRY003
 
     n = array.shape[0]
     logger.debug(

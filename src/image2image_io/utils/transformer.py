@@ -1,10 +1,12 @@
 """Transformer."""
 
 from __future__ import annotations
-import SimpleITK as sitk
-import numpy as np
-from copy import deepcopy
+
 import math
+from copy import deepcopy
+
+import numpy as np
+import SimpleITK as sitk
 
 
 class Transformer:

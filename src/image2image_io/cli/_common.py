@@ -7,7 +7,8 @@ def arg_split_bbox(ctx, param, value):
     if value is None:
         return None
     args = [int(arg.strip()) for arg in value.split(",")]
-    assert len(args) == 4, "Bounding box must have 4 values"
+    if not len(args) == 4:
+        raise ValueError("Bounding box must have 4 values")  # noqa: TRY003
     return args
 
 
@@ -46,4 +47,14 @@ fmt_ = click.option(
     default="ome-tiff",
     show_default=True,
     required=False,
+)
+bbox_ = click.option(
+    "-b",
+    "--bbox",
+    help="Bound box to be used for cropping of the image(s). It must be supplied in the format: x,y,width,height and"
+    " be in PIXEL units. It will throw an error if fewer or more than 4 values are supplied.",
+    type=click.UNPROCESSED,
+    show_default=True,
+    required=False,
+    callback=arg_split_bbox,
 )

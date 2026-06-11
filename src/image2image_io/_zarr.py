@@ -57,8 +57,8 @@ except (AttributeError, ModuleNotFoundError):
 
 
 __all__ = [
-    "Group",
     "Array",
+    "Group",
     "TempStore",
     "atexit_rmglob",
     "atexit_rmtree",

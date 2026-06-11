@@ -7,7 +7,7 @@ from click.testing import CliRunner
 
 from image2image_io.cli.convert import convert
 from image2image_io.readers import get_simple_reader
-from image2image_io.writers import write_ome_tiff_from_array, write_ome_zarr_from_array
+from image2image_io.writers import OmeZarrWrapper, write_ome_tiff_from_array, write_ome_zarr_from_array
 
 
 def test_write_and_read_ome_zarr_multichannel(tmp_path):
@@ -29,6 +29,90 @@ def test_write_and_read_ome_zarr_multichannel(tmp_path):
     assert reader.resolution == 0.5
     assert reader.n_in_pyramid == 3
     assert reader.get_channel(1).shape == (64, 64)
+
+
+def test_write_ome_zarr_wrapper_multichannel(tmp_path):
+    """Test incremental OME-Zarr writing for multichannel images."""
+    array = np.random.default_rng().integers(0, 255, (2, 64, 64), dtype=np.uint8)
+    channel_names = ["DAPI", "FITC"]
+    wrapper = OmeZarrWrapper()
+
+    with wrapper.write(
+        channel_names=channel_names,
+        resolution=0.5,
+        shape=array.shape,
+        dtype=array.dtype,
+        name="wrapped",
+        output_dir=tmp_path,
+        tile_size=16,
+    ):
+        for channel_index, channel_name in enumerate(channel_names):
+            wrapper.add_channel(channel_index, channel_name, array[channel_index])
+
+    reader = get_simple_reader(wrapper.path)
+
+    assert reader.n_channels == 2
+    assert reader.channel_names == channel_names
+    assert reader.resolution == 0.5
+    assert reader.dtype == array.dtype
+    assert reader.n_in_pyramid == 3
+    np.testing.assert_array_equal(reader.get_channel(1).compute(), array[1])
+
+
+def test_write_ome_zarr_wrapper_multichannel_as_uint8(tmp_path):
+    """Test incremental OME-Zarr writing with uint8 conversion."""
+    array = np.random.default_rng().random((2, 64, 64), dtype=np.float32)
+    channel_names = ["C0", "C1"]
+    wrapper = OmeZarrWrapper()
+
+    with wrapper.write(
+        channel_names=channel_names,
+        resolution=0.25,
+        shape=array.shape,
+        dtype=array.dtype,
+        name="wrapped-uint8",
+        output_dir=tmp_path,
+        tile_size=16,
+        as_uint8=True,
+    ):
+        for channel_index, channel_name in enumerate(channel_names):
+            wrapper.add_channel(channel_index, channel_name, array[channel_index])
+
+    reader = get_simple_reader(wrapper.path)
+
+    assert reader.n_channels == 2
+    assert reader.channel_names == channel_names
+    assert reader.resolution == 0.25
+    assert reader.dtype == np.uint8
+    assert reader.get_channel(0).shape == (64, 64)
+
+
+def test_write_ome_zarr_wrapper_rgb(tmp_path):
+    """Test incremental OME-Zarr writing for RGB images."""
+    array = np.random.default_rng().integers(0, 255, (64, 64, 3), dtype=np.uint8)
+    channel_names = ["R", "G", "B"]
+    wrapper = OmeZarrWrapper()
+
+    with wrapper.write(
+        channel_names=channel_names,
+        resolution=0.75,
+        shape=array.shape,
+        dtype=array.dtype,
+        name="wrapped-rgb",
+        output_dir=tmp_path,
+        tile_size=16,
+    ):
+        wrapper.add_channel([0, 1, 2], channel_names, array)
+
+    reader = get_simple_reader(wrapper.path)
+
+    assert reader.is_rgb
+    assert reader.n_channels == 3
+    assert reader.channel_names == channel_names
+    assert reader.resolution == 0.75
+    assert reader.dtype == array.dtype
+    assert reader.n_in_pyramid == 3
+    np.testing.assert_array_equal(reader.get_channel(2, split_rgb=True).compute(), array[:, :, 2])
 
 
 def test_read_ome_zarr_interleaved_rgb(tmp_path):

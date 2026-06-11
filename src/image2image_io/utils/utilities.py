@@ -434,6 +434,7 @@ def check_df_columns(
     either_dtype: tuple[np.dtype, ...] | None = None,
 ) -> bool:
     """Check if a DataFrame has the required columns."""
+
     def _dtype_matches(dtype: ty.Any) -> bool:
         if dtype in either_dtype:
             return True

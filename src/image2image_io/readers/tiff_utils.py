@@ -6,16 +6,15 @@ https://github.com/NHPatterson/napari-imsmicrolink/blob/master/src/napari_imsmic
 
 from __future__ import annotations
 
+from koyo.typing import PathLike
 from ome_types.model import OME
 from tifffile import TiffFile
-from koyo.typing import PathLike
 
 
 def get_n_series(path: PathLike) -> int:
     """Get the number of series in a tiff file."""
     with TiffFile(path) as tif:
-        n_series = len(tif.series)
-    return n_series
+        return len(tif.series)
 
 
 def qptiff_channel_names(tif: TiffFile, series_index: int = 0) -> list[str]:

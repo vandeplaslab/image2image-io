@@ -235,7 +235,7 @@ def transform_masks(
     # mask_inv_pixel_size = image_reader.inv_resolution
     logger.trace(f"Initial mask shape {mask_shape} with {1 / mask_inv_pixel_size:.4f} resolution.")
 
-    with_index = any(f in ["hdf5"] for f in fmt)
+    with_index = any(f == "hdf5" for f in fmt)
     with_shapes = any(f in ["hdf5", "geojson"] for f in fmt)
     for mask in tqdm(masks, desc="Exporting masks..."):
         with MeasureTimer() as timer:

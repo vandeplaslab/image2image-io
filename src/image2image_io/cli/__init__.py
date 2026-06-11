@@ -7,7 +7,9 @@ from loguru import logger
 
 from image2image_io import __version__
 from image2image_io.cli.convert import convert
+from image2image_io.cli.crop import crop
 from image2image_io.cli.czi2tiff import czi2tiff, cziinfo, czimerge
+from image2image_io.cli.mask import mask
 from image2image_io.cli.merge import combine, merge
 from image2image_io.cli.thumbnail import thumbnail
 from image2image_io.cli.transform import transform
@@ -89,13 +91,16 @@ def cli(verbosity: int, no_color: bool, dev: bool) -> None:
 
 
 # register commands
-cli.add_command(convert, help_group="OME-TIFF")
-cli.add_command(merge, help_group="OME-TIFF")
-cli.add_command(combine, help_group="OME-TIFF")
+cli.add_command(convert, help_group="OME")
+cli.add_command(merge, help_group="OME")
+cli.add_command(combine, help_group="OME")
+cli.add_command(mask, help_group="OME")
+cli.add_command(crop, help_group="OME")
 cli.add_command(cziinfo, help_group="CZI")
 cli.add_command(czi2tiff, help_group="CZI")
 cli.add_command(czimerge, help_group="CZI")
 cli.add_command(thumbnail, help_group="Utility")
+
 if transform:
     cli.add_command(transform, help_group="Utility")
 

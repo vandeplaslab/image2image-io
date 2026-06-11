@@ -89,7 +89,7 @@ class TiffImageReader(BaseReader):
                 self.series_index,
                 0,
             )[0]
-        if Path(self.path).suffix.lower() in [".svs"]:
+        if Path(self.path).suffix.lower() == ".svs":
             return svs_xy_pixel_sizes(
                 self.fh,
                 self.series_index,

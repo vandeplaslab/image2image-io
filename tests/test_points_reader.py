@@ -50,7 +50,9 @@ def test_read_points_from_parquet(tmp_path):
 
 
 def test_get_channel_names_from_df():
-    filter_col, channel_names = get_channel_names_from_df(pl.DataFrame({"feature_name": ["a", "b", "a"], "x": [1, 2, 3]}))
+    filter_col, channel_names = get_channel_names_from_df(
+        pl.DataFrame({"feature_name": ["a", "b", "a"], "x": [1, 2, 3]})
+    )
     assert filter_col == "feature_name"
     assert set(channel_names) == {"a", "b"}
 

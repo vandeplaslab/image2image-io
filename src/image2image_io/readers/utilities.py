@@ -148,7 +148,7 @@ def zarr_get_base_pyr_layer(zarr_store):
 def read_preprocess_array(array, preprocessing, force_rgb=None):
     """Read np.array, zarr.Array, or dask.array image into memory with preprocessing for registration."""
     is_interleaved = guess_rgb(array.shape)
-    is_rgb = force_rgb if force_rgb else is_interleaved
+    is_rgb = force_rgb or is_interleaved
 
     if is_rgb:
         if preprocessing:

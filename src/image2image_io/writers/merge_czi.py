@@ -92,7 +92,7 @@ def _to_cyx(scene: np.ndarray, axes: str) -> np.ndarray:
         scene2 = scene2[None, ...]  # (1, Y, X) plus any leftover dims (shouldn't happen)
         if scene2.ndim != 3:
             # collapse any leftover dims
-            scene2 = scene2.reshape((1,) + scene2.shape[-2:])
+            scene2 = scene2.reshape((1, *scene2.shape[-2:]))
         return scene2
 
     # Permute to (C, Y, X) dropping any other dims by flattening them (should be singleton)
