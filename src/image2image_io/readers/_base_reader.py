@@ -382,13 +382,13 @@ class BaseReader:
         return self.crop_polygon(bbox_or_yx)
 
     def crop_region_iter(
-        self, bbox_or_yx: np.ndarray | tuple[int, int, int, int]
+        self, bbox_or_yx: np.ndarray | tuple[int, int, int, int], multiply: bool = True
     ) -> ty.Generator[tuple[np.ndarray | None, tuple[int, int, int, int]], None, None]:
         """Crop region."""
-        if isinstance(bbox_or_yx, tuple) and len(bbox_or_yx) == 4:
-            yield from self.crop_bbox_iter(*bbox_or_yx)
+        if isinstance(bbox_or_yx, (tuple, list)) and len(bbox_or_yx) == 4:
+            yield from self.crop_bbox_iter(*bbox_or_yx, multiply=multiply)
         else:
-            yield from self.crop_polygon_iter(bbox_or_yx)
+            yield from self.crop_polygon_iter(bbox_or_yx, multiply=multiply)
 
     def crop_bbox(
         self,
@@ -433,11 +433,11 @@ class BaseReader:
         return array_, (left, right, top, bottom)
 
     def crop_polygon_iter(
-        self, yx: np.ndarray
+        self, yx: np.ndarraym, multiply: bool = True
     ) -> ty.Generator[tuple[np.ndarray | None, tuple[int, int, int, int]], None, None]:
         """Polygon iterator."""
         # Prepare polygon coordinates
-        xy, (left, right, top, bottom) = _prepare_polygon(yx, self.inv_resolution, self.image_shape, multiply=True)
+        xy, (left, right, top, bottom) = _prepare_polygon(yx, self.inv_resolution, self.image_shape, multiply=multiply)
         # Adjust polygon coordinates for the cropped region
         xy_cropped = xy - np.array([left, top])
         yield None, (left, right, top, bottom)
@@ -499,13 +499,13 @@ class BaseReader:
         return self.mask_polygon(bbox_or_yx)
 
     def mask_region_iter(
-        self, bbox_or_yx: np.ndarray | tuple[int, int, int, int]
+        self, bbox_or_yx: np.ndarray | tuple[int, int, int, int], multiply: bool = True
     ) -> ty.Generator[tuple[np.ndarray | None, str], None, None]:
         """Crop region."""
-        if isinstance(bbox_or_yx, tuple) and len(bbox_or_yx) == 4:
-            yield from self.mask_bbox_iter(*bbox_or_yx)
+        if isinstance(bbox_or_yx, (tuple, list)) and len(bbox_or_yx) == 4:
+            yield from self.mask_bbox_iter(*bbox_or_yx, multiply=multiply)
         else:
-            yield from self.mask_polygon_iter(bbox_or_yx)
+            yield from self.mask_polygon_iter(bbox_or_yx, multiply=multiply)
 
     def mask_bbox(
         self,
@@ -597,10 +597,12 @@ class BaseReader:
             return array_.compute(), hash_str
         return array_, hash_str
 
-    def mask_polygon_iter(self, yx: np.ndarray) -> ty.Generator[tuple[np.ndarray | None, str], None, None]:
+    def mask_polygon_iter(
+        self, yx: np.ndarray, multiply: bool = True
+    ) -> ty.Generator[tuple[np.ndarray | None, str], None, None]:
         """Polygon iterator."""
         # Prepare polygon coordinates
-        xy, (left, right, top, bottom) = _prepare_polygon(yx, self.inv_resolution, self.image_shape, multiply=True)
+        xy, (left, right, top, bottom) = _prepare_polygon(yx, self.inv_resolution, self.image_shape, multiply=multiply)
         hash_str = _hash_bbox_or_polygon(yx=yx)
         yield None, (left, right, top, bottom)
         mask = None

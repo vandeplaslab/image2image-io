@@ -58,3 +58,13 @@ bbox_ = click.option(
     required=False,
     callback=arg_split_bbox,
 )
+bbox_lrtb_ = click.option(
+    "-b",
+    "--bbox",
+    help="Bound box to be used for cropping or masking of the image(s). It must be supplied in the format: "
+    "left,right,top,bottom and be in PIXEL units. It will throw an error if fewer or more than 4 values are supplied.",
+    type=click.UNPROCESSED,
+    show_default=True,
+    required=False,
+    callback=arg_split_bbox,
+)

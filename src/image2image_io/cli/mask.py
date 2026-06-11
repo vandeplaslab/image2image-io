@@ -5,14 +5,14 @@ from __future__ import annotations
 import click
 from koyo.click import Parameter, cli_parse_paths_sort, print_parameters
 
-from image2image_io.cli._common import ALLOW_EXTRA_ARGS, as_uint8_, bbox_, fmt_, overwrite_, tile_size_
+from image2image_io.cli._common import ALLOW_EXTRA_ARGS, as_uint8_, bbox_lrtb_, fmt_, overwrite_, tile_size_
 
 
 @overwrite_
 @as_uint8_
 @tile_size_
 @fmt_
-@bbox_
+@bbox_lrtb_
 @click.option(
     "-o",
     "--output_dir",
@@ -70,4 +70,7 @@ def convert_runner(
     if fmt == "ome-zarr":
         click.UsageError("ome-zarr is not supported yet.")
     for path in paths:
-        export_mask_regions(path, regions=[bbox], output_dir=output_dir, tile_size=tile_size, as_uint8=as_uint8)
+        for _ in export_mask_regions(
+            path, regions=[bbox], output_dir=output_dir, tile_size=int(tile_size), as_uint8=as_uint8, multiply=False
+        ):
+            pass
