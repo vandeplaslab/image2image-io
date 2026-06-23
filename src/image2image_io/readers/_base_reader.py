@@ -8,6 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
+from dask.array.core import Array as dask_array
 from koyo.typing import PathLike
 from loguru import logger
 
@@ -544,15 +545,27 @@ class BaseReader:
         # Prepare bounding box coordinates
         left, right, top, bottom = _prepare_bbox(left, right, top, bottom, self.inv_resolution, multiply=multiply)
         yield None, (left, right, top, bottom)
-        # Iterate over each channel and apply the mask
-        for channel_id in range(self.n_channels):
-            array = self.get_channel(channel_id, split_rgb=True)
-            array_ = array[top:bottom, left:right]
-            # Check whether an array is dask array - if so, we need to compute it
-            if hasattr(array_, "compute") and apply:
-                yield array_.compute(), (left, right, top, bottom)
-            else:
-                yield array_, (left, right, top, bottom)
+
+        if isinstance(self.pyramid[0], dask_array):
+            from concurrent.futures import ThreadPoolExecutor
+            from os import cpu_count
+
+            from dask import config
+            pool = config.set(pool=ThreadPoolExecutor(cpu_count()))
+        else:
+            from contextlib import nullcontext
+            pool = nullcontext()
+
+        with pool:
+            # Iterate over each channel and apply the mask
+            for channel_id in range(self.n_channels):
+                array = self.get_channel(channel_id, split_rgb=True)
+                array_ = array[top:bottom, left:right]
+                # Check whether an array is dask array - if so, we need to compute it
+                if hasattr(array_, "compute") and apply:
+                    yield array_.compute(), (left, right, top, bottom)
+                else:
+                    yield array_, (left, right, top, bottom)
 
     def mask_bbox_iter(
         self,
