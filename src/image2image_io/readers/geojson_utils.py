@@ -103,7 +103,11 @@ def geojson_to_numpy(gj: dict) -> tuple[list[dict], bool]:
         if not gj["properties"].get("classification"):
             shape_name = "unnamed"
         else:
-            shape_name = gj["properties"].get("classification").get("name")
+            classification = gj["properties"].get("classification")
+            if isinstance(classification, dict):
+                shape_name = gj["properties"].get("classification").get("name")
+            else:
+                shape_name = classification
 
     if isinstance(pts, list):
         return [
