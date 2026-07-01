@@ -175,6 +175,7 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
         self._zstore = TempStore()
         return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
 
+    @lru_cache(maxsize=1)
     def get_thumbnail(self, max_size: int = 1024) -> tuple[np.ndarray, tuple[float, float]]:
         """Get thumbnail."""
         thumbnail, scale = get_czi_thumbnail(self.fh, self.scale, max_size=max_size)
