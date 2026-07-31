@@ -90,7 +90,7 @@ class CziFile(_CziFile):
     def zarr_pyramidize_czi(self, zarr_fp: TempStore, pyramid: bool = True, tile_size: int = 1024) -> list:
         """Create a pyramidal zarr store from a CZI file."""
         dask_pyr = []
-        root = zarr.open_group(zarr_fp, mode="a")
+        root = zarr.open_group(zarr_fp, mode="a", zarr_format=3)
         root.attrs["axes_names"] = list(self.axes)
         root.attrs["orig_shape"] = list(self.shape)
 
@@ -143,6 +143,7 @@ class CziFile(_CziFile):
                     dtype=z_array_ds.dtype,
                     name="0",
                     overwrite=True,
+                    zarr_format=3,
                 )
                 da.store(z_array_ds, zres_array)
                 dask_pyr.append(da.squeeze(da.from_zarr(zres_array)))

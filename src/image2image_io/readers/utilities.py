@@ -13,16 +13,22 @@ from koyo.timer import MeasureTimer
 from loguru import logger
 from tifffile import TiffFile, imread, xml2dict
 
-from image2image_io._zarr import Array, Group
+from image2image_io._zarr import Array, Group, ensure_zarr_store
 from image2image_io.utils.utilities import grayscale, guess_rgb
 
 logger = logger.bind(src="Tiff")
 
 
+def _open_tifffile_zarr(image_filepath: str | Path, series_index: int) -> Array[ty.Any] | Group:
+    """Open a tifffile Zarr store through the Zarr 3 API."""
+    store = ty.cast(ty.Any, imread(image_filepath, aszarr=True, series=series_index))
+    return zarr.open(ensure_zarr_store(store), mode="r")
+
+
 def tifffile_to_dask(im_fp: str | Path, largest_series: int) -> list[da.Array]:
     """Convert a tifffile to a dask array."""
     with MeasureTimer() as timer:
-        imdata = zarr.open(imread(im_fp, aszarr=True, series=largest_series))
+        imdata = _open_tifffile_zarr(im_fp, largest_series)
     logger.trace(f"Loaded OME-TIFF data in {timer()}")
     with MeasureTimer() as timer:
         if isinstance(imdata, Group):
@@ -87,8 +93,7 @@ def tifffile_zarr_backend(image_filepath, largest_series, preprocessing, force_r
         image ready for another registration pre-processing
 
     """
-    zarr_series = imread(image_filepath, aszarr=True, series=largest_series)
-    zarr_store = zarr.open(zarr_series)
+    zarr_store = _open_tifffile_zarr(image_filepath, largest_series)
     zarr_im = zarr_get_base_pyr_layer(zarr_store)
     return read_preprocess_array(zarr_im, preprocessing=preprocessing, force_rgb=force_rgb)
 
@@ -116,8 +121,7 @@ def tifffile_dask_backend(image_filepath, largest_series, preprocessing, force_r
         image ready for other registration pre-processing
 
     """
-    zarr_series = imread(image_filepath, aszarr=True, series=largest_series)
-    zarr_store = zarr.open(zarr_series)
+    zarr_store = _open_tifffile_zarr(image_filepath, largest_series)
     dask_im = da.squeeze(da.from_zarr(zarr_get_base_pyr_layer(zarr_store)))
     return read_preprocess_array(dask_im, preprocessing=preprocessing, force_rgb=force_rgb)
 
@@ -175,8 +179,9 @@ def read_preprocess_array(array, preprocessing, force_rgb=None):
 
 def get_tifffile_info(image_filepath, series_index: int | None = None):
     """Get tiff file information."""
-    series_index = series_index or get_largest_pyramid_series_tiff(image_filepath)
-    zarr_im = zarr.open(imread(image_filepath, aszarr=True, series=series_index))
+    if series_index is None:
+        series_index = get_largest_pyramid_series_tiff(image_filepath)
+    zarr_im = _open_tifffile_zarr(image_filepath, series_index)
     zarr_im = zarr_get_base_pyr_layer(zarr_im)
     image_shape = image_shape_ = np.squeeze(zarr_im.shape)
     if len(image_shape_) == 2:
@@ -205,7 +210,7 @@ def tf_zarr_read_single_ch(image_filepath, channel_idx, is_rgb, is_rgb_interleav
         image as a np.ndarray
     """
     largest_series = get_largest_pyramid_series_tiff(image_filepath)
-    zarr_im = zarr.open(imread(image_filepath, aszarr=True, series=largest_series))
+    zarr_im = _open_tifffile_zarr(image_filepath, largest_series)
     zarr_im = zarr_get_base_pyr_layer(zarr_im)
     try:
         im = da.squeeze(da.from_zarr(zarr_im))

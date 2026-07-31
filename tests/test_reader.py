@@ -7,7 +7,39 @@ import pytest
 
 from image2image_io.readers import ArrayImageReader, get_simple_reader
 from image2image_io.readers.czi_reader import CziImageReader, CziSceneImageReader
+from image2image_io.readers.utilities import get_tifffile_info
 from image2image_io.utils._test import get_test_files
+
+
+def test_get_tifffile_info_legacy_zarr_store(monkeypatch):
+    """Test tifffile's legacy mapping store with the Zarr 3 runtime."""
+    import json
+
+    values = np.arange(12, dtype="<i4").reshape(3, 4)
+    mapping = {
+        ".zarray": json.dumps(
+            {
+                "zarr_format": 2,
+                "shape": [3, 4],
+                "chunks": [3, 4],
+                "dtype": "<i4",
+                "compressor": None,
+                "fill_value": 0,
+                "order": "C",
+                "filters": None,
+            }
+        ).encode(),
+        ".zattrs": b"{}",
+        "0.0": values,
+    }
+    monkeypatch.setattr("image2image_io.readers.utilities.imread", lambda *args, **kwargs: mapping)
+
+    shape, normalized_shape, dtype, series_index = get_tifffile_info("unused.tiff", series_index=0)
+
+    assert tuple(shape) == (3, 4)
+    assert tuple(normalized_shape) == (1, 3, 4)
+    assert dtype == values.dtype
+    assert series_index == 0
 
 
 @pytest.mark.parametrize("path", get_test_files("*.tiff"))

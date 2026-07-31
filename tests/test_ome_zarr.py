@@ -4,6 +4,7 @@
 import numpy as np
 import zarr
 from click.testing import CliRunner
+from skimage.transform import resize
 
 from image2image_io.cli.convert import convert
 from image2image_io.readers import get_simple_reader
@@ -13,14 +14,15 @@ from image2image_io.writers import OmeZarrWrapper, write_ome_tiff_from_array, wr
 def test_write_and_read_ome_zarr_multichannel(tmp_path):
     """Test OME-Zarr writing and reader detection for multichannel images."""
     array = np.random.default_rng().integers(0, 255, (2, 64, 64), dtype=np.uint8)
-    path = write_ome_zarr_from_array(
-        tmp_path / "multi.ome.zarr",
-        None,
-        array,
-        resolution=0.5,
-        channel_names=["DAPI", "FITC"],
-        tile_size=16,
-    )
+    with zarr.config.set({"default_zarr_format": 2}):
+        path = write_ome_zarr_from_array(
+            tmp_path / "multi.ome.zarr",
+            None,
+            array,
+            resolution=0.5,
+            channel_names=["DAPI", "FITC"],
+            tile_size=16,
+        )
 
     reader = get_simple_reader(path)
     assert zarr.open_group(path, mode="r").metadata.zarr_format == 3
@@ -38,7 +40,7 @@ def test_write_ome_zarr_wrapper_multichannel(tmp_path):
     channel_names = ["DAPI", "FITC"]
     wrapper = OmeZarrWrapper()
 
-    with wrapper.write(
+    with zarr.config.set({"default_zarr_format": 2}), wrapper.write(
         channel_names=channel_names,
         resolution=0.5,
         shape=array.shape,
@@ -52,6 +54,7 @@ def test_write_ome_zarr_wrapper_multichannel(tmp_path):
 
     reader = get_simple_reader(wrapper.path)
 
+    assert zarr.open_group(wrapper.path, mode="r").metadata.zarr_format == 3
     assert reader.n_channels == 2
     assert reader.channel_names == channel_names
     assert reader.resolution == 0.5
@@ -142,6 +145,22 @@ def test_read_ome_zarr_interleaved_rgb(tmp_path):
     assert reader.channel_names == ["R", "G", "B"]
     assert reader.resolution == 0.25
     assert reader.get_channel(1, split_rgb=True).shape == (32, 32)
+
+
+def test_write_ome_zarr_preserves_interpolated_pyramid_values(tmp_path):
+    """Test pyramid levels use the previous linear interpolation behavior."""
+    array = np.arange(64 * 64, dtype=np.float32).reshape(64, 64)
+    path = write_ome_zarr_from_array(
+        tmp_path / "pyramid.ome.zarr",
+        None,
+        array,
+        tile_size=16,
+        as_uint8=False,
+    )
+    root = zarr.open_group(path, mode="r")
+    expected = resize(array, (32, 32), order=1, mode="reflect", anti_aliasing=False).astype(array.dtype)
+
+    np.testing.assert_array_equal(root["1"][:], expected)
 
 
 def test_read_legacy_zarr_v2_store(tmp_path):
