@@ -23,6 +23,7 @@ def test_write_and_read_ome_zarr_multichannel(tmp_path):
     )
 
     reader = get_simple_reader(path)
+    assert zarr.open_group(path, mode="r").metadata.zarr_format == 3
 
     assert reader.n_channels == 2
     assert reader.channel_names == ["DAPI", "FITC"]
@@ -120,7 +121,7 @@ def test_read_ome_zarr_interleaved_rgb(tmp_path):
     path = tmp_path / "rgb.ome.zarr"
     array = np.random.default_rng().integers(0, 255, (32, 32, 3), dtype=np.uint8)
     root = zarr.open_group(str(path), mode="w")
-    root.create_dataset("0", data=array, chunks=(16, 16, 3))
+    root.create_array(name="0", data=array, chunks=(16, 16, 3))
     root.attrs["multiscales"] = [
         {
             "version": "0.4",
@@ -141,6 +142,19 @@ def test_read_ome_zarr_interleaved_rgb(tmp_path):
     assert reader.channel_names == ["R", "G", "B"]
     assert reader.resolution == 0.25
     assert reader.get_channel(1, split_rgb=True).shape == (32, 32)
+
+
+def test_read_legacy_zarr_v2_store(tmp_path):
+    """Test reading a Zarr format 2 store with the Zarr 3 runtime."""
+    array = np.arange(32 * 32, dtype=np.uint8).reshape(32, 32)
+    root = zarr.open_group(tmp_path / "legacy.zarr", mode="w", zarr_format=2)
+    root.create_array(name="0", data=array, chunks=(16, 16))
+    root.attrs["multiscales"] = [{"version": "0.4", "datasets": [{"path": "0"}], "axes": ["y", "x"]}]
+
+    reader = get_simple_reader(tmp_path / "legacy.zarr")
+
+    assert reader.n_channels == 1
+    np.testing.assert_array_equal(reader.get_channel(0).compute(), array)
 
 
 def test_convert_cli_writes_ome_zarr(tmp_path):

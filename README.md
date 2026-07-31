@@ -81,6 +81,8 @@ write_ome_tiff_from_array(
 
 Writing and reading OME-Zarr stores is supported through the same reader interface:
 
+OME-Zarr stores written by this package use the Zarr format 3. Existing Zarr format 2 stores remain readable when supported by the Zarr 3 runtime.
+
 ```python
 from image2image_io.readers import get_simple_reader
 from image2image_io.writers import write_ome_zarr_from_array

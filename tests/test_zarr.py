@@ -1,6 +1,22 @@
-"""Test _zarr.py"""
+"""Test Zarr 3 helpers."""
 
-from image2image_io._zarr import atexit_rmglob
+from image2image_io._zarr import TempStore, atexit_rmglob
+
+
+def test_temp_store_lifetime() -> None:
+    """Test that a temporary store remains usable until cleanup."""
+    import zarr
+
+    store = TempStore()
+    path = store.path
+    array = zarr.create_array(store=store, shape=(2,), dtype="i4")
+    array[:] = [1, 2]
+
+    assert path.exists()
+    assert array[:].tolist() == [1, 2]
+
+    store.cleanup()
+    assert not path.exists()
 
 
 def test_atexit_rmglob() -> None:

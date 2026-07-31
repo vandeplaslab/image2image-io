@@ -10,7 +10,7 @@ source = "vcs"
 name = "image2image-io"
 description = "Image readers and writers for image2image."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "BSD 3-Clause License" }
 authors = [
     { email = "lukas.migas@yahoo.com", name = "Lukasz G. Migas" },
@@ -22,7 +22,6 @@ classifiers = [
     "License :: OSI Approved :: BSD License",
     "Natural Language :: English",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -41,13 +40,11 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     "koyo>=0.3.5",
-    "zarr",
-    "ome-zarr>=0.6.1,<0.7",
     "h5py",
     "imzy",
     "czifile>=2019.7.2.1,<2026.3.12",
     "dask[array,distributed]",
-    "tifffile<2025.5.10",  # required until we fix zarr-v3 issues
+    "tifffile>=2025.5.10",
     "imagecodecs",
 #    "aicsimageio",
     "ome_types",
@@ -63,9 +60,7 @@ dependencies = [
     "geojson",
     "polars[pandas]",
     "pyarrow",
-    "numcodecs<0.16.0; python_version < '3.14'",
-#    "numcodecs>=0.16.0; python_version >= '3.13'",  # as long as we don't allow zarr-v3
-    "zarr<3",
+    "zarr>=3,<4",
 ]
 
 [optional-dependencies]

@@ -1,59 +1,50 @@
-"""Zarr storage.
+"""Zarr 3 storage helpers."""
 
-There are some differences between zarr version 2 and version 3, so this module handles the imports.
-"""
+from __future__ import annotations
 
-from zarr import Array
+import atexit
+import glob
+import os
+import shutil
+from pathlib import Path
+from tempfile import mkdtemp
 
-try:
-    # version 2
-    from zarr.hierarchy import Group
-    from zarr.storage import TempStore, atexit_rmglob, atexit_rmtree
-except (AttributeError, ModuleNotFoundError):
-    # version 3
-    import glob
-    import os
-    import shutil
-    from pathlib import Path
-    from tempfile import TemporaryDirectory
+from zarr import Array, Group
+from zarr.storage import LocalStore
 
-    try:
-        from zarr.core.group import Group
-    except (AttributeError, ModuleNotFoundError):
-        from zarr.group import Group
 
-    from zarr.storage import LocalStore
+def atexit_rmtree(path: os.PathLike[str] | str) -> None:  # pragma: no cover
+    """Ensure directory removal at interpreter exit."""
+    path = os.fspath(path)
+    if os.path.isdir(path):
+        shutil.rmtree(path)
 
-    def atexit_rmtree(path, isdir=os.path.isdir, rmtree=shutil.rmtree):  # pragma: no cover
-        """Ensure directory removal at interpreter exit."""
-        if isdir(path):
-            rmtree(path)
 
-    def atexit_rmglob(
-        path,
-        glob=glob.glob,
-        isdir=os.path.isdir,
-        isfile=os.path.isfile,
-        remove=os.remove,
-        rmtree=shutil.rmtree,
-    ):  # pragma: no cover
-        """Ensure removal of multiple files at interpreter exit."""
-        for p in glob(path):
-            if isfile(p):
-                remove(p)
-            elif isdir(p):
-                rmtree(p)
+def atexit_rmglob(path: os.PathLike[str] | str) -> None:  # pragma: no cover
+    """Ensure removal of files and directories matching a glob at exit."""
+    for matched_path in glob.glob(os.fspath(path)):
+        if os.path.isfile(matched_path):
+            os.remove(matched_path)
+        elif os.path.isdir(matched_path):
+            shutil.rmtree(matched_path)
 
-    class TempStore(LocalStore):
-        """Temporary Zarr store that is removed at exit."""
 
-        def __init__(self) -> None:
-            super().__init__(TemporaryDirectory().name)
+class TempStore(LocalStore):
+    """Temporary Zarr store removed explicitly or at interpreter exit."""
 
-        @property
-        def path(self) -> Path:
-            """Return the path to the temporary directory."""
-            return self.root
+    def __init__(self) -> None:
+        self._path = Path(mkdtemp())
+        super().__init__(self._path)
+        atexit.register(atexit_rmtree, self._path)
+
+    @property
+    def path(self) -> Path:
+        """Return the path to the temporary directory."""
+        return self._path
+
+    def cleanup(self) -> None:
+        """Remove the temporary directory immediately."""
+        atexit_rmtree(self._path)
 
 
 __all__ = [
