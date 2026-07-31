@@ -90,7 +90,7 @@ class CziFile(_CziFile):
     def zarr_pyramidize_czi(self, zarr_fp: TempStore, pyramid: bool = True, tile_size: int = 1024) -> list:
         """Create a pyramidal zarr store from a CZI file."""
         dask_pyr = []
-        root = zarr.open_group(zarr_fp, mode="a")
+        root = zarr.open_group(zarr_fp, mode="a", zarr_format=3)
         root.attrs["axes_names"] = list(self.axes)
         root.attrs["orig_shape"] = list(self.shape)
 
@@ -106,16 +106,12 @@ class CziFile(_CziFile):
         out_shape = list(self.shape)
         out_dtype = self.dtype
 
-        kws = {}
-        if hasattr(zarr, "ThreadSynchronizer"):
-            kws["synchronizer"] = zarr.ThreadSynchronizer() if CONFIG.multicore else None
-        out = root.create_dataset(
-            str(pyramid_seq),
+        out = root.create_array(
+            name=str(pyramid_seq),
             shape=tuple(out_shape),
             chunks=chunking,
             dtype=out_dtype,
             overwrite=True,
-            **kws,
         )
 
         with MeasureTimer() as timer:
@@ -140,8 +136,17 @@ class CziFile(_CziFile):
                 rgb_chunk = self.shape[-1] if self.shape[-1] > 2 else 1
                 is_rgb = rgb_chunk > 1
                 z_array_ds = compute_sub_res(z_array, ds_factor, tile_size, is_rgb, self.dtype)
-                da.to_zarr(z_array_ds, zres, component="0")
-                dask_pyr.append(da.squeeze(da.from_zarr(zres, component="0")))
+                zres_array = zarr.create_array(
+                    store=zres,
+                    shape=z_array_ds.shape,
+                    chunks=z_array_ds.chunksize,
+                    dtype=z_array_ds.dtype,
+                    name="0",
+                    overwrite=True,
+                    zarr_format=3,
+                )
+                da.store(z_array_ds, zres_array)
+                dask_pyr.append(da.squeeze(da.from_zarr(zres_array)))
             logger.trace(f"Down-sampled {ds_factor} in {timer()} to shape {z_array_ds.shape}")
         return dask_pyr
 

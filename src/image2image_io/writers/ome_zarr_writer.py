@@ -14,8 +14,7 @@ import zarr
 from koyo.decorators import retry
 from koyo.typing import PathLike
 from loguru import logger
-from ome_zarr.scale import Scaler
-from ome_zarr.writer import write_image
+from skimage.transform import resize as skimage_resize
 
 from image2image_io.utils.utilities import ensure_dask_array
 
@@ -55,11 +54,11 @@ def write_ome_zarr(
     coordinate_transformations = _get_coordinate_transformations(axes, reader.resolution, max_layer)
     omero = _get_omero_metadata(channel_names, reader.channel_colors)
 
-    root = zarr.open_group(str(output_path), mode="w")
-    write_image(
+    root = zarr.open_group(str(output_path), mode="w", zarr_format=3)
+    _write_ome_zarr_pyramid(
         image,
         root,
-        scaler=Scaler(max_layer=max_layer, method="nearest"),
+        max_layer=max_layer,
         chunks=chunks,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
@@ -68,6 +67,77 @@ def write_ome_zarr(
     _set_multiscale_name(root, ome_name or output_path.name)
     logger.trace(f"Wrote OME-Zarr store to {output_path}")
     return output_path
+
+
+def _write_ome_zarr_pyramid(
+    image: da.Array,
+    root: zarr.Group,
+    max_layer: int,
+    chunks: tuple[int, ...],
+    axes: str,
+    coordinate_transformations: list[list[dict[str, ty.Any]]],
+    omero: dict[str, list[dict[str, str]]],
+) -> None:
+    """Write a Dask image pyramid using the Zarr 3 array API."""
+    pyramid = [image]
+    for _ in range(max_layer):
+        previous = pyramid[-1]
+        y_axis = axes.index("y")
+        x_axis = axes.index("x")
+        output_shape = list(previous.shape)
+        output_shape[y_axis] //= 2
+        output_shape[x_axis] //= 2
+        pyramid.append(_resize_dask_image(previous, tuple(output_shape)))
+    datasets = []
+    for pyramid_index, level in enumerate(pyramid):
+        level_chunks = _get_chunks(level.shape, axes, chunks[axes.index("y")])
+        target = root.create_array(
+            name=str(pyramid_index),
+            shape=level.shape,
+            chunks=level_chunks,
+            dtype=level.dtype,
+            fill_value=0,
+        )
+        da.store(level, target)
+        datasets.append(
+            {
+                "path": str(pyramid_index),
+                "coordinateTransformations": coordinate_transformations[pyramid_index],
+            }
+        )
+
+    root.attrs["multiscales"] = [
+        {
+            "version": "0.4",
+            "datasets": datasets,
+            "axes": _get_axes_metadata(axes),
+            "omero": omero,
+        }
+    ]
+
+
+def _resize_dask_image(image: da.Array, output_shape: tuple[int, ...]) -> da.Array:
+    """Resize a Dask image blockwise using linear interpolation."""
+    factors = np.asarray(output_shape) / np.asarray(image.shape, dtype=float)
+    input_chunks = tuple(image.chunksize)
+    prepared_chunks = tuple(
+        np.maximum(1, np.round(np.asarray(input_chunks) * factors) / factors).astype(int)
+    )
+    image = image.rechunk(prepared_chunks)
+    output_chunks = tuple(np.floor(np.asarray(prepared_chunks) * factors).astype(int))
+
+    def _resize_block(block: np.ndarray) -> np.ndarray:
+        return skimage_resize(
+            block.astype(float),
+            output_chunks,
+            order=1,
+            mode="reflect",
+            anti_aliasing=False,
+        ).astype(block.dtype)
+
+    output = da.map_blocks(_resize_block, image, dtype=image.dtype, chunks=output_chunks)
+    output_slices = tuple(slice(0, size) for size in output_shape)
+    return output[output_slices].rechunk(input_chunks).astype(image.dtype)
 
 
 def write_ome_zarr_from_array(
@@ -175,7 +245,7 @@ class OmeZarrWrapper:
         max_layer = _get_max_layer((y_size, x_size), tile_size) if write_pyramid else 0
         self.write_pyramid = max_layer > 0
         self.pyramid_shapes = _get_pyramid_shapes((y_size, x_size), max_layer)
-        self.root = zarr.open_group(str(self.tmp_output_path), mode="w")
+        self.root = zarr.open_group(str(self.tmp_output_path), mode="w", zarr_format=3)
         self.arrays = self._create_datasets(tile_size)
         self._write_metadata(ome_name or self.output_path.name)
 
@@ -210,8 +280,8 @@ class OmeZarrWrapper:
             shape = (y_size, x_size, self.n_channels) if self.axes == "yxc" else (self.n_channels, y_size, x_size)
             chunks = _get_chunks(shape, self.axes, tile_size)
             arrays.append(
-                self.root.create_dataset(
-                    str(pyramid_index),
+                self.root.create_array(
+                    name=str(pyramid_index),
                     shape=shape,
                     chunks=chunks,
                     dtype=self.dtype,
