@@ -9,6 +9,7 @@ from functools import cached_property
 from math import ceil, floor
 from multiprocessing import cpu_count
 from pathlib import Path
+from threading import Lock
 from xml.etree import ElementTree as ET
 
 import dask.array as da
@@ -57,13 +58,22 @@ class CziFile(_CziFile):
         if max_workers is None:
             max_workers = cpu_count() // 2
 
+        # Zarr 3 removed ThreadSynchronizer.  Assigning a tile only updates
+        # part of a chunk, so concurrent assignments can otherwise overwrite
+        # each other's read-modify-write cycle.
+        write_lock = Lock() if max_workers > 1 else None
+
         def func(directory_entry, resize=resize, order=order, start=self.start, out=out):
             """Read, decode, and copy subblock data."""
             subblock = directory_entry.data_segment()
             tile = subblock.data(resize=resize, order=order)
             index = tuple(slice(i - j, i - j + k) for i, j, k in zip(directory_entry.start, start, tile.shape))
             try:
-                out[index] = tile
+                if write_lock is None:
+                    out[index] = tile
+                else:
+                    with write_lock:
+                        out[index] = tile
             except ValueError as e:
                 warnings.warn(str(e), stacklevel=2)
             with pbar.get_lock():

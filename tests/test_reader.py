@@ -1,14 +1,52 @@
 """Test reader."""
+from __future__ import annotations
 
 from pathlib import Path
+from time import sleep
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from image2image_io.readers import ArrayImageReader, get_simple_reader
+from image2image_io.readers._czi import CziFile
 from image2image_io.readers.czi_reader import CziImageReader, CziSceneImageReader
 from image2image_io.readers.utilities import get_tifffile_info
 from image2image_io.utils._test import get_test_files
+
+
+class _RaceyArray:
+    """Array stand-in that exposes unsynchronised read-modify-write losses."""
+
+    def __init__(self, shape: tuple[int, int]) -> None:
+        self.values = np.zeros(shape, dtype=np.uint8)
+
+    def __setitem__(self, index: tuple[slice, ...], value: np.ndarray) -> None:
+        values = self.values.copy()
+        sleep(0.01)
+        values[index] = value
+        self.values = values
+
+
+class _FakeCziSubblock:
+    """Minimal decoded CZI subblock for concurrent-write tests."""
+
+    def __init__(self, tile: np.ndarray) -> None:
+        self._tile = tile
+
+    def data(self, *, resize: bool, order: int) -> np.ndarray:
+        return self._tile
+
+
+class _FakeCziDirectoryEntry:
+    """Minimal CZI directory entry for concurrent-write tests."""
+
+    def __init__(self, start: tuple[int, int], tile: np.ndarray) -> None:
+        self.start = start
+        self._subblock = _FakeCziSubblock(tile)
+
+    def data_segment(self) -> _FakeCziSubblock:
+        return self._subblock
 
 
 def test_get_tifffile_info_legacy_zarr_store(monkeypatch):
@@ -40,6 +78,25 @@ def test_get_tifffile_info_legacy_zarr_store(monkeypatch):
     assert tuple(normalized_shape) == (1, 3, 4)
     assert dtype == values.dtype
     assert series_index == 0
+
+
+def test_czi_array_writes_are_serialized_for_shared_zarr_chunks() -> None:
+    """Concurrent CZI tile writes must not lose updates within one Zarr chunk."""
+    tiles = [np.full((1, 8), value, dtype=np.uint8) for value in range(1, 9)]
+    czi = SimpleNamespace(
+        shape=(8, 8),
+        dtype=np.dtype(np.uint8),
+        start=(0, 0),
+        _fh=SimpleNamespace(lock=None),
+        filtered_subblock_directory=[
+            _FakeCziDirectoryEntry((index, 0), tile) for index, tile in enumerate(tiles)
+        ],
+    )
+    out = _RaceyArray((8, 8))
+
+    CziFile.asarray_alt(czi, out=out, max_workers=8)
+
+    np.testing.assert_array_equal(out.values, np.vstack(tiles))
 
 
 @pytest.mark.parametrize("path", get_test_files("*.tiff"))
