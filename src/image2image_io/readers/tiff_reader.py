@@ -46,7 +46,7 @@ class TiffImageReader(BaseReader):
         super().__init__(path, key, auto_pyramid=auto_pyramid)
         self.fh = TiffFile(self.path)
 
-        self.shape, self._array_dtype, self.series_index = self._get_image_info()
+        self.shape, self._array_dtype, self.series_index = self._get_image_info(series_index)
         self._image_shape = self.shape[0:2] if self.is_rgb else (self.shape[1::] if len(self.shape) > 2 else self.shape)
 
         self.resolution = self._get_im_res()
