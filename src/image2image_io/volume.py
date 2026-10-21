@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import shutil
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -96,6 +97,8 @@ def write_volume(
     read_tile: TileReader,
     provenance: dict[str, Any] | None = None,
     tile_size: int = 512,
+    sharding: bool = False,
+    dot_separator: bool = False,
     progress: Callable[[str], None] | None = None,
     cancelled: Callable[[], bool] | None = None,
 ) -> Path:
@@ -103,6 +106,9 @@ def write_volume(
 
     ``read_tile(c, z, y, x, height, width)`` returns native-intensity pixels.
     Missing sections are zero-filled and explicitly identified in metadata.
+    Optional sharding groups up to 4x4 XY chunks per channel and section,
+    targeting at most 16 MiB uncompressed per shard (or one chunk if larger).
+    Dot-separated filenames are optional; slash-separated paths are the default.
     Existing outputs are never overwritten. Cancellation raises InterruptedError.
     """
     path = Path(path)
@@ -137,14 +143,52 @@ def write_volume(
             raise InterruptedError(message)
 
     def create_level(root: zarr.Group, index: int, size: tuple[int, ...]) -> zarr.Array:
+        chunks = (1, 1, min(tile_size, size[2]), min(tile_size, size[3]))
+        shards = None
+        if sharding:
+            factor = min(4, max(1, math.isqrt(16 * 1024**2 // (math.prod(chunks) * dtype.itemsize))))
+            shards = (
+                1,
+                1,
+                chunks[2] * min(factor, math.ceil(size[2] / chunks[2])),
+                chunks[3] * min(factor, math.ceil(size[3] / chunks[3])),
+            )
         return root.create_array(
             str(index),
             shape=size,
             dtype=dtype,
-            chunks=(1, 1, min(tile_size, size[2]), min(tile_size, size[3])),
+            chunks=chunks,
+            shards=shards,
             fill_value=0,
             dimension_names=tuple("czyx"),
+            chunk_key_encoding={"name": "default", "separator": "." if dot_separator else "/"},
         )
+
+    def write_plane(array: zarr.Array, c: int, z: int, tile_reader: TileReader) -> None:
+        """Write each shard once while retaining tile-sized source reads."""
+        step_y, step_x = (array.shards or array.chunks)[2:]
+        for y in range(0, array.shape[2], step_y):
+            for x in range(0, array.shape[3], step_x):
+                check_cancelled()
+                height, width = min(step_y, array.shape[2] - y), min(step_x, array.shape[3] - x)
+                pixels = np.empty((height, width), dtype=dtype)
+                for dy in range(0, height, tile_size):
+                    for dx in range(0, width, tile_size):
+                        check_cancelled()
+                        h, w = min(tile_size, height - dy), min(tile_size, width - dx)
+                        tile = tile_reader(c, z, y + dy, x + dx, h, w)
+                        if tile.shape != (h, w) or tile.dtype != dtype:
+                            message = "Tile shape or dtype does not match the volume."
+                            raise ValueError(message)
+                        pixels[dy : dy + h, dx : dx + w] = tile
+                check_cancelled()
+                array[c, z, y : y + height, x : x + width] = pixels
+
+    def read_reduced_tile(c: int, z: int, y: int, x: int, height: int, width: int) -> np.ndarray:
+        block = np.asarray(current[c, z, y * 2 : (y + height) * 2, x * 2 : (x + width) * 2])
+        block = np.pad(block, ((0, block.shape[0] % 2), (0, block.shape[1] % 2)), mode="edge")
+        reduced = block.astype(np.float64).reshape(height, 2, width, 2).mean(axis=(1, 3))
+        return reduced.astype(dtype)
 
     try:
         root = zarr.open_group(str(partial), mode="w", zarr_format=3)
@@ -155,15 +199,7 @@ def write_volume(
             if not exists:
                 continue
             for c in range(shape[0]):
-                for y in range(0, shape[2], tile_size):
-                    for x in range(0, shape[3], tile_size):
-                        check_cancelled()
-                        height, width = min(tile_size, shape[2] - y), min(tile_size, shape[3] - x)
-                        tile = read_tile(c, z, y, x, height, width)
-                        if tile.shape != (height, width) or tile.dtype != dtype:
-                            message = "Tile shape or dtype does not match the volume."
-                            raise ValueError(message)  # noqa: TRY301
-                        current[c, z, y : y + height, x : x + width] = tile
+                write_plane(current, c, z, read_tile)
             if progress:
                 progress(f"Reconstructed section {z + 1}/{shape[1]}")
         datasets = []
@@ -186,15 +222,9 @@ def write_volume(
             for z, exists in enumerate(present):
                 if not exists:
                     continue
+                check_cancelled()
                 for c in range(shape[0]):
-                    for y in range(0, size[2], tile_size):
-                        for x in range(0, size[3], tile_size):
-                            check_cancelled()
-                            height, width = min(tile_size, size[2] - y), min(tile_size, size[3] - x)
-                            block = np.asarray(current[c, z, y * 2 : (y + height) * 2, x * 2 : (x + width) * 2])
-                            block = np.pad(block, ((0, block.shape[0] % 2), (0, block.shape[1] % 2)), mode="edge")
-                            reduced = block.astype(np.float64).reshape(height, 2, width, 2).mean(axis=(1, 3))
-                            following[c, z, y : y + height, x : x + width] = reduced.astype(dtype)
+                    write_plane(following, c, z, read_reduced_tile)
             current = following
             level += 1
             if progress:
