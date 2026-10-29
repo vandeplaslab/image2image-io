@@ -5,14 +5,15 @@ from pathlib import Path
 from time import sleep
 from types import SimpleNamespace
 
+import imzy
 import numpy as np
 import pytest
 
-from image2image_io.readers import ArrayImageReader, get_simple_reader
+from image2image_io.readers import ArrayImageReader, get_simple_reader, is_supported
 from image2image_io.readers._czi import CziFile
 from image2image_io.readers.czi_reader import CziImageReader, CziSceneImageReader
 from image2image_io.readers.utilities import get_tifffile_info
-from image2image_io.utils._test import get_test_files
+from image2image_io.utils._test import get_test_file, get_test_files
 
 
 class _RaceyArray:
@@ -173,6 +174,37 @@ def test_get_simple_reader_imzml(path):
     reader = get_simple_reader(path)
     assert not reader.is_rgb, "Reader should not be rgb"
     assert reader.allow_extraction, "Reader should allow extraction"
+
+
+requires_scils = pytest.mark.skipif(
+    not hasattr(imzy, "SCiLSReader"), reason="Installed version of imzy does not support SCiLS files."
+)
+
+
+@requires_scils
+@pytest.mark.parametrize("path", get_test_files("scils/*.sbd") + get_test_files("scils/*.slx"))
+def test_get_simple_reader_scils(path):
+    """Both the .sbd and .slx files should open the same dataset."""
+    reader = get_simple_reader(path)
+    assert not reader.is_rgb, "Reader should not be rgb"
+    assert reader.allow_extraction, "Reader should allow extraction"
+    assert reader.path.suffix == ".sbd", "Reader should always refer to the .sbd file"
+    assert reader.resolution == 10.0
+    assert reader.image_shape == (20, 30)
+    assert reader.xmin == 0 and reader.ymin == 0
+
+    path, labels = reader.extract(np.asarray([450.0, 500.0]), ppm=2000)
+    assert len(labels) == 2
+    assert reader.channel_names[1:] == [label.split(" | ")[0] for label in labels]
+    image = reader.get_channel(1)
+    assert image.shape == reader.image_shape
+    assert image.sum() > 0
+    assert reader.get_image().shape == (*reader.image_shape, 3)
+
+
+def test_is_supported_scils():
+    assert is_supported(get_test_file("scils/synthetic.sbd"))
+    assert is_supported(get_test_file("scils/synthetic.slx"))
 
 
 @pytest.mark.parametrize("path", get_test_files("*.geojson"))

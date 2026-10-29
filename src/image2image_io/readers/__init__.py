@@ -60,6 +60,7 @@ CZI_EXTENSIONS = [".czi"]
 OME_ZARR_EXTENSIONS = [".ome.zarr", ".zarr"]
 BRUKER_EXTENSIONS = [".tsf", ".tdf", ".d"]
 IMZML_EXTENSIONS = [".imzml", ".ibd"]
+SCILS_EXTENSIONS = [".sbd", ".slx"]
 H5_EXTENSIONS = [".h5", ".hdf5"]
 H5AD_EXTENSIONS = [".h5ad"]
 IMSPY_EXTENSIONS = [".data"]
@@ -107,6 +108,7 @@ def sanitize_read_path(path: PathLike, raise_on_error: bool = True) -> Path | No
         + NPZ_EXTENSIONS
         + BRUKER_EXTENSIONS
         + IMZML_EXTENSIONS
+        + SCILS_EXTENSIONS
         + H5_EXTENSIONS
         + H5AD_EXTENSIONS
         + IMSPY_EXTENSIONS
@@ -244,6 +246,9 @@ def get_reader(
     elif suffix in IMZML_EXTENSIONS:
         CONFIG.trace(f"Reading imzML file: {path}")
         path, readers = _read_imzml_reader(path)
+    elif suffix in SCILS_EXTENSIONS:
+        CONFIG.trace(f"Reading SCiLS file: {path}")
+        path, readers = _read_scils_reader(path)
     elif suffix in H5_EXTENSIONS + IMSPY_EXTENSIONS:
         CONFIG.trace(f"Reading HDF5 file: {path}")
         if path.suffix == ".data":
@@ -655,8 +660,8 @@ def _read_tsf_tdf_coordinates(
     include_all: bool = True,
     scene_index: int | None = None,
 ) -> tuple[Path, dict[str, CoordinateImageReader]]:
-    """Read coordinates from TSF file."""
-    import sqlite3
+    """Read coordinates from TSF/TDF file."""
+    from imzy._readers.bruker.utilities import get_coordinates_and_roi, get_pixel_size, get_tic
 
     from image2image_io.readers.coordinate_reader import CoordinateImageReader
 
@@ -666,24 +671,13 @@ def _read_tsf_tdf_coordinates(
     if path.suffix == ".d":
         path = path / "analysis.tsf" if (path / "analysis.tsf").exists() else path / "analysis.tdf"
 
-    # get wrapper
-    conn = sqlite3.connect(path)
-
-    try:
-        cursor = conn.execute("SELECT SpotSize FROM MaldiFrameLaserInfo")
-        resolution = float(cursor.fetchone()[0])
-    except sqlite3.OperationalError:
-        resolution = 1.0
+    resolution = get_pixel_size(path)
 
     # get coordinates
-    cursor = conn.cursor()
-    cursor.execute("SELECT Frame, RegionNumber, XIndexPos, YIndexPos FROM MaldiFrameInfo")
-    frame_index_position = np.array(cursor.fetchall())
+    frame_index_position = get_coordinates_and_roi(path)
 
     # get tic
-    cursor = conn.execute("SELECT SummedIntensities FROM Frames")
-    tic = np.array(cursor.fetchall())
-    tic = tic[:, 0]
+    tic = get_tic(path)
 
     # generate reader(s)
     readers = {}
@@ -739,8 +733,6 @@ def _read_tsf_tdf_coordinates(
 
 def _read_tsf_tdf_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImageReader]]:
     """Read coordinates from Bruker file."""
-    import sqlite3
-
     from imzy import get_reader
 
     from image2image_io.readers.coordinate_reader import CoordinateImageReader
@@ -751,17 +743,10 @@ def _read_tsf_tdf_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImag
     if path.suffix == ".d":
         path = path / "analysis.tsf" if (path / "analysis.tsf").exists() else path / "analysis.tdf"
 
-    conn = sqlite3.connect(path)
-    try:
-        cursor = conn.execute("SELECT SpotSize FROM MaldiFrameLaserInfo")
-        resolution = float(cursor.fetchone()[0])
-    except sqlite3.OperationalError:
-        resolution = 1.0
-    conn.close()
-
     # get wrapper
     path = path.parent
     reader = get_reader(path)
+    resolution = reader.pixel_size
     x = reader.x_coordinates
     y = reader.y_coordinates
     key = get_key(path)
@@ -809,6 +794,30 @@ def _read_imzml_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImageR
     y = y - np.min(y)  # minimized
     key = get_key(path)
     return path, {path.name: CoordinateImageReader(path, x, y, array_or_reader=reader, key=key)}
+
+
+def _read_scils_reader(path: PathLike) -> tuple[Path, dict[str, CoordinateImageReader]]:
+    """Read coordinates from SCiLS Lab file (.sbd/.slx).
+
+    Either of the two files can be specified, the other one is found automatically.
+    """
+    from imzy import get_reader
+
+    from image2image_io.readers.coordinate_reader import CoordinateImageReader
+
+    path = Path(path)
+    assert path.suffix.lower() in SCILS_EXTENSIONS, "Only .sbd and .slx files are supported"
+
+    reader = get_reader(path)
+    path = reader.path  # always refer to the .sbd file
+    x = reader.x_coordinates
+    x = x - np.min(x)  # minimized
+    y = reader.y_coordinates
+    y = y - np.min(y)  # minimized
+    key = get_key(path)
+    return path, {
+        path.name: CoordinateImageReader(path, x, y, resolution=reader.pixel_size, array_or_reader=reader, key=key)
+    }
 
 
 def get_czi_metadata(path: PathLike) -> dict[str, dict[str, ty.Any]]:
