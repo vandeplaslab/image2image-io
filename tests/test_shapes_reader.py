@@ -1,11 +1,16 @@
 """Test shapes reader and utilities."""
 
+from __future__ import annotations
+
+import json
 from pathlib import Path
 
 import numpy as np
 import polars as pl
 import pytest
 
+from image2image_io.readers import get_simple_reader
+from image2image_io.readers.geojson_utils import read_geojson
 from image2image_io.readers.shapes_reader import (
     ShapesReader,
     _convert_geojson_to_df,
@@ -124,3 +129,191 @@ def test_shapes_reader_to_points_kwargs_size_thresholds(n_points, expected_size)
     kwargs = reader.to_points_kwargs(face_color="red")
 
     assert kwargs["size"] == expected_size
+
+
+@pytest.fixture
+def pixel_feature() -> dict:
+    return {
+        "type": "Feature",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[20, 10], [21, 10], [21, 11], [20, 11], [20, 10]]],
+        },
+        "properties": {"objectType": "annotation", "classification": {"name": "roi"}},
+    }
+
+
+@pytest.fixture
+def qupath_path(tmp_path: Path, pixel_feature: dict) -> Path:
+    path = tmp_path / "qupath.geojson"
+    path.write_text(json.dumps({"type": "FeatureCollection", "features": [pixel_feature]}))
+    return path
+
+
+def test_qupath_display_preserves_source_coordinates(qupath_path: Path, tmp_path: Path) -> None:
+    reader = get_simple_reader(qupath_path)
+    source = np.array([[20, 10], [21, 10], [21, 11], [20, 11], [20, 10]], dtype=np.float32)
+    expected_display = np.array([[9.5, 19.5], [9.5, 20.5], [10.5, 20.5], [10.5, 19.5], [9.5, 19.5]])
+    mask_before = reader.to_mask((14, 24))
+
+    assert reader.coordinate_convention == "auto"
+    for _ in range(2):
+        shapes = reader.to_shapes_kwargs()["data"][0][0]
+        points = reader.to_points_kwargs(face_color="red")["data"]
+        np.testing.assert_array_equal(shapes, expected_display)
+        np.testing.assert_array_equal(points, expected_display)
+        assert not np.shares_memory(shapes, reader.shape_data[0]["array"])
+        assert not np.shares_memory(points, reader.shape_data[0]["array"])
+
+    np.testing.assert_array_equal(reader.shape_data[0]["array"], source)
+    np.testing.assert_array_equal(reader.parse_data()[3][0], source[:, ::-1])
+    np.testing.assert_array_equal(reader.to_shapes()[1]["shape_data"][0], source[:, ::-1])
+    np.testing.assert_array_equal(reader.to_table().select("x", "y").to_numpy(), source)
+    output = reader.to_csv(tmp_path / "source.csv")
+    np.testing.assert_array_equal(pl.read_csv(output).select("x", "y").to_numpy(), source)
+    assert reader.geojson_data == json.loads(qupath_path.read_text())["features"]
+    np.testing.assert_array_equal(read_geojson(qupath_path)[1][0]["array"], source)
+    np.testing.assert_array_equal(reader.to_mask((14, 24)), mask_before)
+    np.testing.assert_array_equal(np.argwhere(mask_before), [[10, 20]])
+
+
+@pytest.mark.parametrize("marker", ["objectType", "object_type"])
+@pytest.mark.parametrize("object_type", ["annotation", "detection", "cell", "tile"])
+def test_qupath_markers_correct_display(tmp_path: Path, pixel_feature: dict, marker: str, object_type: str) -> None:
+    pixel_feature["properties"] = {marker: object_type}
+    path = tmp_path / "marked.geojson"
+    path.write_text(json.dumps(pixel_feature))
+
+    reader = ShapesReader(path)
+
+    np.testing.assert_array_equal(reader.to_shapes_kwargs()["data"][0][0][0], [9.5, 19.5])
+    np.testing.assert_array_equal(reader.to_points_kwargs(face_color="red")["data"][0], [9.5, 19.5])
+
+
+@pytest.mark.parametrize(
+    "properties",
+    [{}, {"classification": {"name": "roi"}}, {"objectType": "other"}, {"object_type": "other"}, None],
+)
+def test_unrecognized_geojson_preserves_display(tmp_path: Path, pixel_feature: dict, properties: dict | None) -> None:
+    if properties is None:
+        pixel_feature.pop("properties")
+    else:
+        pixel_feature["properties"] = properties
+    path = tmp_path / "generic.json"
+    path.write_text(json.dumps(pixel_feature))
+
+    reader = ShapesReader(path)
+
+    np.testing.assert_array_equal(reader.to_shapes_kwargs()["data"][0][0][0], [10, 20])
+    np.testing.assert_array_equal(reader.to_points_kwargs(face_color="red")["data"][0], [10, 20])
+
+
+@pytest.mark.parametrize("mixed", [False, True])
+def test_empty_and_mixed_geojson_preserve_display(tmp_path: Path, pixel_feature: dict, mixed: bool) -> None:
+    features = [pixel_feature, {**pixel_feature, "properties": {}}] if mixed else []
+    path = tmp_path / "collection.geojson"
+    path.write_text(json.dumps({"type": "FeatureCollection", "features": features}))
+    reader = ShapesReader(path)
+
+    shapes = reader.to_shapes_kwargs()["data"]
+    points = reader.to_points_kwargs(face_color="red")["data"]
+
+    if mixed:
+        assert len(shapes) == 2
+        for shape, _shape_type in shapes:
+            np.testing.assert_array_equal(shape[0], [10, 20])
+        np.testing.assert_array_equal(points[[0, 5]], [[10, 20], [10, 20]])
+    else:
+        assert shapes == []
+        assert points.shape == (0, 2)
+
+
+@pytest.mark.parametrize("marked", [False, True])
+def test_coordinate_convention_overrides(tmp_path: Path, pixel_feature: dict, marked: bool) -> None:
+    if not marked:
+        pixel_feature["properties"] = {}
+    path = tmp_path / "override.geojson"
+    path.write_text(json.dumps(pixel_feature))
+    reader = ShapesReader(path, coordinate_convention="corner")
+
+    np.testing.assert_array_equal(reader.to_shapes_kwargs()["data"][0][0][0], [9.5, 19.5])
+    np.testing.assert_array_equal(reader.to_points_kwargs(face_color="red")["data"][0], [9.5, 19.5])
+    reader.coordinate_convention = "center"
+    np.testing.assert_array_equal(reader.to_shapes_kwargs()["data"][0][0][0], [10, 20])
+    np.testing.assert_array_equal(reader.to_points_kwargs(face_color="red")["data"][0], [10, 20])
+    reader = ShapesReader(path, coordinate_convention="center")
+    np.testing.assert_array_equal(reader.to_shapes_kwargs()["data"][0][0][0], [10, 20])
+    reader.coordinate_convention = "corner"
+    np.testing.assert_array_equal(reader.to_shapes_kwargs()["data"][0][0][0], [9.5, 19.5])
+
+
+def test_coordinate_convention_rejects_invalid_values(qupath_path: Path) -> None:
+    with pytest.raises(ValueError, match="coordinate_convention"):
+        ShapesReader(qupath_path, coordinate_convention="invalid")  # type: ignore[arg-type]
+    reader = ShapesReader(qupath_path)
+    with pytest.raises(ValueError, match="coordinate_convention"):
+        reader.coordinate_convention = "invalid"  # type: ignore[assignment]
+    assert reader.coordinate_convention == "auto"
+
+
+def test_created_shapes_use_pixel_centers(qupath_path: Path) -> None:
+    reader = ShapesReader.create("drawn")
+    reader.geojson_data, reader.shape_data, _ = read_geojson(qupath_path)
+
+    assert reader.coordinate_convention == "center"
+    np.testing.assert_array_equal(reader.to_shapes_kwargs()["data"][0][0][0], [10, 20])
+    reader.coordinate_convention = "auto"
+    np.testing.assert_array_equal(reader.to_shapes_kwargs()["data"][0][0][0], [9.5, 19.5])
+
+
+@pytest.mark.parametrize("geometry_type", ["Polygon", "MultiPolygon", "LineString", "Point", "MultiPoint"])
+def test_geojson_geometries_use_pixel_centers(tmp_path: Path, pixel_feature: dict, geometry_type: str) -> None:
+    vertices = [[20, 10], [21, 10], [21, 11], [20, 11], [20, 10]]
+    expected = np.array([[9.5, 19.5], [9.5, 20.5], [10.5, 20.5], [10.5, 19.5], [9.5, 19.5]])
+    if geometry_type == "Polygon":
+        coordinates = [vertices]
+    elif geometry_type == "MultiPolygon":
+        coordinates = [[vertices], [[[24, 15], [25, 15], [25, 16], [24, 16], [24, 15]]]]
+    elif geometry_type == "Point":
+        coordinates = vertices[0]
+        expected = expected[:1]
+    else:
+        coordinates = vertices
+    pixel_feature["geometry"] = {"type": geometry_type, "coordinates": coordinates}
+    path = tmp_path / "geometry.geojson"
+    path.write_text(json.dumps(pixel_feature))
+    reader = ShapesReader(path)
+
+    if geometry_type in ("Point", "MultiPoint"):
+        assert reader.display_type == "points"
+        np.testing.assert_array_equal(reader.to_points_kwargs(face_color="red")["data"], expected)
+    else:
+        shapes = reader.to_shapes_kwargs()["data"]
+        np.testing.assert_array_equal(shapes[0][0], expected)
+        if geometry_type == "MultiPolygon":
+            assert len(shapes) == 2
+            np.testing.assert_array_equal(shapes[1][0], expected + np.array([5, 4]))
+
+
+@pytest.mark.parametrize(("resolution", "physical_offset"), [(0.5, 0.25), (20.0, 10.0)])
+@pytest.mark.parametrize("display_type", ["shapes", "points"])
+def test_pixel_offset_precedes_scale_and_affine(
+    qupath_path: Path, resolution: float, physical_offset: float, display_type: str
+) -> None:
+    reader = ShapesReader(qupath_path)
+    reader.resolution = resolution
+    affine = np.array([[0, -1, 100], [2, 0, -50], [0, 0, 1]], dtype=float)
+    reader.transform_data.affine = affine
+    if display_type == "shapes":
+        kwargs = reader.to_shapes_kwargs()
+        data = kwargs["data"][0][0]
+    else:
+        kwargs = reader.to_points_kwargs(face_color="red")
+        data = kwargs["data"]
+
+    np.testing.assert_array_equal(kwargs["scale"], [resolution, resolution])
+    np.testing.assert_array_equal(kwargs["affine"], affine)
+    scaled = data[0] * kwargs["scale"]
+    np.testing.assert_allclose(np.array([10, 20]) * resolution - scaled, [physical_offset, physical_offset])
+    world = kwargs["affine"] @ np.append(scaled, 1)
+    np.testing.assert_allclose(world, [100 - 19.5 * resolution, -50 + 2 * 9.5 * resolution, 1])

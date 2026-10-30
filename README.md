@@ -25,6 +25,30 @@ Currently supported formats:
 - GeoJSON (.geojson) - expects a dictionary with 'type' and 'features' keys (e.g. from QuPath or GeoPandas)
 - Points (.csv, .txt, .parquet) - specific schema required
 
+### GeoJSON coordinates in napari
+
+`ShapesReader` preserves source coordinates for masks, tables, and exports. Its `to_shapes_kwargs()` and
+`to_points_kwargs()` methods subtract 0.5 from both axes for recognized QuPath GeoJSON, before napari applies scale
+and affine transforms. This aligns QuPath's pixel-corner origin with napari's pixel-center origin.
+
+The default `coordinate_convention="auto"` recognizes files only when every feature has `properties.objectType` or
+legacy `properties.object_type` set to `annotation`, `detection`, `cell`, or `tile`. Classification alone, empty collections,
+and mixed marked/unmarked collections retain their original coordinates. Detection assumes native pixel coordinates.
+
+```python
+from image2image_io.readers import ShapesReader
+
+reader = ShapesReader("annotations.geojson")  # automatic QuPath detection
+reader.coordinate_convention = "corner"  # force correction for other pixel-corner files
+reader.coordinate_convention = "center"  # preserve already converted or physical coordinates
+```
+
+The convention can also be passed to the constructor. Readers created with `ShapesReader.create()` default to `"center"`
+for shapes drawn in napari. `read_geojson()`, `parse_data()`, and `to_shapes()` retain source coordinates; use the kwargs
+methods for napari display. Writing source GeoJSON requires no additional half-pixel offset.
+
+### Reading and writing images
+
 If you want to open an image, you can use the `get_simple_reader` function. This function will automatically detect the
 image format and return the appropriate reader.
 

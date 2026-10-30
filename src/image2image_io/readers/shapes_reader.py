@@ -22,6 +22,7 @@ if ty.TYPE_CHECKING:
 
 
 PATH_IF_COUNT = 1_000
+CoordinateConvention = ty.Literal["auto", "corner", "center"]
 
 
 def _read_delimited_shapes(path: Path, n_rows: int | None = None) -> pl.DataFrame:
@@ -129,15 +130,24 @@ def read_data(path: Path) -> tuple[list, dict[str, np.ndarray | str], bool]:
 
 
 class ShapesReader(BaseReader):
-    """GeoJSON reader for image2image."""
+    """Read shapes in source coordinates and convert their origin only for napari display."""
 
     _is_rgb: bool = False
     reader_type = "shapes"
     _channel_names: list[str]
     _array_dtype = np.dtype("float32")
 
-    def __init__(self, path: PathLike, key: str | None = None, auto_pyramid: bool | None = None, init: bool = True):
+    def __init__(
+        self,
+        path: PathLike,
+        key: str | None = None,
+        auto_pyramid: bool | None = None,
+        init: bool = True,
+        *,
+        coordinate_convention: CoordinateConvention = "auto",
+    ) -> None:
         super().__init__(path, key=key, auto_pyramid=auto_pyramid)
+        self.coordinate_convention = coordinate_convention
         if not init:
             self.geojson_data, self.shape_data = [], []
             return
@@ -146,12 +156,45 @@ class ShapesReader(BaseReader):
         self._channel_names = [self.path.stem]
 
     @classmethod
-    def create(cls, name: str = "", channel_names: list[str] | None = None):
-        """Create empty instance."""
-        obj = cls(name, key=name, init=False)
+    def create(cls, name: str = "", channel_names: list[str] | None = None) -> ShapesReader:
+        """Create an empty instance using pixel-center coordinates."""
+        obj = cls(name, key=name, init=False, coordinate_convention="center")
         if channel_names:
             obj._channel_names = channel_names
         return obj
+
+    @property
+    def coordinate_convention(self) -> CoordinateConvention:
+        """Return the source pixel origin used for napari display conversion.
+
+        ``auto`` uses corners only when every feature has a QuPath ``objectType`` or
+        ``object_type`` marker (annotation, detection, cell, or tile). ``corner`` always
+        subtracts 0.5 on display; ``center`` preserves coordinates, including data already
+        converted or expressed in physical units. Source data, masks, and exports are unchanged.
+        """
+        return self._coordinate_convention
+
+    @coordinate_convention.setter
+    def coordinate_convention(self, value: CoordinateConvention) -> None:
+        if value not in ("auto", "corner", "center"):
+            message = "coordinate_convention must be 'auto', 'corner', or 'center'."
+            raise ValueError(message)
+        self._coordinate_convention = value
+
+    def _napari_coordinate_offset(self) -> float:
+        """Return the source-to-center offset in pixels, before scale and affine transforms."""
+        if self.coordinate_convention == "center":
+            return 0.0
+        if self.coordinate_convention == "corner":
+            return 0.5
+        is_qupath = bool(self.geojson_data) and all(
+            any(
+                (feature.get("properties") or {}).get(key) in ("annotation", "detection", "cell", "tile")
+                for key in ("objectType", "object_type")
+            )
+            for feature in self.geojson_data
+        )
+        return 0.5 if is_qupath else 0.0
 
     def remove_invalid(self) -> None:
         """Remove invalid shapes."""
@@ -247,7 +290,7 @@ class ShapesReader(BaseReader):
         return n_shapes, shape_types, shape_names, shape_arrays, shape_props, shape_text
 
     def to_shapes(self) -> tuple[str, dict[str, np.ndarray | str]]:
-        """Convert to shapes that can be exported to Shapes layer."""
+        """Return shapes in source coordinates and y,x order for masks and export."""
         _, shape_types, shape_names, shape_arrays, *_ = self.parse_data()
         if len(shape_types) > PATH_IF_COUNT:
             shape_types = ["path"] * len(shape_types)
@@ -256,8 +299,11 @@ class ShapesReader(BaseReader):
         return shape_names[0], {"shape_types": shape_types, "shape_data": shape_arrays}
 
     def to_shapes_kwargs(self, edge_color: str = "cyan", **kwargs: ty.Any) -> dict:
-        """Return data so it's compatible with Shapes layer."""
+        """Return napari Shapes kwargs with the configured pixel-origin conversion."""
         n_shapes, _, _, shape_arrays, shape_props, shape_text = self.parse_data()
+        offset = self._napari_coordinate_offset()
+        if offset:
+            shape_arrays = [shape - offset for shape in shape_arrays]
         if CONFIG.shape_display == "polygon or path":
             shape_type = "polygon" if n_shapes < PATH_IF_COUNT else "path"
         else:
@@ -276,7 +322,7 @@ class ShapesReader(BaseReader):
         return kws
 
     def to_points_kwargs(self, face_color: str, **kwargs: ty.Any) -> dict:
-        """Return data so it's compatible with Shapes layer."""
+        """Return napari Points kwargs with the configured pixel-origin conversion."""
         df = _convert_geojson_to_df(self.shape_data)
         x = df["x"].to_numpy()
         y = df["y"].to_numpy()
@@ -288,7 +334,7 @@ class ShapesReader(BaseReader):
             size = 5
 
         kws = {
-            "data": np.c_[y, x],
+            "data": np.c_[y, x] - self._napari_coordinate_offset(),
             "scale": self.scale,
             "affine": self.transform,
             "face_color": face_color,
