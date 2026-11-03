@@ -224,4 +224,5 @@ ignore = [
     "_version.py",
     "misc/**/*",
     "Makefile",
+    "CLAUDE.md",
 ]
