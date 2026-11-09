@@ -179,6 +179,7 @@ Options:
 
 OME:
   convert  Convert images to pyramidal OME-TIFF or OME-Zarr.
+  filter   Keep selected microscopy channels and optionally rename them.
   merge    Export images.
 
 CZI:
@@ -192,6 +193,41 @@ Utility:
 
 For instance, the `i2io convert` command let's you convert between a few file formats (e.g. CZI to OME-TIFF) or create
 a different representation of the image, for instance with different tiling or data type.
+
+Use `i2io filter` to reduce the channels in 2D microscopy images. Channel IDs are zero-based;
+comma-separated IDs and inclusive ranges are written in the supplied order:
+
+```bash
+i2io filter -i sample.ome.tiff -o output --channel_ids "0,2,4-6"
+i2io filter -i sample.ome.tiff -o output --channel_ids "0,2" \
+  --channel_names DAPI --channel_names CD3
+i2io filter -i "images/*.ome.tiff" -o output --channel_file channels.csv --fmt ome-zarr
+```
+
+Repeat `-i/--image` (or `-p/--path`) for multiple images. The same selection is applied to every
+image and CZI scene. Supply either `--channel_ids`, optionally with one `--channel_names` per
+selected ID, or `--channel_file`. CSV, TSV, and comma- or tab-delimited TXT tables must have
+exactly one data row per input channel. Row position identifies the channel. The required
+`include` column accepts case-insensitive `true`/`false` or `1`/`0`. An optional `channel_names`
+column renames included channels and must have a nonempty name for each included row:
+
+```csv
+include,channel_names
+true,DAPI
+false,
+true,CD3
+```
+
+Outputs are named `sample_filtered.ome.tiff` by default or `sample_filtered.ome.zarr` with
+`--fmt ome-zarr`. CZI scene names include `_scene=00`, etc., before `_filtered`. Existing
+outputs are skipped unless `-W/--overwrite` is supplied. The entire batch is validated before
+writing, including channel counts and output name collisions.
+
+Input dtype and pixel values are preserved by default and with `-U/--no_as_uint8/--no_uint8`.
+Use `-u/--as_uint8/--uint8` to scale each retained channel to uint8. Use `--tile_size` to control
+pyramid tiling. This command supports separate 2D channels; packed RGB, Z stacks, and time
+series are rejected. TIFF inputs use the existing default series selection (the largest series
+for most formats).
 
 ## Contributing
 
