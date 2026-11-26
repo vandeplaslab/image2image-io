@@ -65,8 +65,7 @@ def _read_coordinates(handle: h5py.File) -> np.ndarray:
     coordinates = np.asarray(node[:])
     if coordinates.ndim != 2 or coordinates.shape[1] != 2:
         _raise_format_error(
-            "AnnData 'obsm/spatial' must have shape (n_observations, 2) in y/x order; "
-            f"got {coordinates.shape}."
+            "AnnData 'obsm/spatial' must have shape (n_observations, 2) in y/x order; " f"got {coordinates.shape}."
         )
     if not np.issubdtype(coordinates.dtype, np.number) or not np.all(np.isfinite(coordinates)):
         _raise_format_error("AnnData 'obsm/spatial' coordinates must be finite numeric values.")

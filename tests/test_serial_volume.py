@@ -1,6 +1,7 @@
 """Physical and transactional behavior of serial volumes."""
 
 # ruff: noqa: INP001
+from __future__ import annotations
 
 import math
 from pathlib import Path

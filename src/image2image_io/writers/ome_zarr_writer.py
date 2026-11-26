@@ -120,9 +120,7 @@ def _resize_dask_image(image: da.Array, output_shape: tuple[int, ...]) -> da.Arr
     """Resize a Dask image blockwise using linear interpolation."""
     factors = np.asarray(output_shape) / np.asarray(image.shape, dtype=float)
     input_chunks = tuple(image.chunksize)
-    prepared_chunks = tuple(
-        np.maximum(1, np.round(np.asarray(input_chunks) * factors) / factors).astype(int)
-    )
+    prepared_chunks = tuple(np.maximum(1, np.round(np.asarray(input_chunks) * factors) / factors).astype(int))
     image = image.rechunk(prepared_chunks)
     output_chunks = tuple(np.floor(np.asarray(prepared_chunks) * factors).astype(int))
 
