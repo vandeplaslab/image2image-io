@@ -28,7 +28,8 @@ def match_histograms_cv2(
     """
     Histogram-match src to ref using OpenCV-style LUT mapping.
 
-    Notes:
+    Notes
+    -----
     - Fastest for uint8/uint16.
     - For float images, we quantize to uint16 internally and map back.
     - mask / ref_mask let you ignore background (useful for IMS sparse pixels).

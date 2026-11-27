@@ -1,4 +1,5 @@
 """Test reader."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -89,9 +90,7 @@ def test_czi_array_writes_are_serialized_for_shared_zarr_chunks() -> None:
         dtype=np.dtype(np.uint8),
         start=(0, 0),
         _fh=SimpleNamespace(lock=None),
-        filtered_subblock_directory=[
-            _FakeCziDirectoryEntry((index, 0), tile) for index, tile in enumerate(tiles)
-        ],
+        filtered_subblock_directory=[_FakeCziDirectoryEntry((index, 0), tile) for index, tile in enumerate(tiles)],
     )
     out = _RaceyArray((8, 8))
 

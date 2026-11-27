@@ -14,6 +14,7 @@ from image2image_io._zarr import TempStore
 from image2image_io.config import CONFIG
 from image2image_io.readers._base_reader import BaseReader
 from image2image_io.readers._czi import CziFile, CziSceneFile, get_czi_thumbnail
+from image2image_io.readers._czi_pyramid import get_czi_lazy_pyramid
 from image2image_io.utils.utilities import guess_rgb
 
 logger = logger.bind(src="CZI")
@@ -28,6 +29,24 @@ class CziMixin:
     _is_rgb: bool | None = None
     auto_pyramid: bool | None = None
     n_channels: int
+    _zstore: TempStore | None
+
+    def _get_czi_pyramid(self) -> list:
+        """Return the pyramid, using the lazy internal CZI pyramid when the file has one."""
+        auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
+
+        def make_store() -> TempStore:
+            # only called when coarse levels have to be built, so `close` can remove the store
+            self._zstore = TempStore()
+            return self._zstore
+
+        pyramid = get_czi_lazy_pyramid(self.fh, auto_pyramid, store_factory=make_store, background=True)
+        if pyramid is not None:
+            logger.trace(f"Using lazy pyramid with {len(pyramid)} level(s)")
+            return pyramid
+        # no internal pyramid (or unsupported layout), read everything and downsample
+        self._zstore = TempStore()
+        return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
 
     def _get_channel_names(self) -> list[str]:
         """Return list of channel names."""
@@ -117,9 +136,7 @@ class CziImageReader(BaseReader, CziMixin):  # type: ignore[misc]
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
-        auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
-        self._zstore = TempStore()
-        return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
+        return self._get_czi_pyramid()
 
     @lru_cache(maxsize=1)
     def get_thumbnail(self, max_size: int = 1024) -> tuple[np.ndarray, tuple[float, float]]:
@@ -171,9 +188,7 @@ class CziSceneImageReader(BaseReader, CziMixin):  # type: ignore[misc]
 
     def get_dask_pyr(self) -> list:
         """Get instance of Dask pyramid."""
-        auto_pyramid = self.auto_pyramid if self.auto_pyramid is not None else CONFIG.auto_pyramid
-        self._zstore = TempStore()
-        return self.fh.zarr_pyramidize_czi(self._zstore, auto_pyramid)
+        return self._get_czi_pyramid()
 
     @lru_cache(maxsize=1)
     def get_thumbnail(self, max_size: int = 1024) -> tuple[np.ndarray, tuple[float, float]]:
